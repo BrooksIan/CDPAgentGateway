@@ -4,6 +4,20 @@
 
 Operator guide: [docs/spark.md](../../docs/spark.md). `spark_submit_batch` is a write as the Knox token subject. Livy cannot read this file from your laptop. Copy it to a URI Ranger allows, then submit through the gateway.
 
+```mermaid
+flowchart LR
+  laptop["Laptop count_to_10.py"]
+  fs["HDFS / Ozone URI"]
+  mcp["gateway mcp spark_submit_batch"]
+  livy["Livy as Knox sub"]
+  poll["spark_get_batch / spark_get_log"]
+
+  laptop -->|"hdfs dfs -put"| fs
+  fs --> mcp
+  mcp --> livy
+  livy --> poll
+```
+
 ```bash
 # example: HDFS (adjust user and FS)
 hdfs dfs -mkdir -p /user/$USER/examples

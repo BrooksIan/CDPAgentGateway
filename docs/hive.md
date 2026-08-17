@@ -15,6 +15,29 @@ CDP often puts Livy and Hive on **different Knox topologies**:
 
 `gateway knox` pins the **token** topology for Livy. A `cdp-proxy-api` URL is rejected there on purpose. Hive JDBC goes through `gateway jdbc add` so it cannot overwrite the Spark upstream.
 
+```mermaid
+flowchart TB
+  host["Same Knox host"]
+  token["cdp-proxy-token"]
+  api["cdp-proxy-api"]
+  livy["livy_for_spark3"]
+  hive["hive"]
+  sparkRoute["Agent: /mcp/spark and GET Livy"]
+  hiveInv[".env HIVE_* inventory"]
+  hive404["Agent: /cdp/hive 404"]
+  hiveOp["Operator: gateway hive SHOW DATABASES"]
+
+  host --> token
+  host --> api
+  token --> livy
+  token --> hive
+  api --> hive
+  livy --> sparkRoute
+  hive --> hiveInv
+  hive --> hive404
+  token --> hiveOp
+```
+
 ```
 Spark:  gateway knox  https://knox…/<env>/cdp-proxy-token/livy_for_spark3/
 Hive:   gateway jdbc add  'jdbc:hive2://knox…/;ssl=true;transportMode=http;httpPath=<env>/cdp-proxy-api/hive'
@@ -62,6 +85,23 @@ gateway hive databases    # same
 
 This calls Knox `{KNOX_PROXY_PREFIX}/hive` with `KNOX_TOKEN`. It is not an agent route and does not add `/cdp/hive`. Needs `impyla` (`pip install 'impyla>=0.19'` or `pip install -e ".[hive]"`).
 
+```mermaid
+sequenceDiagram
+  participant Op as Operator CLI
+  participant Env as .env
+  participant GW as APISIX :9080
+  participant Knox as Knox
+  participant HS2 as HiveServer2
+
+  Op->>Env: gateway jdbc add jdbc:hive2 .../cdp-proxy-api/hive
+  Note over Env: HIVE_* stored Livy prefix unchanged
+  Op->>Knox: gateway hive JWT on token topology /hive
+  Knox->>HS2: SHOW DATABASES as sub
+  HS2-->>Op: database names
+  Op->>GW: GET /cdp/hive Bearer JWT
+  GW-->>Op: 404 unpublished
+```
+
 ## What is not enabled
 
 - No APISIX route for `/cdp/hive` (operator `gateway hive` talks to Knox directly)
@@ -74,6 +114,24 @@ A valid Knox JWT plus `/cdp/hive` still returns **404**. That is a test case (P1
 ## Planned `mcp-hive` (not implemented)
 
 When it lands, it should look like Spark: APISIX `knox-jwt` on `/mcp/hive`, adapter uses the caller bearer against `{HIVE_KNOX_URL}`, Ranger authorizes `sub`.
+
+```mermaid
+flowchart LR
+  agent["Agent"]
+  apisix["APISIX knox-jwt"]
+  mcp["mcp-hive planned"]
+  knox["Knox"]
+  hs2["HiveServer2"]
+  ranger["Ranger"]
+
+  agent -->|"POST /mcp/hive"| apisix
+  apisix --> mcp
+  mcp -->|"caller bearer"| knox
+  knox --> hs2
+  hs2 --> ranger
+  agent -.->|"GET /cdp/hive today"| apisix
+  apisix -.->|"404"| agent
+```
 
 Expected first tools (read-only):
 

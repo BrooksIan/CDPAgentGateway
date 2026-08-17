@@ -11,8 +11,22 @@ Two surfaces share the same Knox JWT and the same Ranger subject:
 
 Both require `Authorization: Bearer <knox-jwt>`. APISIX `knox-jwt` validates the token, then either rewrites to Knox Livy or forwards to the `mcp-spark` adapter. Hive and other CDP paths stay **404**.
 
-```
-agent / CLI  →  APISIX  →  mcp-spark (MCP only)  →  Knox cdp-proxy-token  →  Livy for Spark 3
+```mermaid
+flowchart LR
+  agent["Agent / CLI"]
+  apisix["APISIX knox-jwt"]
+  mcp["mcp-spark"]
+  knox["Knox cdp-proxy-token"]
+  livy["Livy for Spark 3"]
+  ranger["Ranger"]
+
+  agent -->|"POST /mcp/spark"| apisix
+  agent -->|"GET /cdp/livy_for_spark3*"| apisix
+  apisix --> mcp
+  apisix -->|"rewrite GET/HEAD"| knox
+  mcp -->|"caller bearer"| knox
+  knox --> livy
+  livy --> ranger
 ```
 
 ## Lab
@@ -56,6 +70,21 @@ Rewrite: `/cdp/(.*)` → `{KNOX_PROXY_PREFIX}/$1`. Example:
 `GET http://127.0.0.1:9080/cdp/livy_for_spark3/sessions`  
 → `GET https://knox…/<prefix>/cdp-proxy-token/livy_for_spark3/sessions`
 
+```mermaid
+sequenceDiagram
+  participant Op as gateway spark
+  participant GW as APISIX :9080
+  participant Knox as Knox
+  participant Livy as Livy Spark 3
+
+  Op->>GW: GET /cdp/livy_for_spark3/sessions Bearer JWT
+  GW->>GW: knox-jwt RS256 iss exp sub
+  GW->>Knox: GET {prefix}/livy_for_spark3/sessions same Bearer
+  Knox->>Livy: Trusted Proxy as sub
+  Livy-->>Op: sessions JSON
+  Note over GW: POST/PUT/DELETE on this prefix is 404/405
+```
+
 Prefer MCP for agents. Raw Livy on the agent listener is **GET/HEAD only**. `POST`/`PUT`/`DELETE` (including `.../sessions/{id}/statements` and `POST .../batches`) return 404 or 405. Submit a cluster file URI with `spark_submit_batch`.
 
 ## MCP tools
@@ -80,6 +109,32 @@ gateway mcp --tool spark_get_log --arg batch_id=0
 ### Submit (write)
 
 This tool runs Spark **as the Knox token subject**. Ranger still decides whether that user may use the queue. Copy a job to a URI Ranger allows, then submit that URI. Livy cannot read a laptop path.
+
+```mermaid
+sequenceDiagram
+  participant Ag as Agent / gateway mcp
+  participant GW as APISIX
+  participant MCP as mcp-spark
+  participant Admin as admin quotas
+  participant Knox as Knox
+  participant Livy as Livy
+  participant FS as HDFS / Ozone
+
+  Note over FS: Operator already put count_to_10.py on cluster
+  Ag->>GW: POST /mcp/spark spark_submit_batch file=hdfs://...
+  GW->>GW: knox-jwt plus limit-count by sub
+  GW->>MCP: POST /mcp same Bearer X-Knox-User
+  MCP->>Admin: admit daily submits
+  alt quota exceeded
+    Admin-->>Ag: MCP error 429 never reaches Livy
+  else allowed
+    Admin-->>MCP: ok
+    MCP->>MCP: reject http file proxyUser inline code
+    MCP->>Knox: POST /batches caller Bearer
+    Knox->>Livy: job as Knox sub
+    Livy-->>Ag: id state submitted
+  end
+```
 
 Allowed `file` schemes: `hdfs`, `viewfs`, `s3a`, `s3`, `abfs`, `abfss`, `o3fs`, `ofs`. Rejected: `http`, `file` (unless `SPARK_ALLOW_FILE_SCHEME=true` for a closed lab), `..` in the path, inline `code`, `proxyUser`.
 
@@ -115,7 +170,7 @@ Put the Knox JWT in the host secret store, never in git.
 }
 ```
 
-Agents should call `/mcp/spark` only. Do not teach them the Knox URL, `/cdp/hive`, or the operator admin UI (`:9090`).
+Agents should call `/mcp/spark` only, with **POST JSON-RPC**. Streamable HTTP (GET SSE, MCP session) is **not** implemented and is held. Do not teach them the Knox URL, `/cdp/hive`, or the operator admin UI (`:9090`).
 
 Operators set per-user daily call/submit quotas in [admin.md](admin.md). A denied submit is an MCP tool error and does not reach Livy. Operators look up a call by APISIX `X-Request-Id` (`GET /api/audit`) to join tool, `sub`, and `knox.id`.
 
@@ -124,6 +179,7 @@ APISIX also applies a per-`sub` burst cap on `/mcp/spark` (`MCP_RATE_COUNT` / `M
 ## What Spark does not do
 
 - No Hive SQL (see [hive.md](hive.md))
+- No Streamable HTTP (GET SSE / MCP session); hosts POST JSON-RPC to `/mcp/spark`
 - No catch-all `/cdp/*`
 - No raw Livy writes on `/cdp/livy_for_spark3*` (GET/HEAD only)
 - No gateway-held keytab or impersonation

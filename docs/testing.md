@@ -80,6 +80,7 @@ Against mock CDP unless noted. Spark URI is `/cdp/livy_for_spark3/sessions`.
 | ID | Case | Phase |
 | --- | --- | --- |
 | P2-05 | Hive MCP through APISIX | 2 (`mcp-hive` not started) |
+| — | Streamable HTTP / GET SSE / MCP session | Held; POST JSON-RPC is the `/mcp/spark` contract |
 | P3-01 | `401` includes RFC 9728 resource metadata | 3 |
 | P3-02 | Revoked-but-unexpired Knox token is rejected | 3 |
 | P3-03 | Partner without mTLS/caller key is rejected | 3 |

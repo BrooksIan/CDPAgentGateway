@@ -33,7 +33,7 @@ Example: `GET http://127.0.0.1:9080/cdp/livy_for_spark3/sessions` becomes `GET {
 
 ## Non-goals
 
-- Do not treat APISIX as a dedicated MCP gateway. It can proxy Streamable HTTP later; tool servers stay as real services.
+- Do not treat APISIX as a dedicated MCP gateway. Streamable HTTP is held; tool servers stay as real services. APISIX may proxy it later if a host requires it.
 - Do not build on the experimental APISIX `mcp-bridge` (stdio → SSE) prototype.
 - Do not replace Knox with AISIX. AISIX has a stronger MCP/A2A catalog, but no Knox JWTProvider, Trusted Proxy, or Ranger story.
 - Do not expose `cdp-proxy-token` to untrusted networks. The gateway is the only public address agents should see.

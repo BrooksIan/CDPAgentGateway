@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,6 +10,8 @@ from typing import Any
 
 DEFAULT_SUB = "*"
 WRITE_TOOLS = frozenset({"spark_submit_batch"})
+_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+EVENT_RESULTS = frozenset({"ok", "quota", "error"})
 
 
 def utc_now() -> datetime:
@@ -17,6 +20,17 @@ def utc_now() -> datetime:
 
 def utc_day(now: datetime | None = None) -> str:
     return (now or utc_now()).strftime("%Y-%m-%d")
+
+
+def parse_day(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if not _DAY.match(text):
+        raise ValueError("day must be YYYY-MM-DD")
+    return text
 
 
 def connect(path: str | Path) -> sqlite3.Connection:
@@ -195,8 +209,13 @@ def record_event(
     request_id: str | None = None,
     token_id: str | None = None,
     status: int | None = None,
+    at: datetime | None = None,
 ) -> dict[str, Any]:
-    now = utc_now()
+    now = at or utc_now()
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    else:
+        now = now.astimezone(timezone.utc)
     name = (sub or "").strip() or "unknown"
     tool_name = (tool or "").strip() or "unknown"
     if len(name) > 256 or len(tool_name) > 128:
@@ -331,15 +350,41 @@ def list_users(db: sqlite3.Connection, *, day: str | None = None) -> list[dict[s
     return users
 
 
-def list_events(db: sqlite3.Connection, *, limit: int = 50, sub: str | None = None) -> list[dict[str, Any]]:
+def list_events(
+    db: sqlite3.Connection,
+    *,
+    limit: int = 50,
+    sub: str | None = None,
+    tool: str | None = None,
+    result: str | None = None,
+    day: str | None = None,
+) -> list[dict[str, Any]]:
     limit = max(1, min(int(limit), 200))
-    if sub:
-        rows = db.execute(
-            "SELECT * FROM events WHERE sub = ? ORDER BY id DESC LIMIT ?",
-            (sub, limit),
-        ).fetchall()
-    else:
-        rows = db.execute("SELECT * FROM events ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    clauses = ["day = ?"]
+    params: list[Any] = [parse_day(day) or utc_day()]
+    name = (sub or "").strip()
+    if name:
+        clauses.append("sub = ?")
+        params.append(name)
+    tool_name = (tool or "").strip()
+    if tool_name:
+        clauses.append("tool = ?")
+        params.append(tool_name)
+    kind = (result or "").strip()
+    if kind:
+        if kind not in EVENT_RESULTS:
+            raise ValueError("result must be ok, quota, or error")
+        if kind == "quota":
+            clauses.append("kind = 'denied'")
+        elif kind == "error":
+            clauses.append("kind = 'call' AND ok = 0")
+        else:
+            clauses.append("kind = 'call' AND ok = 1")
+    params.append(limit)
+    rows = db.execute(
+        f"SELECT * FROM events WHERE {' AND '.join(clauses)} ORDER BY id DESC LIMIT ?",
+        params,
+    ).fetchall()
     return [dict(row) for row in rows]
 
 

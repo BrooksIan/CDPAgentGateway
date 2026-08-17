@@ -48,9 +48,12 @@ services:
   admin:
     build: ./admin
     environment:
-      PORT: "8080"
-      ADMIN_DB: /data/gateway.sqlite
-      ADMIN_INTERNAL_TOKEN: ${ADMIN_INTERNAL_TOKEN:-lab-admin}
+      GATEWAY_MODE: ${GATEWAY_MODE:-local}
+      UPSTREAM_HOST: ${UPSTREAM_HOST:-mock-cdp}
+      MCP_RATE_COUNT: ${MCP_RATE_COUNT:-60}
+      MCP_RATE_WINDOW: ${MCP_RATE_WINDOW:-60}
+      APISIX_HEALTH_URL: http://apisix:9080/health
+      MCP_SPARK_HEALTH_URL: http://mcp-spark:8080/health
     volumes:
       - ./data:/data
     ports:

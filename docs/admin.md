@@ -13,15 +13,27 @@ Default URL: `http://127.0.0.1:9090`.
 
 ## What it shows
 
-- Usage for the current **UTC day**, keyed by Knox `sub` (and `knox.id` when forwarded)
-- Tool calls, Spark submits, quota denials, and errors
-- Audit join: tool + `sub` + `knox.id` + APISIX `X-Request-Id`. Bearers are never stored.
-
-Lookup a call from the UI or:
+- Path status: quotas enforcing, APISIX burst cap, `GATEWAY_MODE`, upstream host, health of admin / mcp-spark / APISIX
+- Usage for a chosen **UTC day**, keyed by Knox `sub` (and `knox.id` when forwarded)
+- Default `*` quota plus per-user overrides
+- Activity filtered by user, tool, and result (ok / quota 429 / Livy error)
+- Audit join: click a request id (or lookup) for tool + `sub` + `knox.id` + `X-Request-Id`. Bearers are never stored.
 
 ```bash
 curl -s "http://127.0.0.1:9090/api/audit?request_id=<X-Request-Id>"
+curl -s "http://127.0.0.1:9090/api/status"
 ```
+
+## Two 429s
+
+| Layer | Where | In this sqlite? |
+| --- | --- | --- |
+| Daily quota | `mcp-spark` calls admin **before** Livy | Yes (`kind=denied`) |
+| Burst cap | APISIX `limit-count` on `/mcp/spark` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW`) | No |
+
+If this admin service is down, `mcp-spark` **fails open** (allows the call). The UI badge is honest: quotas are enforcing only while you can load this page.
+
+Livy GET on `/cdp/livy_for_spark3*` is not burst-capped. Ranger still authorizes data for allowed calls.
 
 ## Quotas
 
@@ -32,14 +44,11 @@ Empty fields mean unlimited. Per-user rows override the default `*` quota.
 | Daily tool calls | Every `tools/call` (list, get, log, submit) |
 | Daily submits | `spark_submit_batch` only |
 
-`mcp-spark` checks quotas **before** Livy. A denied submit returns an MCP tool error (`status=429`) and does not reach Knox. Ranger still authorizes data for allowed calls.
-
-If the admin service is down, `mcp-spark` **fails open** (allows the call) so a laptop UI outage does not brick Spark. Restart `admin` to enforce again.
-
-APISIX also caps **bursts** on `/mcp/spark` (`limit-count`, keyed by Knox `sub`). Default `MCP_RATE_COUNT=60` per `MCP_RATE_WINDOW=60` seconds. That is HTTP `429` at the edge, before the adapter. Daily quotas above are a different layer. Livy GET on `/cdp/livy_for_spark3*` is not burst-capped.
+A denied submit returns an MCP tool error (`status=429`) and does not reach Knox.
 
 ## What it is not
 
 - Not Ranger and not a CDP user directory
 - Not TLS, mTLS, or partner caller keys (Phase 3)
 - Not an agent route (`GET /admin` on `:9080` is 404)
+- Not a Livy / Cloudera Manager console (no job kill, no cluster metrics, no JWT paste)

@@ -1,9 +1,23 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
-from store import admit, check_quota, connect, get_audit, record_event, set_quota, usage_today
+import pytest
+
+from store import (
+    admit,
+    check_quota,
+    connect,
+    get_audit,
+    list_events,
+    overview,
+    parse_day,
+    record_event,
+    set_quota,
+    usage_today,
+)
 
 
 def test_default_quota_is_unlimited(tmp_path: Path) -> None:
@@ -78,3 +92,44 @@ def test_audit_does_not_store_jwt_shaped_ids(tmp_path: Path) -> None:
         token_id="Bearer secret",
     )
     assert get_audit(db, jwt) is None
+
+
+def test_parse_day_rejects_junk() -> None:
+    with pytest.raises(ValueError, match="YYYY-MM-DD"):
+        parse_day("17-08-2026")
+    assert parse_day("") is None
+    assert parse_day("2024-01-02") == "2024-01-02"
+
+
+def test_events_and_overview_honor_utc_day_and_result(tmp_path: Path) -> None:
+    db = connect(tmp_path / "gw.sqlite")
+    past = datetime(2024, 1, 2, 15, 30, tzinfo=timezone.utc)
+    record_event(
+        db,
+        sub="analyst",
+        tool="spark_list_batches",
+        kind="call",
+        ok=True,
+        request_id="old-day",
+        at=past,
+    )
+    record_event(
+        db,
+        sub="analyst",
+        tool="spark_submit_batch",
+        kind="denied",
+        ok=False,
+        request_id="quota-now",
+        status=429,
+    )
+    assert overview(db, day="2024-01-02")["calls"] == 1
+    assert overview(db, day="2024-01-02")["denied"] == 0
+    assert overview(db)["denied"] == 1
+    old = list_events(db, day="2024-01-02", tool="spark_list_batches")
+    assert [row["request_id"] for row in old] == ["old-day"]
+    assert list_events(db, day="2024-01-02", result="quota") == []
+    quota = list_events(db, result="quota")
+    assert quota[0]["request_id"] == "quota-now"
+    assert list_events(db, result="ok", day="2024-01-02")[0]["tool"] == "spark_list_batches"
+    with pytest.raises(ValueError, match="result"):
+        list_events(db, result="burst")

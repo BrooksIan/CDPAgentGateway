@@ -18,12 +18,14 @@
       </p>
     </header>
 
+    <section class="status-strip" id="status-strip"></section>
+
     <section class="stats" id="stats"></section>
 
     <section class="panel">
       <div class="panel-head">
         <h2>Quotas</h2>
-        <p>Empty fields mean unlimited. Daily window is UTC.</p>
+        <p>Empty fields mean unlimited. Daily window is UTC. Default <code>*</code> applies unless a user row overrides it.</p>
       </div>
       <form id="quota-form" class="quota-form">
         <label>
@@ -44,12 +46,28 @@
         </div>
       </form>
       <p id="quota-status" class="status" hidden></p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Knox user</th>
+              <th>Daily calls</th>
+              <th>Daily submits</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody id="quota-rows"></tbody>
+        </table>
+      </div>
     </section>
 
     <section class="panel">
       <div class="panel-head">
         <h2>User usage</h2>
-        <p id="day-label"></p>
+        <label class="day-pick">
+          UTC day
+          <input id="day" type="date" required />
+        </label>
       </div>
       <div class="table-wrap">
         <table>
@@ -93,9 +111,39 @@
 
     <section class="panel">
       <div class="panel-head">
-        <h2>Recent activity</h2>
-        <p>Tool, Knox subject, token id, and request id. Bearers are never stored.</p>
+        <h2>Activity</h2>
+        <p>Click a request id to join. Click a user to filter and edit quota. Burst 429s from APISIX are not listed.</p>
       </div>
+      <form id="event-filters" class="filter-form">
+        <label>
+          User
+          <input name="sub" placeholder="all Knox users" />
+        </label>
+        <label>
+          Tool
+          <select name="tool">
+            <option value="">all tools</option>
+            <option>spark_list_sessions</option>
+            <option>spark_list_batches</option>
+            <option>spark_get_batch</option>
+            <option>spark_get_log</option>
+            <option>spark_submit_batch</option>
+          </select>
+        </label>
+        <label>
+          Result
+          <select name="result">
+            <option value="">all</option>
+            <option value="ok">ok</option>
+            <option value="quota">quota 429</option>
+            <option value="error">Livy error</option>
+          </select>
+        </label>
+        <div class="actions">
+          <button type="submit">Filter</button>
+          <button type="button" id="clear-filters" class="ghost">Clear</button>
+        </div>
+      </form>
       <div class="table-wrap">
         <table>
           <thead>

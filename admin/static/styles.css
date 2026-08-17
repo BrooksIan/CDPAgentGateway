@@ -69,6 +69,38 @@ h2 {
   font-size: 13px;
 }
 
+.status-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px 32px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.status-strip > div {
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  padding: 10px 12px;
+}
+
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  background: var(--muted);
+}
+
+.dot.ok {
+  background: var(--ok);
+}
+
+.dot.bad {
+  background: var(--bad);
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -125,6 +157,41 @@ h2 {
 
 .audit-form {
   grid-template-columns: 1fr auto;
+}
+
+.filter-form {
+  display: grid;
+  grid-template-columns: 1.2fr 1.4fr 1fr auto;
+  gap: 12px;
+  padding: 16px 18px 8px;
+  align-items: end;
+}
+
+.day-pick {
+  min-width: 160px;
+}
+
+select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  padding: 8px 10px;
+  font: inherit;
+  width: 100%;
+}
+
+.click-rid,
+.click-sub,
+.click-tool {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--stroke);
+}
+
+.click-rid:hover,
+.click-sub:hover,
+.click-tool:hover {
+  color: var(--accent);
 }
 
 .audit-result {
@@ -266,11 +333,14 @@ tbody tr:hover {
 @media (max-width: 960px) {
   .stats,
   .quota-form,
-  .audit-form {
+  .audit-form,
+  .filter-form,
+  .status-strip {
     grid-template-columns: 1fr 1fr;
   }
   .top,
   .stats,
+  .status-strip,
   .panel {
     margin-left: 16px;
     margin-right: 16px;

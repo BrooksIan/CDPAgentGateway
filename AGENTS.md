@@ -13,6 +13,7 @@ Read [docs/architecture.md](docs/architecture.md) and [docs/identity-and-auth.md
 - Bind two identities on every request: agent consumer (mTLS or caller key) and Knox `sub`.
 - Ranger remains authorization. Never impersonate a different user than the token `sub`.
 - MCP adapters are upstream services, not APISIX plugins and not the experimental `mcp-bridge`.
+- Keep `/mcp/spark` as POST JSON-RPC. Do not add Streamable HTTP (GET SSE / session) unless a real host fails `initialize` and the operator asks for it.
 - Never commit `.env`, Knox tokens, passcodes, keytabs, or JWKS private material.
 
 ## How to work

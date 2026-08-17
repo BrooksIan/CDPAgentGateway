@@ -22,6 +22,9 @@ def test_admin_ui_is_on_operator_port_not_apisix(client) -> None:
     assert page.status_code == 200
     assert "Operator" in page.text
     assert "knox.id" in page.text
+    assert "fail-open" in page.text
+    assert "UTC day" in page.text
+    assert "quota 429" in page.text
     via_gateway = client.get("/admin")
     assert via_gateway.status_code == 404
 
@@ -140,3 +143,49 @@ def test_mcp_audit_join_uses_request_id(client) -> None:
     dumped = json.dumps(joined.json())
     assert "Bearer" not in dumped
     assert token not in dumped
+
+
+def test_admin_status_shows_burst_and_fail_open() -> None:
+    response = httpx.get(f"{ADMIN_URL}/api/status", timeout=5.0)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["service"] == "admin"
+    assert body["quotas"] == "enforcing"
+    assert body["fail_open"] is True
+    assert body["burst"]["route"] == "/mcp/spark"
+    assert body["burst"]["in_sqlite"] is False
+    assert body["burst"]["count"] >= 1
+    assert body["health"]["admin"] == "ok"
+    dumped = json.dumps(body)
+    assert "Bearer" not in dumped
+    assert "KNOX_TOKEN" not in dumped
+
+
+def test_admin_events_filter_by_day_and_result() -> None:
+    token = os.environ.get("ADMIN_INTERNAL_TOKEN", "lab-admin")
+    recorded = httpx.post(
+        f"{ADMIN_URL}/internal/event",
+        headers={"X-Admin-Internal": token, "Content-Type": "application/json"},
+        json={
+            "sub": "filter-user",
+            "tool": "spark_list_sessions",
+            "kind": "call",
+            "ok": True,
+            "request_id": "p2-ui-day",
+        },
+        timeout=5.0,
+    )
+    assert recorded.status_code == 200, recorded.text
+    matched = httpx.get(
+        f"{ADMIN_URL}/api/events",
+        params={"sub": "filter-user", "tool": "spark_list_sessions", "result": "ok", "limit": 10},
+        timeout=5.0,
+    )
+    assert matched.status_code == 200, matched.text
+    ids = [row["request_id"] for row in matched.json()["events"]]
+    assert "p2-ui-day" in ids
+    empty = httpx.get(f"{ADMIN_URL}/api/events", params={"day": "2020-01-01"}, timeout=5.0)
+    assert empty.status_code == 200, empty.text
+    assert empty.json()["events"] == []
+    bad = httpx.get(f"{ADMIN_URL}/api/overview", params={"day": "17-08-2026"}, timeout=5.0)
+    assert bad.status_code == 400

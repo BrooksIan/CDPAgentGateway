@@ -38,6 +38,8 @@ Same Knox JWT as the Spark submit (`KNOX_TOKEN` / `gateway token set`). Do not p
 
 If Impala has not seen the table yet, the tool error names `count_to_10`. Hive MCP may still work; this adapter does not run `INVALIDATE METADATA`.
 
+HTTP `401 invalid_signature` is APISIX (usually `--mint` on live Knox). A JSON-RPC tool error with `status` 401 and `HTTP code 401` means the CDW coordinator rejected the JWT after APISIX accepted it. Details: [docs/impala.md](../../docs/impala.md#errors).
+
 ```bash
 source .venv/bin/activate
 

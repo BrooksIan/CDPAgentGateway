@@ -46,7 +46,7 @@ Against mock CDP unless noted. Spark URI is `/cdp/livy_for_spark3/sessions`.
 | P1-03 | Valid Knox-shaped JWT + sessions path | `2xx`; `Authorization` forwarded; `knox_user` matches `sub` | `tests/test_gateway_auth.py`, `tests/test_gateway_proxy.py` |
 | P1-04 | Expired JWT | `401` `expired` | `tests/test_gateway_auth.py` |
 | P1-05 | Wrong `iss`, `alg=none`, or HS256 confusion | `401` | `tests/test_gateway_auth.py` |
-| P1-06 | Valid JWT, path outside Spark/WebHDFS allowlist (`/cdp/hive`) | `404` | `tests/test_gateway_proxy.py` |
+| P1-06 | Valid JWT, path outside Spark/WebHDFS allowlist (`/cdp/hive`, `/cdp/impala`) | `404` | `tests/test_gateway_proxy.py` |
 | P1-07 | Request ID present | `X-Request-Id` on `/health` and Spark routes | `tests/test_gateway_auth.py`, `tests/test_gateway_proxy.py` |
 | P1-08 | Auth failure reason is visible | `X-Agent-Gateway-Reason` / JSON `reason`; **no raw token** | `tests/test_gateway_auth.py` |
 | P1-09 | Auth success binds the user | `X-Knox-User` and `X-Knox-Token-Id` forwarded upstream | mock CDP echoes `knox_user` / `token_id` |
@@ -73,6 +73,7 @@ Against mock CDP unless noted. Spark URI is `/cdp/livy_for_spark3/sessions`.
 | P2-04 | Audit record joins tool, `sub`, `knox.id` | `GET /api/audit?request_id=` returns those fields; no bearer | `tests/test_admin_store.py`, `tests/test_admin_gateway.py` |
 | P2-05 | Hive MCP through APISIX | `tools/list` + `hive_list_databases`; `/cdp/hive` still 404 | `tests/test_mcp_hive.py` |
 | P2-16 | Impala MCP through APISIX | `tools/list` + `impala_list_databases`; `/cdp/impala` still 404 | `tests/test_mcp_impala.py`; live `tests/test_live_cdp.py` |
+| P2-17 | Impala HS2 errors map without leaking secrets | Coordinator `HTTP code 401` → tool `status` 401; privileges/`403` → 403; impyla `close` bug → 502 without `NoneType` or Bearer | `tests/test_impala_hs2.py` |
 | P2-06 | Raw Livy writes on the agent listener | Authenticated `POST .../sessions/0/statements`, `POST .../batches`, `PUT`, `DELETE` → `404` or `405` | `tests/test_gateway_proxy.py` |
 | P2-07 | `spark_submit_batch` accepts cluster file URI | HDFS (or other allowlisted scheme) submit `isError=false`; `submitted=true` | `tests/test_mcp_spark.py` |
 | P2-08 | `spark_submit_batch` rejects remote HTTP file | `isError=true`; error names HDFS/object-store | `tests/test_mcp_spark.py` |

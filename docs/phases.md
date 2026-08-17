@@ -26,7 +26,7 @@ Laptop APISIX in front of mock Knox or a reachable `cdp-proxy-token` URL.
 - Proxy Livy for Spark 3: `GET`/`HEAD` `/cdp/livy_for_spark3*` → `{KNOX_PROXY_PREFIX}/livy_for_spark3/...`. Writes are not on this route.
 - Proxy WebHDFS: `GET`/`HEAD`/`PUT` `/cdp/webhdfs*` → `{KNOX_PROXY_PREFIX}/webhdfs/...`. `DELETE` is not a route. Operator CLI: `gateway webhdfs`.
 - `X-Request-Id` on every route; `X-Knox-User` / `X-Knox-Token-Id` on authenticated Spark calls
-- Lab: `gateway test`. Live: `gateway knox <url>`, `gateway token set`, `gateway hive`, `gateway test --live`
+- Lab: `gateway test`. Live: `gateway knox <url>`, `gateway token set`, `gateway hive`, `gateway impala`, `gateway test --live`
 
 Success: a client can list Livy Spark 3 sessions with a Knox JWT through local APISIX, every call is audited, `/cdp/hive` and other unpublished CDP paths 404, and the same token against the raw Knox URL from an untrusted network remains blocked at the CDP perimeter.
 

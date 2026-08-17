@@ -34,7 +34,7 @@ Do not put `KNOX_TOKEN` in project env or git. Paste the Knox JWT into the MCP h
 | --- | --- | --- |
 | `mcp-spark` | Bypassed (MCP hosts cannot send CML cookies) | POST JSON-RPC Spark. Knox JWT required. GET `/` and `/health` are public. |
 | `mcp-hive` | Bypassed | POST JSON-RPC Hive (read-only). Knox JWT required. `/cdp/hive` is not this app. |
-| `mcp-impala` | Bypassed | POST JSON-RPC Impala (read-only). Knox JWT required. `/cdp/impala` is not this app. |
+| `mcp-impala` | Bypassed | POST JSON-RPC Impala (read-only). Knox JWT required. `/cdp/impala` is not this app. CDW `HTTP code 401` after a valid JWT is warehouse trust, not APISIX. |
 | `gateway-admin` | Required | Operator usage/quotas. Shares `data/gateway.sqlite`. Not an agent route. |
 
 Quotas use sqlite on the project filesystem (`ADMIN_BACKEND=sqlite`). Compose still uses HTTP to the admin container and fails open if that container is down.

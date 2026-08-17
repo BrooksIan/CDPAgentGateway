@@ -73,7 +73,7 @@ Architecture constraints: [docs/architecture.md](docs/architecture.md). Identity
 - Spark allowlist — MCP `/mcp/spark` (list, get, log, submit); Livy HTTP is GET/HEAD only; WebHDFS GET/HEAD/PUT for operator file staging
 - Hive MCP — `/mcp/hive` list/describe/select (no `SELECT *`, limit 50); `/cdp/hive` stays 404
 - Impala MCP — `/mcp/impala` list/describe/select (no `SELECT *`, limit 50); `/cdp/impala` stays 404
-- Hive JDBC inventory — `gateway jdbc add` stores Knox Hive JDBC and/or CDW Impala JDBC; `gateway hive` / `gateway impala` list databases
+- JDBC inventory — `gateway jdbc add` stores Knox Hive JDBC and/or CDW Impala JDBC; `gateway hive` / `gateway impala` list databases
 - Local-to-live — `gateway knox <livy-url>` points the same Compose file at external Knox
 - Operator admin UI — UTC-day usage, quotas vs burst 429s, audit join on localhost `:9090`
 - MCP burst cap — `limit-count` on `/mcp/spark`, `/mcp/hive`, and `/mcp/impala` keyed by Knox `sub` (default 60/minute)
@@ -131,7 +131,7 @@ Agents terminate at APISIX (Compose) or at a Cloudera AI Application (optional A
 
 ![CDP Agent Gateway traffic path](assets/architecture.svg)
 
-Spark MCP is the published Spark path. Operators stage HDFS files at `/cdp/webhdfs*`. Hive MCP is read-only at `/mcp/hive`. Impala MCP is read-only at `/mcp/impala`. `/cdp/hive` and `/cdp/impala` stay **404**. JDBC inventory is `gateway jdbc add` / `gateway hive`.
+Spark MCP is the published Spark path. Operators stage HDFS files at `/cdp/webhdfs*`. Hive MCP is read-only at `/mcp/hive`. Impala MCP is read-only at `/mcp/impala`. `/cdp/hive` and `/cdp/impala` stay **404**. JDBC inventory is `gateway jdbc add` / `gateway hive` / `gateway impala`.
 
 | Component | Role |
 | --- | --- |
@@ -144,13 +144,13 @@ Spark MCP is the published Spark path. Operators stage HDFS files at `/cdp/webhd
 | Mock CDP (lab) | Stand-in Knox JWKS and Livy probes for `gateway test` |
 | Operator admin | Local UI on `:9090`: UTC-day usage, quotas vs burst 429s, audit join |
 | Apache Knox | Token issuance, `cdp-proxy-token`, Trusted Proxy / doAs |
-| Apache Ranger | Authorization for the Knox subject on Spark (and Hive when probed) |
+| Apache Ranger | Authorization for the Knox subject on Spark, Hive, Impala, and HDFS |
 
 | Agent URI | Methods | Upstream |
 | --- | --- | --- |
 | `/mcp/spark` | POST JSON-RPC | `mcp-spark` → Knox Livy |
 | `/mcp/hive` | POST JSON-RPC | `mcp-hive` → Knox Hive (read-only) |
-| `/mcp/impala` | POST JSON-RPC | `mcp-impala` → Knox Impala (read-only) |
+| `/mcp/impala` | POST JSON-RPC | `mcp-impala` → CDW `cliservice` or Knox Impala (read-only) |
 | `/cdp/livy_for_spark3*` | GET, HEAD | Knox Livy (operators/tests) |
 | `/cdp/webhdfs*` | GET, HEAD, PUT | Knox WebHDFS (operator staging) |
 | `/cdp/hive` | — | **404** (not published) |
@@ -171,11 +171,11 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 | --- | --- |
 | `assets/` | Architecture diagram, AMP catalog cover, admin UI screenshots |
 | `deploy/` | Docker Compose (APISIX, mock CDP, mcp-spark, mcp-hive, mcp-impala, admin) |
-| `docs/` | Architecture, Spark, Hive, admin, identity, AMP, phases, tests |
+| `docs/` | Architecture, Spark, Hive, Impala, admin, identity, AMP, phases, tests |
 | `LICENSE` | Apache License 2.0 |
 | `METADATA.yaml` | Catalog metadata for the Cloudera blueprint website |
 | `.project-metadata.yaml` | Optional CML AMP runbook (`launchable` is still false) |
-| `0_`–`5_` AMP dirs | CML jobs/apps; ignored by Compose |
+| `0_`–`6_` AMP dirs | CML jobs/apps; ignored by Compose |
 | `conf/` | APISIX standalone config templates |
 | `plugins/` | Custom `knox-jwt` APISIX plugin |
 | `inventory/` | Phase 0 CDP inventory consumed by tests |

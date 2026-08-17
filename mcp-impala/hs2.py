@@ -137,13 +137,19 @@ def impala_error_from_hs2(exc: BaseException) -> ImpalaError:
         status = 404
     elif "database" in lowered and ("not found" in lowered or "does not exist" in lowered):
         status = 404
+    elif "http code 401" in lowered or " 401:" in lowered:
+        status = 401
     elif (
         "access denied" in lowered
         or "permission denied" in lowered
         or "authorizationexception" in lowered
         or "does not have privileges" in lowered
+        or "http code 403" in lowered
+        or " 403:" in lowered
     ):
         status = 403
+    elif "has no attribute 'close'" in lowered:
+        return ImpalaError("Impala HS2 rejected the request", status=502)
     return ImpalaError(_public_hs2_message(exc), status=status)
 
 

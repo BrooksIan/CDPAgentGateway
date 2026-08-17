@@ -97,7 +97,20 @@ Must not:
 
 A valid Knox JWT plus `/cdp/impala` still returns **404**.
 
-`401` `invalid_signature` on `/mcp/impala` means the bearer was not signed by the PEM APISIX is verifying. On live Knox drop `--mint` and use `gateway token set`.
+## Errors
+
+APISIX `401` (HTTP, JSON `{"error":"unauthorized"}`) is **not** the same as an Impala tool error. MCP still returns HTTP 200 JSON-RPC with `isError` when HS2 fails after the gateway accepted the JWT.
+
+| What you see | Where it failed | What to do |
+| --- | --- | --- |
+| HTTP `401` `invalid_signature` | APISIX `knox-jwt` | Lab `--mint` against live Knox JWKS. Drop `--mint`; `gateway token set`. |
+| HTTP `401` `missing_token` / missing `X-Agent-Key` | APISIX | Send `Authorization: Bearer` and Compose `X-Agent-Key`. |
+| JSON-RPC `isError`, `status` 401, message has `HTTP code 401` | CDW `cliservice` (or Knox `/impala`) rejected the JWT | APISIX already accepted it. JDBC `auth=browser` is not used. The warehouse must trust that Knox JWT (`AuthMech=12`). |
+| JSON-RPC `isError`, `status` 403 | Ranger / Impala privileges | Grant the Knox `sub` on that database/table. |
+| JSON-RPC `isError`, `status` 404 | Unknown database/table/column, or HMS not visible to Impala | Wait for metadata; this adapter does not `INVALIDATE METADATA`. Hive MCP may still work. |
+| JSON-RPC `isError`, `status` 502, `Impala HS2 rejected the request` | HS2/impyla transport (no stack leaked) | Check `IMPALA_HOST` / TLS; recreate `mcp-impala` after `gateway jdbc add`. |
+
+The adapter never returns the raw bearer in a tool error.
 
 ## Operator probe: list databases
 
@@ -120,6 +133,7 @@ This uses `KNOX_TOKEN` against inventoried `IMPALA_HOST` (`cliservice`) or Knox 
 2. `gateway jdbc add` with the CDW `jdbc:impala://` URL (or confirm Knox `/impala` is the hop)
 3. `gateway impala` lists databases for the Knox `sub`
 4. `gateway mcp --adapter impala --tool impala_list_databases` as the same `sub` (omit `--mint` on live Knox)
-5. Confirm Ranger Impala policies for that `sub` (CDW VW or Knox Impala)
-6. Optional: `impala_select` on `{user}.count_to_10` after Spark succeeds — [examples/impala/README.md](../examples/impala/README.md)
-7. Keep `/cdp/impala` unpublished
+5. If that call is JSON-RPC `status` 401 with `HTTP code 401`, the VW rejected the JWT — see [Errors](#errors)
+6. Confirm Ranger Impala policies for that `sub` (CDW VW or Knox Impala)
+7. Optional: `impala_select` on `{user}.count_to_10` after Spark succeeds — [examples/impala/README.md](../examples/impala/README.md)
+8. Keep `/cdp/impala` unpublished

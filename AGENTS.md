@@ -21,7 +21,7 @@ Read [docs/architecture.md](docs/architecture.md) and [docs/identity-and-auth.md
 
 1. Fill [docs/phase-0-inventory.md](docs/phase-0-inventory.md) and `inventory/cdp.yaml` for the external CDP under test.
 2. Put secrets only in `.env` (from `.env.example`).
-3. Change Compose and APISIX config under `deploy/`, `conf/`, and `plugins/`. AMP jobs/apps stay in numbered `0_`–`5_` dirs plus `src/agentgateway/amp.py`.
+3. Change Compose and APISIX config under `deploy/`, `conf/`, and `plugins/`. AMP jobs/apps stay in numbered `0_`–`6_` dirs plus `src/agentgateway/amp.py`.
 4. Use the operator CLI for local work: `gateway init`, `gateway knox <knox-proxy-url>`, `gateway jdbc add <jdbc:hive2://… or jdbc:impala://…>`, `gateway webhdfs put`, `gateway up`, `gateway test`. `python -m agentgateway` is the same entry point.
 5. Execute cases in [docs/testing.md](docs/testing.md); record results without tokens.
 6. Keep `README.md` catalog sections and `METADATA.yaml` in sync when the product story changes.

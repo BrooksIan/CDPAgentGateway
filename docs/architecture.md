@@ -16,7 +16,7 @@ Phase 1 traffic is `agents → APISIX → Knox → Livy (Spark 3)` plus operator
 | AMP mcp-spark / mcp-hive / mcp-impala apps (optional) | Same Knox JWT rules in Python; CML Application URL | Compose, APISIX, mock Knox, impersonation, WebHDFS |
 | MCP adapters (`mcp-spark`, `mcp-hive`, `mcp-impala`) | Spark list/get/log/submit; Hive and Impala list/describe/select; forward the caller's Knox bearer | Impersonation, inline Spark code, free-form SQL, long-lived Knox secrets |
 | Knox | Token issuance, `JWTProvider` on `cdp-proxy-token`, Trusted Proxy / doAs, WebHDFS | Public internet exposure |
-| Ranger | Data authorization for the Knox subject on Spark, Hive, and HDFS | Agent-product identity |
+| Ranger | Data authorization for the Knox subject on Spark, Hive, Impala, and HDFS | Agent-product identity |
 
 ## Phase 1 routes
 

@@ -74,7 +74,7 @@ gateway jdbc show
 gateway jdbc clear --adapter impala
 ```
 
-That stores `HIVE_*` and/or `IMPALA_*` in `.env`. It does **not** publish `/cdp/hive` or `/cdp/impala`. Agents use `/mcp/hive` and `/mcp/impala`. JDBC `auth=browser` is ignored; agents send the Knox JWT (`AuthMech=12`). Details: [hive.md](hive.md), [impala.md](impala.md).
+That stores `HIVE_*` and/or `IMPALA_*` in `.env`. It does **not** publish `/cdp/hive` or `/cdp/impala`. Agents use `/mcp/hive` and `/mcp/impala`. JDBC `auth=browser` is ignored; agents send the Knox JWT (`AuthMech=12`). HTTP `401 invalid_signature` is APISIX; a JSON-RPC tool `status` 401 with `HTTP code 401` is the CDW coordinator rejecting that JWT. Details: [hive.md](hive.md), [impala.md](impala.md#errors).
 
 Knox JWTs (`aud=cdp-proxy-token`) run Hive SQL on the **token** topology. Operator probe (needs `impyla`):
 

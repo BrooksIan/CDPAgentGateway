@@ -46,6 +46,20 @@ def test_impala_error_from_hs2_maps_privileges() -> None:
     assert exc.status == 403
 
 
+def test_impala_error_from_hs2_maps_http_401() -> None:
+    exc = hs2.impala_error_from_hs2(RuntimeError("HTTP code 401: Unauthorized"))
+    assert exc.status == 401
+    assert "401" in str(exc)
+    assert "Bearer" not in str(exc)
+
+
+def test_impala_error_from_hs2_hides_impyla_close_bug() -> None:
+    exc = hs2.impala_error_from_hs2(AttributeError("'NoneType' object has no attribute 'close'"))
+    assert exc.status == 502
+    assert "NoneType" not in str(exc)
+    assert "HS2" in str(exc)
+
+
 def test_impala_error_from_hs2_strips_bearer() -> None:
     exc = hs2.impala_error_from_hs2(RuntimeError("Authorization: Bearer abc.def"))
     assert str(exc) == "RuntimeError"

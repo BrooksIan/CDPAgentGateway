@@ -27,7 +27,7 @@ def run_gateway(*args: str, check: bool = True) -> subprocess.CompletedProcess[s
 def test_help_lists_operator_commands() -> None:
     result = run_gateway("--help")
     assert result.returncode == 0
-    for command in ("init", "up", "down", "test", "token", "call", "spark", "webhdfs", "hive", "mcp", "admin", "doctor", "knox", "jdbc", "fetch-jwks"):
+    for command in ("init", "up", "down", "test", "token", "call", "spark", "webhdfs", "hive", "impala", "mcp", "admin", "doctor", "knox", "jdbc", "fetch-jwks"):
         assert command in result.stdout
 
 
@@ -55,6 +55,7 @@ def test_jdbc_help_lists_add_show_clear() -> None:
     assert result.returncode == 0
     for command in ("add", "show", "clear"):
         assert command in result.stdout
+    assert "impala" in result.stdout.lower()
 
 
 def test_webhdfs_help_lists_ls_stat_mkdir_put() -> None:
@@ -80,8 +81,11 @@ def test_config_writes_apisix_yaml() -> None:
     assert "livy_for_spark3" in text
     assert "mcp-spark" in text
     assert "mcp-hive" in text
+    assert "mcp-impala" in text
     assert "uri: /mcp/hive*" in text
+    assert "uri: /mcp/impala*" in text
     assert "uri: /cdp/hive" not in text
+    assert "uri: /cdp/impala" not in text
     assert 'uri: /cdp/livy_for_spark3*' in text
     assert 'uri: /cdp/webhdfs*' in text
     assert "oauth-protected-resource" in text

@@ -1,6 +1,6 @@
 # Deploy
 
-Docker Compose for the laptop demo: Apache APISIX, mock Knox-shaped upstream, `mcp-spark`, `mcp-hive`, and the operator admin UI.
+Docker Compose for the laptop demo: Apache APISIX, mock Knox-shaped upstream, `mcp-spark`, `mcp-hive`, `mcp-impala`, and the operator admin UI.
 
 Prefer the operator CLI from the repo root:
 

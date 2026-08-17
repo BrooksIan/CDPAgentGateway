@@ -100,7 +100,7 @@ async function load() {
     `<div><span class="pill ok">quotas enforcing</span> fail-open if this service stops</div>`,
     `<div><span class="pill warn">burst ${esc(burst.count)}/${esc(burst.window)}s</span> on ${esc(burst.route)} · not in sqlite</div>`,
     `<div>mode <code>${esc(status.mode)}</code> · host <code>${esc(status.upstream_host)}</code></div>`,
-    `<div>admin ${healthDot(health.admin)} · mcp-spark ${healthDot(health.mcp_spark)} · mcp-hive ${healthDot(health.mcp_hive)} · apisix ${healthDot(health.apisix)}</div>`,
+    `<div>admin ${healthDot(health.admin)} · mcp-spark ${healthDot(health.mcp_spark)} · mcp-hive ${healthDot(health.mcp_hive)} · mcp-impala ${healthDot(health.mcp_impala || "down")} · apisix ${healthDot(health.apisix)}</div>`,
   ].join("");
 
   $("stats").innerHTML = [

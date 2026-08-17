@@ -27,10 +27,17 @@ def compose_argv(*args: str) -> list[str]:
     raise FileNotFoundError("docker compose is not installed")
 
 
-def compose_run(args: Sequence[str], *, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess[str]:
+def compose_run(
+    args: Sequence[str],
+    *,
+    check: bool = True,
+    capture: bool = False,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         compose_argv(*args),
         check=check,
         text=True,
         capture_output=capture,
+        env=env,
     )

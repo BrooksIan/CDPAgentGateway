@@ -8,9 +8,9 @@ from agentgateway.keys import generate_test_keys
 from agentgateway.paths import repo_root
 
 
-def write_apisix_config() -> Path:
+def write_apisix_config(values: dict[str, str] | None = None) -> Path:
     root = repo_root()
-    values = load_env()
+    values = values or load_env()
     generate_test_keys()
     out_dir = root / "conf" / "generated"
     out_dir.mkdir(parents=True, exist_ok=True)

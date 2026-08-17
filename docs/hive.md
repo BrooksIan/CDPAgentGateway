@@ -188,3 +188,5 @@ sequenceDiagram
 6. Confirm Ranger policies for that `sub` on the Hive database
 7. `gateway mcp --adapter hive --tool hive_select` on `{user}.count_to_10` column `n` after Spark succeeds — [examples/hive/README.md](../examples/hive/README.md)
 8. Keep `/cdp/hive` unpublished
+
+Impala is a separate adapter: [impala.md](impala.md) (`/mcp/impala`; `/cdp/impala` 404). CDW Impala JDBC is `gateway jdbc add 'jdbc:impala://…;httpPath=cliservice'` and does not overwrite Livy.

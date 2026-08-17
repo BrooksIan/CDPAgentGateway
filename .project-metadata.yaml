@@ -2,7 +2,7 @@ name: CDP Agent Gateway
 description: >-
   Optional Cloudera AI Workbench profile of CDP Agent Gateway. Agents send Knox JWTs
   to MCP applications; adapters forward the same bearer to Knox. Spark MCP and
-  read-only Hive MCP are published. Ranger authorizes the token subject. This is not
+  read-only Hive and Impala MCP are published. Ranger authorizes the token subject. This is not
   Docker Compose and does not replace Apache Knox.
 author: Cloudera
 specification_version: "1.0"
@@ -49,6 +49,28 @@ environment_variables:
   ADMIN_INTERNAL_TOKEN:
     default: ""
     description: Unused when both AMP apps share sqlite. Leave empty.
+    required: false
+  IMPALA_HOST:
+    default: ""
+    description: >-
+      CDW Impala Virtual Warehouse coordinator hostname from jdbc:impala://.
+      Leave empty to use Knox {prefix}/impala. Does not replace KNOX_PROXY_URL.
+    required: false
+  IMPALA_PORT:
+    default: "443"
+    description: CDW Impala HS2 HTTP port (usually 443).
+    required: false
+  IMPALA_SCHEME:
+    default: "https"
+    description: CDW Impala HTTP scheme.
+    required: false
+  IMPALA_HTTP_PATH:
+    default: "cliservice"
+    description: CDW Impala HS2 httpPath (cliservice). Ignored when IMPALA_HOST is empty.
+    required: false
+  IMPALA_TLS_VERIFY:
+    default: "true"
+    description: Verify TLS to the CDW Impala coordinator. Set false only for lab CAs.
     required: false
 
 runtimes:
@@ -124,6 +146,21 @@ tasks:
     memory: 2
     kernel: python3
     short_summary: Read-only Hive MCP JSON-RPC. Requires Knox JWT. /cdp/hive stays unpublished.
+    long_summary: >-
+      Lists databases/tables, describe, and column SELECT (limit 50, no SELECT *)
+      as the Knox token subject. Ranger authorizes that subject. CML cookies are
+      not the user credential.
+
+  - type: start_application
+    name: Impala MCP
+    subdomain: mcp-impala
+    static_subdomain: true
+    bypass_authentication: true
+    script: 6_app-mcp-impala/app.py
+    cpu: 1
+    memory: 2
+    kernel: python3
+    short_summary: Read-only Impala MCP JSON-RPC. Requires Knox JWT. /cdp/impala stays unpublished.
     long_summary: >-
       Lists databases/tables, describe, and column SELECT (limit 50, no SELECT *)
       as the Knox token subject. Ranger authorizes that subject. CML cookies are

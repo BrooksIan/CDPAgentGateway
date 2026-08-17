@@ -35,6 +35,15 @@ upstreams:
       read: 60
     nodes:
       "mcp-hive:8080": 1
+  - id: mcp-impala
+    type: roundrobin
+    scheme: http
+    timeout:
+      connect: 6
+      send: 60
+      read: 60
+    nodes:
+      "mcp-impala:8080": 1
 
 routes:
   - id: health
@@ -53,6 +62,7 @@ routes:
       - /.well-known/oauth-protected-resource
       - /.well-known/oauth-protected-resource/mcp/spark
       - /.well-known/oauth-protected-resource/mcp/hive
+      - /.well-known/oauth-protected-resource/mcp/impala
     methods: ["GET"]
     plugins:
       mocking:
@@ -165,5 +175,36 @@ routes:
           - "^/mcp/hive(.*)"
           - "/mcp$1"
     upstream_id: mcp-hive
+
+  - id: mcp-impala-http
+    uri: /mcp/impala*
+    methods: ["GET", "HEAD", "POST", "DELETE"]
+    plugins:
+      knox-jwt:
+        public_key_file: /usr/local/apisix/conf/knox-public.pem
+        issuer: "{{KNOX_ISSUER}}"
+        expected_alg: "{{KNOX_EXPECTED_ALG}}"
+        clock_skew: {{KNOX_CLOCK_SKEW}}
+        hide_credentials: false
+        realm: knox
+        resource_metadata: "{{RESOURCE_METADATA_URL}}"
+        token_state_url: "{{KNOX_TOKEN_STATE_URL}}"
+        token_state_host: "{{UPSTREAM_HOST}}"
+        token_state_tls_verify: {{UPSTREAM_TLS_VERIFY}}
+{{MCP_KEY_AUTH_BLOCK}}      limit-count:
+        count: {{MCP_RATE_COUNT}}
+        time_window: {{MCP_RATE_WINDOW}}
+        key_type: var
+        key: knox_user
+        rejected_code: 429
+        rejected_msg: mcp rate limit
+        policy: local
+        show_limit_quota_header: true
+        group: mcp-impala
+      proxy-rewrite:
+        regex_uri:
+          - "^/mcp/impala(.*)"
+          - "/mcp$1"
+    upstream_id: mcp-impala
 
 #END

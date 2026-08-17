@@ -1,4 +1,4 @@
-"""Cloudera AI / CML AMP runtime: Python Knox JWT in front of mcp-spark and mcp-hive.
+"""Cloudera AI / CML AMP runtime: Python Knox JWT in front of mcp-spark, mcp-hive, and mcp-impala.
 
 Compose still uses APISIX + knox-jwt.lua. This profile is optional and live-Knox only.
 """
@@ -63,24 +63,43 @@ def apply_live_upstream() -> dict[str, str]:
     return parsed
 
 
-def _ensure_service_path(relative: str) -> None:
+def _ensure_service_path(relative: str) -> str:
     path = str(repo_root() / relative)
-    if path not in sys.path:
-        sys.path.append(path)
+    if path in sys.path:
+        sys.path.remove(path)
+    sys.path.insert(0, path)
+    return path
 
 
 def _load_module(module_name: str, directory: str, filename: str = "server.py"):
     import importlib.util
 
-    _ensure_service_path(directory)
+    path = _ensure_service_path(directory)
     file_path = repo_root() / directory / filename
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Cannot load {file_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module
+    displaced: dict[str, object] = {}
+    try:
+        for name in ("sql", "hs2", "quota", "livy"):
+            cached = sys.modules.get(name)
+            file = getattr(cached, "__file__", "") or ""
+            if cached is not None and not file.startswith(path):
+                displaced[name] = cached
+                sys.modules.pop(name, None)
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        if sys.path and sys.path[0] == path:
+            sys.path.pop(0)
+        for name in ("sql", "hs2", "quota"):
+            cached = sys.modules.get(name)
+            file = getattr(cached, "__file__", "") or ""
+            if cached is not None and file.startswith(path):
+                sys.modules.pop(name, None)
+        sys.modules.update(displaced)
 
 
 def _int_env(name: str, default: int) -> int:
@@ -256,6 +275,7 @@ def _prm_routes() -> list[Route]:
         "/.well-known/oauth-protected-resource",
         "/.well-known/oauth-protected-resource/mcp/spark",
         "/.well-known/oauth-protected-resource/mcp/hive",
+        "/.well-known/oauth-protected-resource/mcp/impala",
     )
     return [Route(path, prm, methods=["GET"]) for path in paths]
 
@@ -305,6 +325,33 @@ def build_hive_mcp_app() -> Starlette:
             Route("/mcp/", mcp.mcp_endpoint, methods=["GET", "POST"]),
             Route("/mcp/hive", mcp.mcp_endpoint, methods=["GET", "POST"]),
             Route("/mcp/hive/", mcp.mcp_endpoint, methods=["GET", "POST"]),
+        ]
+    )
+    limiter = BurstLimiter(
+        _int_env("MCP_RATE_COUNT", 60),
+        _int_env("MCP_RATE_WINDOW", 60),
+    )
+    return KnoxJWTMiddleware(app, public_key_file=amp_public_key_path(), limiter=limiter)
+
+
+def build_impala_mcp_app() -> Starlette:
+    apply_live_upstream()
+    mcp = _load_module("amp_mcp_impala_server", "mcp-impala")
+
+    async def root(request: Request) -> Response:
+        if request.method == "GET":
+            return JSONResponse({"status": "ok", "service": "mcp-impala", "profile": "amp"})
+        return await mcp.mcp_endpoint(request)
+
+    app = Starlette(
+        routes=[
+            *_prm_routes(),
+            Route("/health", mcp.health, methods=["GET"]),
+            Route("/", root, methods=["GET", "POST"]),
+            Route("/mcp", mcp.mcp_endpoint, methods=["GET", "POST"]),
+            Route("/mcp/", mcp.mcp_endpoint, methods=["GET", "POST"]),
+            Route("/mcp/impala", mcp.mcp_endpoint, methods=["GET", "POST"]),
+            Route("/mcp/impala/", mcp.mcp_endpoint, methods=["GET", "POST"]),
         ]
     )
     limiter = BurstLimiter(

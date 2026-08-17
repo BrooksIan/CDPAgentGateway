@@ -146,3 +146,67 @@ def test_live_cdp_hive_stays_unpublished() -> None:
             headers={"Authorization": f"Bearer {_token()}"},
         )
         assert response.status_code == 404, response.text
+
+
+@pytest.mark.skipif(not _live_enabled(), reason="Set GATEWAY_MODE=live and KNOX_TOKEN to run")
+def test_live_impala_tools_and_cdp_impala_unpublished() -> None:
+    """P2-16: Impala MCP is published; /cdp/impala stays 404."""
+    with httpx.Client(base_url=_base(), timeout=60.0, verify=False) as client:
+        listed = client.post(
+            "/mcp/impala",
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+            headers=_auth(),
+        )
+        assert listed.status_code == 200, listed.text
+        names = {item["name"] for item in listed.json()["result"]["tools"]}
+        assert "impala_select" in names
+
+        unpublished = client.get(
+            "/cdp/impala",
+            headers={"Authorization": f"Bearer {_token()}"},
+        )
+        assert unpublished.status_code == 404, unpublished.text
+
+        who = client.post(
+            "/mcp/impala",
+            json={
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {"name": "impala_list_databases", "arguments": {}},
+            },
+            headers=_auth(),
+        )
+        assert who.status_code == 200, who.text
+        body = who.json()["result"]
+        payload = json.loads(body["content"][0]["text"])
+        dumped = json.dumps(payload)
+        assert "Bearer" not in dumped
+        assert "Authorization" not in dumped
+        if body.get("isError"):
+            pytest.skip(payload.get("error") or "Impala list_databases not available on this cluster")
+        knox_user = payload["knox_user"]
+        selected = client.post(
+            "/mcp/impala",
+            json={
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {
+                    "name": "impala_select",
+                    "arguments": {
+                        "database": knox_user,
+                        "table": "count_to_10",
+                        "columns": ["n"],
+                        "limit": 10,
+                    },
+                },
+            },
+            headers=_auth(),
+        )
+        assert selected.status_code == 200, selected.text
+        result = selected.json()["result"]
+        select_payload = json.loads(result["content"][0]["text"])
+        if result.get("isError"):
+            pytest.skip(select_payload.get("error") or "Impala has not seen {sub}.count_to_10")
+        assert [int(row["n"]) for row in select_payload["rows"]] == list(range(1, 11))

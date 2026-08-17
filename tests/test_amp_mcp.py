@@ -8,7 +8,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from agentgateway.amp import BurstLimiter, KnoxJWTMiddleware, build_mcp_app
+from agentgateway.amp import BurstLimiter, KnoxJWTMiddleware, build_impala_mcp_app, build_mcp_app
 from agentgateway.keys import generate_test_keys
 from agentgateway.token import knox_claims, sign_rs256, unsigned_token
 
@@ -111,6 +111,28 @@ def test_amp_mcp_tools_list(pem_file: Path, tmp_path: Path, monkeypatch: pytest.
     assert listed.status_code == 200, listed.text
     names = [tool["name"] for tool in listed.json()["result"]["tools"]]
     assert "spark_submit_batch" in names
+    assert "Authorization" not in listed.text
+
+
+def test_amp_impala_mcp_tools_list(pem_file: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KNOX_PROXY_URL", "https://knox.example.com/gateway/cdp-proxy-token/livy_for_spark3/")
+    monkeypatch.setenv("KNOX_PUBLIC_KEY_FILE", str(pem_file))
+    monkeypatch.setenv("ADMIN_BACKEND", "sqlite")
+    monkeypatch.setenv("ADMIN_DB", str(tmp_path / "gateway.sqlite"))
+    client = TestClient(build_impala_mcp_app())
+    public = client.get("/health")
+    assert public.status_code == 200
+    denied = client.post("/mcp/impala", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    assert denied.status_code == 401
+    token = sign_rs256(knox_claims(sub="analyst"))
+    listed = client.post(
+        "/mcp/impala",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+    )
+    assert listed.status_code == 200, listed.text
+    names = [tool["name"] for tool in listed.json()["result"]["tools"]]
+    assert "impala_select" in names
     assert "Authorization" not in listed.text
 
 

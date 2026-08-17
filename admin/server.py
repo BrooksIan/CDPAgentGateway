@@ -36,6 +36,7 @@ STATIC = Path(__file__).resolve().parent / "static"
 APISIX_HEALTH_URL = os.environ.get("APISIX_HEALTH_URL", "http://apisix:9080/health")
 MCP_SPARK_HEALTH_URL = os.environ.get("MCP_SPARK_HEALTH_URL", "http://mcp-spark:8080/health")
 MCP_HIVE_HEALTH_URL = os.environ.get("MCP_HIVE_HEALTH_URL", "http://mcp-hive:8080/health")
+MCP_IMPALA_HEALTH_URL = os.environ.get("MCP_IMPALA_HEALTH_URL", "http://mcp-impala:8080/health")
 
 _db = None
 
@@ -133,22 +134,29 @@ async def api_events(request: Request) -> JSONResponse:
 async def api_status(_request: Request) -> JSONResponse:
     mcp = _probe(MCP_SPARK_HEALTH_URL)
     hive = _probe(MCP_HIVE_HEALTH_URL)
+    impala = _probe(MCP_IMPALA_HEALTH_URL)
     apisix = _probe(APISIX_HEALTH_URL)
     return JSONResponse(
         {
             "service": "admin",
             "quotas": "enforcing",
             "fail_open": True,
-            "fail_open_note": "mcp-spark and mcp-hive allow calls if this service is down",
+            "fail_open_note": "mcp-spark, mcp-hive, and mcp-impala allow calls if this service is down",
             "burst": {
                 "count": _positive_int("MCP_RATE_COUNT", 60),
                 "window": _positive_int("MCP_RATE_WINDOW", 60),
-                "route": "/mcp/spark,/mcp/hive",
+                "route": "/mcp/spark,/mcp/hive,/mcp/impala",
                 "in_sqlite": False,
             },
             "mode": os.environ.get("GATEWAY_MODE") or "local",
             "upstream_host": os.environ.get("UPSTREAM_HOST") or "mock-cdp",
-            "health": {"admin": "ok", "mcp_spark": mcp, "mcp_hive": hive, "apisix": apisix},
+            "health": {
+                "admin": "ok",
+                "mcp_spark": mcp,
+                "mcp_hive": hive,
+                "mcp_impala": impala,
+                "apisix": apisix,
+            },
         }
     )
 

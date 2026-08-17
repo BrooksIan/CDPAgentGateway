@@ -10,7 +10,7 @@ Two surfaces share the same Knox JWT and the same Ranger subject. Operators also
 | WebHDFS | `/cdp/webhdfs*` | GET, HEAD, PUT | Operators (`gateway webhdfs`) to put `file` URIs |
 | MCP | `/mcp/spark` | POST (JSON-RPC) | Cursor, Claude, `gateway mcp` |
 
-Both require `Authorization: Bearer <knox-jwt>`. Compose MCP also requires `X-Agent-Key` (`AGENT_CALLER_KEY`, default `lab-agent`). Compose: APISIX `knox-jwt` validates the token, then either rewrites to Knox Livy or WebHDFS, or forwards to the `mcp-spark` adapter. AMP: the CML `mcp-spark` application validates the same JWT in Python (no WebHDFS route; no caller key). `/cdp/hive` stays **404**; Hive MCP is `/mcp/hive` ([hive.md](hive.md)).
+Both require `Authorization: Bearer <knox-jwt>`. Compose MCP also requires `X-Agent-Key` (`AGENT_CALLER_KEY`, default `lab-agent`). Compose: APISIX `knox-jwt` validates the token, then either rewrites to Knox Livy or WebHDFS, or forwards to the `mcp-spark` adapter. AMP: the CML `mcp-spark` application validates the same JWT in Python (no WebHDFS route; no caller key). `/cdp/hive` and `/cdp/impala` stay **404**; Hive MCP is `/mcp/hive` ([hive.md](hive.md)); Impala MCP is `/mcp/impala` ([impala.md](impala.md)).
 
 ```mermaid
 flowchart LR
@@ -44,6 +44,7 @@ gateway spark --mint
 gateway webhdfs ls --mint /
 gateway mcp --mint
 gateway mcp --adapter hive --mint
+gateway mcp --adapter impala --mint
 ```
 
 Mock Livy and Hive live in `mock-cdp`. `gateway spark --mint` signs a local RS256 JWT. No CDP entitlement is required. `--mint` is `GATEWAY_MODE=local` only; live Knox JWKS rejects those signatures.
@@ -223,20 +224,28 @@ Put the Knox JWT in the host secret store, never in git.
         "Authorization": "Bearer <knox-jwt>",
         "X-Agent-Key": "lab-agent"
       }
+    },
+    "cdp-impala": {
+      "url": "http://127.0.0.1:9080/mcp/impala",
+      "headers": {
+        "Authorization": "Bearer <knox-jwt>",
+        "X-Agent-Key": "lab-agent"
+      }
     }
   }
 }
 ```
 
-Agents should call `/mcp/spark` or `/mcp/hive` only, with **POST JSON-RPC**. Streamable HTTP (GET SSE, MCP session) is **not** implemented and is held. Do not teach them the Knox URL, `/cdp/webhdfs`, `/cdp/hive`, or the operator admin UI (`:9090`). AMP hosts use `https://mcp-spark.<workspace>/mcp/spark` or `https://mcp-hive.<workspace>/mcp/hive` instead of localhost; see [amp.md](amp.md).
+Agents should call `/mcp/spark`, `/mcp/hive`, or `/mcp/impala` only, with **POST JSON-RPC**. Streamable HTTP (GET SSE, MCP session) is **not** implemented and is held. Do not teach them the Knox URL, `/cdp/webhdfs`, `/cdp/hive`, `/cdp/impala`, or the operator admin UI (`:9090`). AMP hosts use `https://mcp-spark.<workspace>/mcp/spark`, `https://mcp-hive.<workspace>/mcp/hive`, or `https://mcp-impala.<workspace>/mcp/impala` instead of localhost; see [amp.md](amp.md).
 
 Operators set per-user daily call/submit quotas in [admin.md](admin.md). A denied submit is an MCP tool error and does not reach Livy. Operators look up a call by APISIX `X-Request-Id` (`GET /api/audit`) to join tool, `sub`, and `knox.id`.
 
-APISIX also applies a per-`sub` burst cap on `/mcp/spark` and `/mcp/hive` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW` in `.env`, default 60 per 60s). Exceeding it is HTTP `429` (`mcp rate limit`). Livy GET and WebHDFS are not capped this way. The AMP profile enforces the same counters in Python.
+APISIX also applies a per-`sub` burst cap on `/mcp/spark`, `/mcp/hive`, and `/mcp/impala` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW` in `.env`, default 60 per 60s). Exceeding it is HTTP `429` (`mcp rate limit`). Livy GET and WebHDFS are not capped this way. The AMP profile enforces the same counters in Python.
 
 ## What Spark does not do
 
 - No Hive SQL through Spark tools (see [hive.md](hive.md) for `/mcp/hive`)
+- No Impala SQL through Spark tools (see [impala.md](impala.md) for `/mcp/impala`)
 - No Streamable HTTP (GET SSE / MCP session); hosts POST JSON-RPC to `/mcp/spark`
 - No catch-all `/cdp/*`
 - No raw Livy writes on `/cdp/livy_for_spark3*` (GET/HEAD only)

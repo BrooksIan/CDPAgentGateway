@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 300" role="img" aria-labelledby="title desc">
   <title id="title">CDP Agent Gateway traffic path</title>
-  <desc id="desc">Third-party agents to APISIX to MCP adapters to Apache Knox to Cloudera Data Platform Spark, HDFS WebHDFS staging, and Hive</desc>
+  <desc id="desc">Third-party agents to APISIX to MCP adapters to Apache Knox to Cloudera Data Platform Spark, HDFS WebHDFS staging, Hive, and Impala</desc>
   <style>
     .box { fill: #f4f4f5; stroke: #3f3f46; stroke-width: 1.5; }
     .box-gw { fill: #e4e4e7; stroke: #18181b; stroke-width: 2; }
@@ -24,7 +24,7 @@
   <line class="arrow" x1="344" y1="150" x2="372" y2="150"/>
   <rect class="box" x="380" y="114" width="150" height="72" rx="6"/>
   <text class="label" x="455" y="146" text-anchor="middle">MCP adapters</text>
-  <text class="sub" x="455" y="166" text-anchor="middle">Spark MCP · Hive MCP</text>
+  <text class="sub" x="455" y="166" text-anchor="middle">Spark · Hive · Impala</text>
   <line class="arrow" x1="530" y1="150" x2="558" y2="150"/>
   <rect class="box" x="566" y="114" width="140" height="72" rx="6"/>
   <text class="label" x="636" y="146" text-anchor="middle">Apache Knox</text>
@@ -39,6 +39,6 @@
   <text class="label" x="860" y="146" text-anchor="middle">CDP HDFS</text>
   <text class="sub" x="860" y="166" text-anchor="middle">WebHDFS · /cdp/webhdfs</text>
   <rect class="box-hive" x="756" y="212" width="208" height="72" rx="6"/>
-  <text class="label" x="860" y="244" text-anchor="middle">CDP Hive</text>
-  <text class="sub" x="860" y="264" text-anchor="middle">/mcp/hive · /cdp/hive 404</text>
+  <text class="label" x="860" y="244" text-anchor="middle">CDP Hive / Impala</text>
+  <text class="sub" x="860" y="264" text-anchor="middle">/mcp/hive · /mcp/impala · raw 404</text>
 </svg>

@@ -1,6 +1,6 @@
 # Operator admin UI
 
-The admin console is for **gateway operators**, not MCP hosts. It is bound to `127.0.0.1:9090` and is **not** published on APISIX `:9080`. Agents must keep using `/mcp/spark` and `/mcp/hive`.
+The admin console is for **gateway operators**, not MCP hosts. It is bound to `127.0.0.1:9090` and is **not** published on APISIX `:9080`. Agents must keep using `/mcp/spark`, `/mcp/hive`, and `/mcp/impala`.
 
 Open after `gateway up`:
 
@@ -17,7 +17,7 @@ On the optional CML AMP profile the same UI is a workbench application (`gateway
 
 ## What it shows
 
-- Path status: quotas enforcing, APISIX burst cap, `GATEWAY_MODE`, upstream host, health of admin / mcp-spark / mcp-hive / APISIX
+- Path status: quotas enforcing, APISIX burst cap, `GATEWAY_MODE`, upstream host, health of admin / mcp-spark / mcp-hive / mcp-impala / APISIX
 - Usage for a chosen **UTC day**, keyed by Knox `sub` (and `knox.id` when forwarded)
 - Default `*` quota plus per-user overrides
 - Activity filtered by user, tool, and result (ok / quota 429 / Livy error)
@@ -32,10 +32,10 @@ curl -s "http://127.0.0.1:9090/api/status"
 
 | Layer | Where | In this sqlite? |
 | --- | --- | --- |
-| Daily quota | `mcp-spark` and `mcp-hive` call admin **before** Knox | Yes (`kind=denied`) |
-| Burst cap | APISIX `limit-count` on `/mcp/spark` and `/mcp/hive` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW`); AMP uses the same env on the Python JWT middleware | No |
+| Daily quota | `mcp-spark`, `mcp-hive`, and `mcp-impala` call admin **before** Knox | Yes (`kind=denied`) |
+| Burst cap | APISIX `limit-count` on `/mcp/spark`, `/mcp/hive`, and `/mcp/impala` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW`); AMP uses the same env on the Python JWT middleware | No |
 
-If this admin service is down, `mcp-spark` and `mcp-hive` **fail open** (allow the call). The UI badge is honest: quotas are enforcing only while you can load this page.
+If this admin service is down, `mcp-spark`, `mcp-hive`, and `mcp-impala` **fail open** (allow the call). The UI badge is honest: quotas are enforcing only while you can load this page.
 
 Livy GET on `/cdp/livy_for_spark3*` and WebHDFS on `/cdp/webhdfs*` are not burst-capped. Ranger still authorizes data for allowed calls.
 
@@ -47,7 +47,7 @@ Empty fields mean unlimited. Per-user rows override the default `*` quota.
 
 | Field | Applies to |
 | --- | --- |
-| Daily tool calls | Every `tools/call` (Spark list/get/log/submit; Hive list/describe/select) |
+| Daily tool calls | Every `tools/call` (Spark list/get/log/submit; Hive and Impala list/describe/select) |
 | Daily submits | `spark_submit_batch` only |
 
 A denied submit returns an MCP tool error (`status=429`) and does not reach Knox.

@@ -4,8 +4,10 @@ from agentgateway.knox import (
     default_call_path,
     hive_jdbc_updates,
     http_url_from_jdbc,
+    jdbc_inventory_updates,
     merge_knox_config,
     parse_hive_jdbc,
+    parse_impala_jdbc,
     parse_knox_proxy_url,
     redact_jdbc,
     require_token_topology,
@@ -155,6 +157,54 @@ def test_jdbc_add_rejects_other_host() -> None:
         raise AssertionError("expected host mismatch")
 
 
+CDW_IMPALA_JDBC = (
+    "jdbc:impala://coordinator-default-impala-aws.dw-go01-demo-aws.ylcu-atmi.cloudera.site:443/default;"
+    "AuthMech=12;transportMode=http;httpPath=cliservice;ssl=1;auth=browser"
+)
+
+
+def test_parse_impala_jdbc_cdw_coordinator() -> None:
+    parsed = parse_impala_jdbc(CDW_IMPALA_JDBC)
+    assert parsed["IMPALA_HOST"] == "coordinator-default-impala-aws.dw-go01-demo-aws.ylcu-atmi.cloudera.site"
+    assert parsed["IMPALA_PORT"] == "443"
+    assert parsed["IMPALA_SCHEME"] == "https"
+    assert parsed["IMPALA_HTTP_PATH"] == "cliservice"
+    assert parsed["IMPALA_TLS_VERIFY"] == "false"
+
+
+def test_impala_jdbc_does_not_replace_livy_host() -> None:
+    livy = parse_knox_proxy_url(
+        "https://go01-obser-de-gateway.go01-dem.ylcu-atmi.cloudera.site"
+        "/go01-obser-de/cdp-proxy-token/livy_for_spark3/"
+    )
+    updates = jdbc_inventory_updates(livy, CDW_IMPALA_JDBC)
+    assert "UPSTREAM_HOST" not in updates
+    assert "KNOX_PROXY_PREFIX" not in updates
+    assert updates["IMPALA_HOST"].startswith("coordinator-default-impala-aws")
+    assert updates["IMPALA_HTTP_PATH"] == "cliservice"
+
+
+def test_impala_jdbc_requires_http_transport() -> None:
+    try:
+        parse_impala_jdbc("jdbc:impala://coordinator.example:21050/default;AuthMech=12")
+    except ValueError as exc:
+        assert "transportMode=http" in str(exc)
+    else:
+        raise AssertionError("expected HTTP transport requirement")
+
+
+def test_impala_jdbc_rejects_password_authmech() -> None:
+    try:
+        parse_impala_jdbc(
+            "jdbc:impala://coordinator.example:443/default;"
+            "AuthMech=3;transportMode=http;httpPath=cliservice;ssl=1;UID=alice;PWD=secret"
+        )
+    except ValueError as exc:
+        assert "AuthMech" in str(exc)
+    else:
+        raise AssertionError("expected AuthMech=12 requirement")
+
+
 def test_redact_jdbc_password() -> None:
     jdbc = (
         "jdbc:hive2://knox.example.cloudera.site/;"
@@ -197,6 +247,29 @@ def test_inspect_bearer_rejects_unsigned_token() -> None:
         assert "RS256" in str(exc)
     else:
         raise AssertionError("expected alg rejection")
+
+
+def test_lab_test_env_overrides_live_dotenv_without_writing() -> None:
+    from agentgateway.env import lab_test_env, token_state_url
+
+    overlay = lab_test_env(
+        {
+            "GATEWAY_MODE": "live",
+            "UPSTREAM_HOST": "knox.example.cloudera.site",
+            "UPSTREAM_SCHEME": "https",
+            "AGENT_CALLER_KEY": "lab-agent",
+            "KNOX_TOKEN_STATE_URL": "https://knox.example.cloudera.site/knoxtoken/api/v2/token/state",
+            "IMPALA_HOST": "coordinator.example.cloudera.site",
+            "IMPALA_HTTP_PATH": "cliservice",
+        }
+    )
+    assert overlay["GATEWAY_MODE"] == "local"
+    assert overlay["UPSTREAM_HOST"] == "mock-cdp"
+    assert overlay["AGENT_CALLER_KEY"] == "lab-agent"
+    assert overlay["KNOX_TOKEN_STATE_URL"] == ""
+    assert overlay["IMPALA_HOST"] == ""
+    assert overlay["IMPALA_HTTP_PATH"] == ""
+    assert token_state_url(overlay).startswith("http://mock-cdp:8080/")
 
 
 def test_help_includes_knox() -> None:

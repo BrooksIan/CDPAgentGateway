@@ -56,6 +56,11 @@ def test_mcp_hive_route_has_limit_count() -> None:
     assert "group: mcp-hive" in hive
     assert "limit-count:" not in livy
     assert "uri: /cdp/hive" not in rendered
+    impala = _route_block(rendered, "mcp-impala-http")
+    assert "uri: /mcp/impala*" in rendered
+    assert "limit-count:" in impala
+    assert "group: mcp-impala" in impala
+    assert "uri: /cdp/impala" not in rendered
     webhdfs = _route_block(rendered, "hdfs-webhdfs")
     assert "uri: /cdp/webhdfs*" in rendered
     assert 'methods: ["GET", "HEAD", "PUT"]' in webhdfs
@@ -82,10 +87,14 @@ def test_mcp_key_auth_is_optional() -> None:
     assert "key-auth:" not in off
     on = render_apisix_yaml(TEMPLATE, {**BASE, "AGENT_CALLER_KEY": "lab-agent"})
     mcp = _route_block(on, "mcp-spark-http")
+    hive = _route_block(on, "mcp-hive-http")
+    impala = _route_block(on, "mcp-impala-http")
     livy = _route_block(on, "spark-livy")
     assert "key-auth:" in mcp
     assert "X-Agent-Key" in mcp
     assert "hide_credentials: true" in mcp
+    assert "key-auth:" in hive
+    assert "key-auth:" in impala
     assert "key-auth:" not in livy
     assert "username: agent-platform" in on
 

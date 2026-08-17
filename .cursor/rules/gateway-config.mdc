@@ -10,9 +10,10 @@ alwaysApply: false
 - Prefer `gateway up` / `gateway knox` / `gateway test`. Compose lives in `deploy/docker-compose.yml` with `--project-directory` at the repo root.
 - Prefer file-based APISIX config and Compose. Keep Admin API bound to localhost.
 - Pin `KNOX_JWKS_URL` host. Allowlist Livy for Spark 3 `GET`/`HEAD` only (`/cdp/livy_for_spark3*`). Allowlist WebHDFS `GET`/`HEAD`/`PUT` (`/cdp/webhdfs*`) for operator staging. Livy writes go through `/mcp/spark`. Do not publish WebHDFS `DELETE`.
-- Put `limit-count` on `/mcp/spark` and `/mcp/hive` keyed by Knox `sub` (`knox_user`). Do not burst-cap operator Livy GET or WebHDFS.
+- Recreate the `apisix` container when `mock-cdp` is recreated. Stale DNS makes token-state HTTP 404 look like `401 revoked`.
+- Put `limit-count` on `/mcp/spark`, `/mcp/hive`, and `/mcp/impala` keyed by Knox `sub` (`knox_user`). Do not burst-cap operator Livy GET or WebHDFS.
 - Enable APISIX `key-auth` in `conf/config.yaml` when MCP caller keys are used. Custom `plugins:` lists replace the default set; omitting `key-auth` drops MCP routes.
-- Put `key-auth` (`X-Agent-Key`) on `/mcp/spark` and `/mcp/hive` when `AGENT_CALLER_KEY` is set. Do not put it on Livy GET or WebHDFS. Hide the caller key from upstreams.
+- Put `key-auth` (`X-Agent-Key`) on `/mcp/spark`, `/mcp/hive`, and `/mcp/impala` when `AGENT_CALLER_KEY` is set. Do not put it on Livy GET or WebHDFS. Hide the caller key from upstreams.
 - Publish `/.well-known/oauth-protected-resource` without JWT. Put `resource_metadata` on knox-jwt `401`. Pin `KNOX_TOKEN_STATE_URL` to `UPSTREAM_HOST`.
 - Fail closed: missing/invalid bearer must not reach Knox. Revoked managed tokens (`knox.id`) must not reach Knox when token-state is configured.
 - Timeouts should assume long CDP jobs; do not use tiny defaults on probe routes without documenting why.

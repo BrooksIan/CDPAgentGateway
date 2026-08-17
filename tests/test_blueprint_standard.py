@@ -53,8 +53,10 @@ def test_readme_has_blueprint_standard_sections() -> None:
     assert "docs/amp.md" in text
     assert "docs/spark.md" in text
     assert "docs/hive.md" in text
+    assert "docs/impala.md" in text or "docs/impala" in text
     assert "/mcp/spark" in text
     assert "/mcp/hive" in text
+    assert "/mcp/impala" in text
     assert "127.0.0.1:9090" in text or "localhost `:9090`" in text
 
 
@@ -72,6 +74,7 @@ def test_metadata_yaml_has_catalog_fields() -> None:
     assert "agents" in meta["tags"]
     assert "spark" in meta["tags"]
     assert "hive" in meta["tags"]
+    assert "impala" in meta["tags"]
     assert "Cloudera Data Engineering" in meta["product_mapping"]
 
 
@@ -82,12 +85,15 @@ def test_blueprint_layout_dirs_exist() -> None:
         ROOT / "docs" / "architecture.md",
         ROOT / "mcp-spark" / "server.py",
         ROOT / "mcp-hive" / "server.py",
+        ROOT / "mcp-impala" / "server.py",
         ROOT / "admin" / "server.py",
         ROOT / "examples" / "spark" / "count_to_10.py",
         ROOT / "examples" / "hive" / "README.md",
+        ROOT / "examples" / "impala" / "README.md",
         ROOT / "docs" / "operator-cli.md",
         ROOT / "docs" / "spark.md",
         ROOT / "docs" / "hive.md",
+        ROOT / "docs" / "impala.md",
         ROOT / "docs" / "amp.md",
         ROOT / ".project-metadata.yaml",
         ROOT / "catalog-entry.yaml",

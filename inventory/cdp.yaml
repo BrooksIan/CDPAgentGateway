@@ -40,6 +40,11 @@ first_tools:
     path: /mcp/hive
     access: read
     purpose: Read-only Hive MCP (list databases/tables, describe, capped select). /cdp/hive stays 404.
+  - id: impala-mcp-databases
+    method: POST
+    path: /mcp/impala
+    access: read
+    purpose: Read-only Impala MCP (list databases/tables, describe, capped select). CDW coordinator via IMPALA_HOST or Knox /impala. /cdp/impala stays 404.
   - id: webhdfs-list
     method: GET
     path: /cdp/webhdfs/v1/

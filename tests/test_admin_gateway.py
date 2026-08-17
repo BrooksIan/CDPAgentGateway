@@ -152,7 +152,7 @@ def test_admin_status_shows_burst_and_fail_open() -> None:
     assert body["service"] == "admin"
     assert body["quotas"] == "enforcing"
     assert body["fail_open"] is True
-    assert body["burst"]["route"] == "/mcp/spark,/mcp/hive"
+    assert body["burst"]["route"] == "/mcp/spark,/mcp/hive,/mcp/impala"
     assert body["burst"]["in_sqlite"] is False
     assert body["burst"]["count"] >= 1
     assert body["health"]["admin"] == "ok"

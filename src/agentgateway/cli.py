@@ -12,17 +12,20 @@ from agentgateway import __version__
 from agentgateway.compose import compose_run
 from agentgateway.config import write_apisix_config
 from agentgateway.doctor import run_checks
-from agentgateway.env import admin_url, ensure_dotenv, gateway_url, load_env, upsert_dotenv
+from agentgateway.env import admin_url, ensure_dotenv, gateway_url, lab_test_env, load_env, upsert_dotenv
 from agentgateway.keys import fetch_knox_pubkey, generate_test_keys
 from agentgateway.knox import (
     HIVE_ENV_KEYS,
+    IMPALA_ENV_KEYS,
+    JDBC_IMPALA,
     LOCAL_UPSTREAM,
     SPARK_MCP_PATH,
     HIVE_MCP_PATH,
+    IMPALA_MCP_PATH,
     SPARK_SESSIONS_PATH,
     agent_paths,
     default_call_path,
-    hive_jdbc_updates,
+    jdbc_inventory_updates,
     merge_knox_config,
     parse_knox_proxy_url,
     redact_jdbc,
@@ -31,6 +34,7 @@ from agentgateway.knox import (
     trusted_jku,
 )
 from agentgateway.hive import HiveError, hive_http_path, show_databases
+from agentgateway.impala import ImpalaError, impala_target, show_databases as impala_show_databases
 from agentgateway.mcp import mcp_path, mcp_rpc
 from agentgateway.paths import repo_root
 from agentgateway.probe import parse_params, request_path, tool_arguments
@@ -50,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
             "  gateway token show\n"
             "  gateway knox https://knox.example.com/env/cdp-proxy-token/livy_for_spark3/\n"
             "  gateway jdbc add 'jdbc:hive2://knox.example/;ssl=true;transportMode=http;httpPath=env/cdp-proxy-api/hive'\n"
+            "  gateway jdbc add 'jdbc:impala://coordinator.example:443/default;AuthMech=12;transportMode=http;httpPath=cliservice;ssl=1'\n"
             "  gateway spark\n"
             "  gateway webhdfs put examples/spark/count_to_10.py /user/you/examples/count_to_10.py\n"
             "  gateway hive\n"
@@ -186,8 +191,27 @@ def main(argv: list[str] | None = None) -> int:
     p_hive.add_argument("--sub", default="analyst")
     p_hive.set_defaults(func=cmd_hive)
 
-    p_mcp = sub.add_parser("mcp", help="Call Spark or Hive MCP through the gateway")
-    p_mcp.add_argument("--adapter", choices=("spark", "hive"), default="spark", help="MCP server (default: spark)")
+    p_impala = sub.add_parser(
+        "impala", help="Run SHOW DATABASES on Knox Impala (token topology, not /cdp/impala)"
+    )
+    p_impala.add_argument(
+        "resource",
+        nargs="?",
+        default="databases",
+        help="Impala probe (default: databases)",
+    )
+    p_impala.add_argument("--mint", action="store_true", help="Sign a lab mock token (GATEWAY_MODE=local only)")
+    p_impala.add_argument("--token", help="Bearer token (default: KNOX_TOKEN or --mint)")
+    p_impala.add_argument("--sub", default="analyst")
+    p_impala.set_defaults(func=cmd_impala)
+
+    p_mcp = sub.add_parser("mcp", help="Call Spark, Hive, or Impala MCP through the gateway")
+    p_mcp.add_argument(
+        "--adapter",
+        choices=("spark", "hive", "impala"),
+        default="spark",
+        help="MCP server (default: spark)",
+    )
     p_mcp.add_argument("--tool", help="tools/call name (default: list tools)")
     p_mcp.add_argument("--arg", action="append", default=[], metavar="KEY=VALUE")
     p_mcp.add_argument("--mint", action="store_true", help="Sign a lab mock token (GATEWAY_MODE=local only)")
@@ -217,25 +241,32 @@ def main(argv: list[str] | None = None) -> int:
 
     p_jdbc = sub.add_parser(
         "jdbc",
-        help="Add or show a Hive JDBC URL (Knox HTTP). Does not publish /cdp/hive.",
+        help="Add Hive (Knox) or Impala (CDW) JDBC. Does not publish /cdp/hive or /cdp/impala.",
     )
     jdbc_sub = p_jdbc.add_subparsers(dest="jdbc_cmd", required=True)
 
-    p_jdbc_add = jdbc_sub.add_parser("add", help="Parse jdbc:hive2 HTTP URL and store it in .env")
+    p_jdbc_add = jdbc_sub.add_parser("add", help="Parse jdbc:hive2 or jdbc:impala HTTP URL into .env")
     p_jdbc_add.add_argument(
         "url",
         nargs="?",
-        help="jdbc:hive2://…;transportMode=http;httpPath=…/cdp-proxy-api/hive",
+        help="jdbc:hive2://…/hive or jdbc:impala://…;httpPath=cliservice (AuthMech=12)",
     )
-    p_jdbc_add.add_argument("--tls-verify", action="store_true", help="Verify Knox TLS (default: off for labs)")
-    p_jdbc_add.add_argument("--fetch-jwks", action="store_true", help="Download JWKS after storing the URL")
+    p_jdbc_add.add_argument("--tls-verify", action="store_true", help="Verify TLS (default: off for labs)")
+    p_jdbc_add.add_argument("--fetch-jwks", action="store_true", help="Download JWKS after storing a Hive URL")
     p_jdbc_add.add_argument("--insecure", action="store_true", help="Skip TLS verify when fetching JWKS")
     p_jdbc_add.set_defaults(func=cmd_jdbc_add)
 
-    jdbc_sub.add_parser("show", help="Print stored Hive JDBC fields (passwords redacted)").set_defaults(
+    jdbc_sub.add_parser("show", help="Print stored Hive/Impala JDBC fields (passwords redacted)").set_defaults(
         func=cmd_jdbc_show
     )
-    jdbc_sub.add_parser("clear", help="Remove stored Hive JDBC from .env").set_defaults(func=cmd_jdbc_clear)
+    p_jdbc_clear = jdbc_sub.add_parser("clear", help="Remove stored Hive and/or Impala JDBC from .env")
+    p_jdbc_clear.add_argument(
+        "--adapter",
+        choices=("hive", "impala", "all"),
+        default="all",
+        help="Which inventoried JDBC to clear (default: all)",
+    )
+    p_jdbc_clear.set_defaults(func=cmd_jdbc_clear)
 
     p_jwks = sub.add_parser("fetch-jwks", help="Download Knox JWKS and write a verifying PEM")
     p_jwks.add_argument("--jwks-url")
@@ -332,6 +363,24 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def _compose_env(overlay: dict[str, str]) -> dict[str, str]:
+    env = os.environ.copy()
+    env.update(overlay)
+    return env
+
+
+def _restore_operator_stack(values: dict[str, str]) -> None:
+    try:
+        write_apisix_config(values)
+    except FileNotFoundError as exc:
+        print(f"restore config skipped: {exc}", file=sys.stderr)
+        return
+    compose_run(
+        ["up", "-d", "--force-recreate", "apisix", "mcp-spark", "mcp-hive", "mcp-impala"],
+        check=False,
+    )
+
+
 def cmd_test(args: argparse.Namespace) -> int:
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
     if args.unit:
@@ -342,10 +391,15 @@ def cmd_test(args: argparse.Namespace) -> int:
                 "tests/test_cli.py",
                 "tests/test_knox_url.py",
                 "tests/test_hive.py",
+                "tests/test_impala.py",
                 "tests/test_hive_sql.py",
+                "tests/test_impala_sql.py",
+                "tests/test_impala_hs2.py",
                 "tests/test_webhdfs.py",
                 "tests/test_mcpspark_livy.py",
                 "tests/test_spark_example.py",
+                "tests/test_hive_example.py",
+                "tests/test_impala_example.py",
                 "tests/test_admin_store.py",
                 "tests/test_quota_client.py",
                 "tests/test_apisix_render.py",
@@ -354,15 +408,29 @@ def cmd_test(args: argparse.Namespace) -> int:
                 "tests/test_amp_mcp.py",
             ]
         )
-    else:
-        ensure_dotenv()
-        generate_test_keys()
-        write_apisix_config()
+        pytest_cmd.extend(args.pytest_args)
+        return subprocess.call(pytest_cmd, cwd=repo_root())
+
+    ensure_dotenv()
+    generate_test_keys()
+    saved = load_env()
+    pytest_env = os.environ.copy()
+    if args.live:
+        write_apisix_config(saved)
         compose_run(["up", "-d", "--build"])
-        pytest_cmd.append("tests")
-        pytest_cmd.extend(["-m", "live"] if args.live else ["-m", "not live"])
+    else:
+        overlay = lab_test_env(saved)
+        write_apisix_config(overlay)
+        pytest_env = _compose_env(overlay)
+        compose_run(["up", "-d", "--build", "--force-recreate"], env=pytest_env)
+    pytest_cmd.append("tests")
+    pytest_cmd.extend(["-m", "live"] if args.live else ["-m", "not live"])
     pytest_cmd.extend(args.pytest_args)
-    return subprocess.call(pytest_cmd, cwd=repo_root())
+    try:
+        return subprocess.call(pytest_cmd, cwd=repo_root(), env=pytest_env)
+    finally:
+        if not args.live:
+            _restore_operator_stack(saved)
 
 
 def cmd_token_mint(args: argparse.Namespace) -> int:
@@ -574,6 +642,30 @@ def cmd_hive(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_impala(args: argparse.Namespace) -> int:
+    token = _require_bearer(args)
+    if not token:
+        return 2
+    resource = (args.resource or "databases").strip().lower()
+    if resource not in {"databases", "database", "dbs"}:
+        print("error: only `gateway impala databases` is implemented", file=sys.stderr)
+        return 2
+    env = load_env()
+    try:
+        print(f"SHOW DATABASES {impala_target(env)}")
+        names = impala_show_databases(env, token)
+    except ImpalaError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:  # noqa: BLE001
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    for name in names:
+        print(name)
+    print(f"count {len(names)}")
+    return 0
+
+
 def cmd_mcp(args: argparse.Namespace) -> int:
     token = _require_bearer(args)
     if not token:
@@ -679,59 +771,94 @@ def _print_knox(env: dict[str, str]) -> None:
         print(f"agent {path}")
     print(f"mcp {gateway_url(env).rstrip('/')}{SPARK_MCP_PATH}")
     print(f"mcp {gateway_url(env).rstrip('/')}{HIVE_MCP_PATH}")
+    print(f"mcp {gateway_url(env).rstrip('/')}{IMPALA_MCP_PATH}")
     print(f"admin {admin_url(env)}")
     hive_url = env.get("HIVE_KNOX_URL") or ""
     if hive_url:
         print(f"hive {hive_url}")
         print("hive_agent /mcp/hive (read-only); /cdp/hive stays 404")
+    impala_host = (env.get("IMPALA_HOST") or "").strip()
+    if impala_host:
+        print(f"impala {impala_target(env)}")
+        print("impala_agent /mcp/impala (read-only); /cdp/impala stays 404")
 
 
 def cmd_jdbc_add(args: argparse.Namespace) -> int:
     raw = args.url
     if not raw:
         if sys.stdin.isatty():
-            print("Paste the Hive JDBC URL, then EOF (Ctrl-D):", file=sys.stderr)
+            print("Paste a jdbc:hive2:// or jdbc:impala:// URL, then EOF (Ctrl-D):", file=sys.stderr)
         raw = sys.stdin.read()
-    updates = hive_jdbc_updates(load_env(), raw, tls_verify=args.tls_verify)
+    updates = jdbc_inventory_updates(load_env(), raw, tls_verify=args.tls_verify)
     path = upsert_dotenv(updates)
     print(f"wrote {path}")
     env = load_env()
     _print_jdbc(env)
+    is_impala = raw.strip().lower().startswith(JDBC_IMPALA)
     if args.fetch_jwks:
-        jwks = env.get("KNOX_JWKS_URL") or ""
-        if not jwks:
-            print("error: no KNOX_JWKS_URL; run gateway knox <livy-url> first", file=sys.stderr)
-            return 2
-        out = fetch_knox_pubkey(
-            jwks,
-            repo_root() / "conf" / "keys" / "knox-live.pem",
-            insecure=args.insecure or not args.tls_verify,
+        if is_impala:
+            print("note: Impala JDBC does not set KNOX_JWKS_URL; skip --fetch-jwks", file=sys.stderr)
+        else:
+            jwks = env.get("KNOX_JWKS_URL") or ""
+            if not jwks:
+                print("error: no KNOX_JWKS_URL; run gateway knox <livy-url> first", file=sys.stderr)
+                return 2
+            out = fetch_knox_pubkey(
+                jwks,
+                repo_root() / "conf" / "keys" / "knox-live.pem",
+                insecure=args.insecure or not args.tls_verify,
+            )
+            print(f"jwks {out}")
+    if is_impala:
+        print(
+            "note: CDW Impala coordinator inventoried as IMPALA_HOST; agents use /mcp/impala "
+            "with the Knox JWT (AuthMech=12). JDBC auth=browser is ignored. "
+            "Does not change Livy UPSTREAM_HOST. /cdp/impala stays unpublished"
         )
-        print(f"jwks {out}")
-    print("note: Hive JDBC is inventoried; agents use /mcp/hive. /cdp/hive stays unpublished")
+    else:
+        print("note: Hive JDBC is inventoried; agents use /mcp/hive. /cdp/hive stays unpublished")
     return 0
 
 
 def cmd_jdbc_show(_args: argparse.Namespace) -> int:
     env = load_env()
-    if not (env.get("HIVE_JDBC_URL") or "").strip():
-        print("error: no Hive JDBC stored; run gateway jdbc add <jdbc:hive2://...>", file=sys.stderr)
+    hive = (env.get("HIVE_JDBC_URL") or "").strip()
+    impala = (env.get("IMPALA_JDBC_URL") or env.get("IMPALA_HOST") or "").strip()
+    if not hive and not impala:
+        print(
+            "error: no Hive or Impala JDBC stored; run gateway jdbc add <jdbc:hive2://...> "
+            "or gateway jdbc add <jdbc:impala://...>",
+            file=sys.stderr,
+        )
         return 1
     _print_jdbc(env)
     return 0
 
 
-def cmd_jdbc_clear(_args: argparse.Namespace) -> int:
-    upsert_dotenv({key: "" for key in HIVE_ENV_KEYS})
-    print("cleared Hive JDBC")
+def cmd_jdbc_clear(args: argparse.Namespace) -> int:
+    adapter = args.adapter
+    keys: list[str] = []
+    if adapter in {"hive", "all"}:
+        keys.extend(HIVE_ENV_KEYS)
+        print("cleared Hive JDBC")
+    if adapter in {"impala", "all"}:
+        keys.extend(IMPALA_ENV_KEYS)
+        print("cleared Impala JDBC")
+    upsert_dotenv({key: "" for key in keys})
     return 0
 
 
 def _print_jdbc(env: dict[str, str]) -> None:
-    jdbc = env.get("HIVE_JDBC_URL") or ""
-    print(f"HIVE_JDBC_URL={redact_jdbc(jdbc)}")
-    for key in ("HIVE_KNOX_URL", "HIVE_KNOX_PREFIX", "HIVE_KNOX_TOPOLOGY", "HIVE_KNOX_SERVICE"):
-        print(f"{key}={env.get(key, '')}")
+    hive = env.get("HIVE_JDBC_URL") or ""
+    if hive.strip():
+        print(f"HIVE_JDBC_URL={redact_jdbc(hive)}")
+        for key in ("HIVE_KNOX_URL", "HIVE_KNOX_PREFIX", "HIVE_KNOX_TOPOLOGY", "HIVE_KNOX_SERVICE"):
+            print(f"{key}={env.get(key, '')}")
+    impala = env.get("IMPALA_JDBC_URL") or ""
+    if impala.strip() or (env.get("IMPALA_HOST") or "").strip():
+        print(f"IMPALA_JDBC_URL={redact_jdbc(impala)}")
+        for key in ("IMPALA_HOST", "IMPALA_PORT", "IMPALA_SCHEME", "IMPALA_HTTP_PATH", "IMPALA_TLS_VERIFY"):
+            print(f"{key}={env.get(key, '')}")
 
 
 def cmd_fetch_jwks(args: argparse.Namespace) -> int:

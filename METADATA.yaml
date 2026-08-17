@@ -5,7 +5,7 @@
 # --- Identity ---
 name: "CDP Agent Gateway"
 slug: "cdp-agent-gateway" # URL-safe repo / catalog identifier
-description: "Front third-party agents with Apache APISIX so Cloudera Data Platform stays behind Knox JWTs and Ranger. Spark MCP and read-only Hive MCP are published with RFC 9728 metadata and caller keys; operators stage HDFS files at /cdp/webhdfs; /cdp/hive stays 404."
+description: "Front third-party agents with Apache APISIX so Cloudera Data Platform stays behind Knox JWTs and Ranger. Spark MCP plus read-only Hive and Impala MCP are published with RFC 9728 metadata and caller keys; operators stage HDFS files at /cdp/webhdfs; /cdp/hive and /cdp/impala stay 404."
 reprise_link: "" # Public reprise link — add when the demo recording is published
 
 # --- Classification (website filters) ---
@@ -26,6 +26,7 @@ tags:
   - spark
   - livy
   - hive
+  - impala
   - apache-knox
   - apache-apisix
   - gateway

@@ -1,12 +1,13 @@
 # Test cases
 
-Phase 0 defines cases. Phase 1 executes them against **local APISIX** (mock Knox or live Knox). Mark live results in the table at the bottom; do not commit tokens.
+Phase 0 defines cases. Phases 1–3 execute them against **local APISIX** (mock Knox or live Knox). Mark live results in the table at the bottom; do not commit tokens.
 
 Assumptions:
 
 - `GATEWAY_URL` is `http://127.0.0.1:9080` unless `APISIX_PORT` is changed
 - Live Knox URL is set with `gateway knox <https-url>`
 - Hive JDBC (optional) is stored with `gateway jdbc add <jdbc:hive2://…>`. Agents use `/mcp/hive`; `/cdp/hive` stays 404
+- Impala agents use `/mcp/impala`; `/cdp/impala` stays 404. Inventory CDW JDBC with `gateway jdbc add <jdbc:impala://…>`. Operator probe is `gateway impala`
 - `KNOX_TOKEN` is a Knox JWT in `.env` (`gateway token set`), never in git. `--mint` is lab-only (`GATEWAY_MODE=local`). Live pytest reads those keys from `.env` via `load_env()`; you do not have to export them in the shell.
 - Phase 1 probe is `GET /cdp/livy_for_spark3/sessions`
 - WebHDFS staging is `GET`/`PUT` `/cdp/webhdfs/v1/...` (`gateway webhdfs`)
@@ -15,8 +16,8 @@ Assumptions:
 
 ```bash
 gateway test --unit          # inventory, CLI, blueprint, AMP packaging (no Docker)
-gateway test                 # start Compose, run pytest -m "not live"
-gateway test --live          # requires GATEWAY_MODE=live and KNOX_TOKEN
+gateway test                 # mock-cdp overlay (does not rewrite `.env`), Compose, pytest -m "not live"
+gateway test --live          # requires GATEWAY_MODE=live and KNOX_TOKEN; leaves that stack running
 ```
 
 `make test` / `make test-unit` / `make live` call the same CLI.
@@ -71,6 +72,7 @@ Against mock CDP unless noted. Spark URI is `/cdp/livy_for_spark3/sessions`.
 | P2-03 | `spark_list_batches` forwards `sub` | JSON result includes `knox_user`; no raw token | `tests/test_mcp_spark.py` |
 | P2-04 | Audit record joins tool, `sub`, `knox.id` | `GET /api/audit?request_id=` returns those fields; no bearer | `tests/test_admin_store.py`, `tests/test_admin_gateway.py` |
 | P2-05 | Hive MCP through APISIX | `tools/list` + `hive_list_databases`; `/cdp/hive` still 404 | `tests/test_mcp_hive.py` |
+| P2-16 | Impala MCP through APISIX | `tools/list` + `impala_list_databases`; `/cdp/impala` still 404 | `tests/test_mcp_impala.py`; live `tests/test_live_cdp.py` |
 | P2-06 | Raw Livy writes on the agent listener | Authenticated `POST .../sessions/0/statements`, `POST .../batches`, `PUT`, `DELETE` → `404` or `405` | `tests/test_gateway_proxy.py` |
 | P2-07 | `spark_submit_batch` accepts cluster file URI | HDFS (or other allowlisted scheme) submit `isError=false`; `submitted=true` | `tests/test_mcp_spark.py` |
 | P2-08 | `spark_submit_batch` rejects remote HTTP file | `isError=true`; error names HDFS/object-store | `tests/test_mcp_spark.py` |
@@ -78,7 +80,7 @@ Against mock CDP unless noted. Spark URI is `/cdp/livy_for_spark3/sessions`.
 | P2-10 | `spark_submit_batch` rejects inline `code` | `isError=true`; file URI required | `tests/test_mcp_spark.py`, `tests/test_mcpspark_livy.py` |
 | P2-11 | Operator admin UI on `:9090` | `GET /health` 200; `GET /admin` on APISIX is 404 | `tests/test_admin_gateway.py` |
 | P2-12 | Per-user submit quota | `daily_submits=0` → admin admit `429`; MCP `isError` when mock PEM is in use | `tests/test_admin_gateway.py`, `tests/test_admin_store.py` |
-| P2-13 | MCP burst rate limit | Authenticated `/mcp/spark` or `/mcp/hive` returns `429` after `MCP_RATE_COUNT` per Knox `sub`; Livy GET is not capped | `tests/test_gateway_ratelimit.py`, `tests/test_apisix_render.py` |
+| P2-13 | MCP burst rate limit | Authenticated `/mcp/spark`, `/mcp/hive`, or `/mcp/impala` returns `429` after `MCP_RATE_COUNT` per Knox `sub`; Livy GET is not capped | `tests/test_gateway_ratelimit.py`, `tests/test_apisix_render.py` |
 | P2-14 | `--mint` on a live stack | CLI exit 2; no POST; message names Knox JWKS / `invalid_signature` | `tests/test_cli.py` |
 | P2-15 | Live Spark `count_to_10` then Hive select `{sub}.count_to_10` | `spark_submit_batch` reaches `state=success`; `hive_select` returns `n` 1..10; `/cdp/hive` 404 | CLI submit + `tests/test_live_cdp.py` |
 
@@ -107,7 +109,7 @@ Python Knox JWT and CML packaging. Compose tests above stay the source of truth 
 
 | ID | Case | Phase |
 | --- | --- | --- |
-| — | Streamable HTTP / GET SSE / MCP session | Held; POST JSON-RPC is the `/mcp/spark` and `/mcp/hive` contract |
+| — | Streamable HTTP / GET SSE / MCP session | Held; POST JSON-RPC is the `/mcp/spark`, `/mcp/hive`, and `/mcp/impala` contract |
 | P3-05 | MCP OAuth PKCE broker exchanges into a Knox JWT | 3 (IdP) |
 | P3-06 | Partner without mTLS is rejected on TLS listener | 3 (after HTTPS) |
 
@@ -117,4 +119,5 @@ Copy a row per live run. Keep this table free of secrets.
 
 | Date | IDs run | Environment | Pass / fail | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-08-17 | P3-01, P3-02, P3-03, P3-04 (plus Phase 0–2 mock suite) | Local Compose mock-cdp; APISIX `:9080` | pass | `pytest -m "not live"` 147 passed. PRM public; `401` has `resource_metadata`; revoked `knox.id=revoked-token-id` → `401 revoked`; MCP without `X-Agent-Key` → 401, Livy GET still 200; Spark logs redact `eyJ` / `Bearer`. `gateway test` overlays mock-cdp without rewriting `.env`. Recreate APISIX with mock-cdp so token-state DNS is fresh. |
 | 2026-08-17 | P2-07 (live submit), P2-14, P2-15, P1-06 | Public Cloud `go01-obser-de` via local APISIX `:9080`; Knox `sub=ibrooks` | pass | Staged `hdfs:///user/ibrooks/examples/count_to_10.py`; Livy batch `id=2` `state=success` (`application_1786294128788_3137`); Hive `ibrooks.count_to_10` `n` 1..10; `/cdp/hive` 404; `--mint` → `401 invalid_signature`. `pytest tests/test_live_cdp.py tests/test_phase0_inventory.py` 8 passed. No tokens recorded. |

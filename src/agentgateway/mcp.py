@@ -5,18 +5,19 @@ from typing import Any
 import httpx
 
 from agentgateway.env import agent_headers, gateway_url
-from agentgateway.knox import HIVE_MCP_PATH, SPARK_MCP_PATH
+from agentgateway.knox import HIVE_MCP_PATH, IMPALA_MCP_PATH, SPARK_MCP_PATH
 
 ADAPTERS = {
     "spark": SPARK_MCP_PATH,
     "hive": HIVE_MCP_PATH,
+    "impala": IMPALA_MCP_PATH,
 }
 
 
 def mcp_path(adapter: str = "spark") -> str:
     key = (adapter or "spark").strip().lower()
     if key not in ADAPTERS:
-        raise ValueError(f"unknown MCP adapter {adapter!r}; use spark or hive")
+        raise ValueError(f"unknown MCP adapter {adapter!r}; use spark, hive, or impala")
     return ADAPTERS[key]
 
 

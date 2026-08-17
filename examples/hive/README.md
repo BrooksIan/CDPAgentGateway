@@ -14,7 +14,7 @@ sequenceDiagram
 
   Note over HS2: Spark already wrote Iceberg {user}.count_to_10
   Op->>GW: hive_list_tables database=$USER
-  GW->>MCP: POST /mcp Bearer JWT
+  GW->>MCP: POST /mcp Bearer JWT + X-Agent-Key
   MCP->>Knox: SHOW TABLES IN `user`
   Knox->>HS2: as Knox sub
   HS2-->>Op: count_to_10

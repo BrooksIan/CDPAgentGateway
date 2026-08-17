@@ -54,7 +54,7 @@ curl -s http://127.0.0.1:9080/.well-known/oauth-protected-resource
 
 ## Gaps to plan for
 
-**Revocation.** Managed Knox tokens can be disabled while still unexpired. Local JWT validation used to accept them until `exp`. Phase 3 calls a host-pinned token-state URL with `knox.id` (`401` `revoked`). Local mock: `http://mock-cdp:8080/gateway/homepage/knoxtoken/api/v2/token/state/{id}`. Live: set `KNOX_TOKEN_STATE_URL` on the same host as `UPSTREAM_HOST`, or leave unset.
+**Revocation.** Managed Knox tokens can be disabled while still unexpired. Local JWT validation used to accept them until `exp`. The gateway now calls a host-pinned token-state URL with `knox.id` (`401` `revoked`). Local mock: `http://mock-cdp:8080/gateway/homepage/knoxtoken/api/v2/token/state/{id}`. Live: set `KNOX_TOKEN_STATE_URL` on the same host as `UPSTREAM_HOST`, or leave unset (signature + `exp` only).
 
 **JWKS pinning.** `gateway token set` and `trusted_jku()` honor `jku` only when the host matches `UPSTREAM_HOST`. Never fetch keys from an arbitrary URL in the token. APISIX itself verifies a PEM copied to `conf/generated/knox-public.pem`. Token-state URLs use the same host pin.
 
@@ -67,12 +67,12 @@ curl -s http://127.0.0.1:9080/.well-known/oauth-protected-resource
 1. Operator obtains a Knox JWT from Token Generation or Token API v2.
 2. `gateway knox https://…/cdp-proxy-token/livy_for_spark3/` writes the live upstream.
 3. `gateway token set` stores the JWT in `.env` as `KNOX_TOKEN` (never printed) and refreshes JWKS from a pinned `jku` when present.
-4. `gateway up` then `gateway spark`, `gateway webhdfs`, `gateway mcp`, or `gateway mcp --adapter hive` (or an MCP host) sends `Authorization: Bearer` to `http://127.0.0.1:9080`. MCP also sends `X-Agent-Key: $AGENT_CALLER_KEY` (default `lab-agent`). Do not pass `--mint` on the live path.
+4. `gateway up` then `gateway spark`, `gateway webhdfs`, `gateway mcp`, `gateway mcp --adapter hive`, `gateway mcp --adapter impala`, or an MCP host sends `Authorization: Bearer` to `http://127.0.0.1:9080`. MCP also sends `X-Agent-Key: $AGENT_CALLER_KEY` (default `lab-agent`). Do not pass `--mint` on the live path.
 5. APISIX validates signature, `iss`, `sub`, and `exp`, then forwards the same header to Knox.
 
 ## Audit
 
-APISIX assigns `X-Request-Id` on every route. `mcp-spark` and `mcp-hive` record tool name, Knox `sub`, and `knox.id` (`X-Knox-Token-Id`) against that id in the operator sqlite store. Lookup:
+APISIX assigns `X-Request-Id` on every route. `mcp-spark`, `mcp-hive`, and `mcp-impala` record tool name, Knox `sub`, and `knox.id` (`X-Knox-Token-Id`) against that id in the operator sqlite store. Lookup:
 
 ```bash
 curl -s "http://127.0.0.1:9090/api/audit?request_id=<X-Request-Id>"

@@ -8,11 +8,14 @@ API_TOPOLOGY = "cdp-proxy-api"
 KNOWN_TOPOLOGIES = (TOKEN_TOPOLOGY, API_TOPOLOGY, "cdp-proxy")
 DEFAULT_PREFIX = f"/gateway/{TOKEN_TOPOLOGY}"
 JDBC_HIVE2 = "jdbc:hive2://"
+JDBC_IMPALA = "jdbc:impala://"
 HIVE_SERVICE = "hive"
+IMPALA_SERVICE = "impala"
 SPARK_LIVY_SERVICE = "livy_for_spark3"
 SPARK_SESSIONS_PATH = f"/cdp/{SPARK_LIVY_SERVICE}/sessions"
 SPARK_MCP_PATH = "/mcp/spark"
 HIVE_MCP_PATH = "/mcp/hive"
+IMPALA_MCP_PATH = "/mcp/impala"
 HIVE_ENV_KEYS = (
     "HIVE_JDBC_URL",
     "HIVE_KNOX_URL",
@@ -20,7 +23,25 @@ HIVE_ENV_KEYS = (
     "HIVE_KNOX_TOPOLOGY",
     "HIVE_KNOX_SERVICE",
 )
+IMPALA_ENV_KEYS = (
+    "IMPALA_JDBC_URL",
+    "IMPALA_HOST",
+    "IMPALA_PORT",
+    "IMPALA_SCHEME",
+    "IMPALA_HTTP_PATH",
+    "IMPALA_TLS_VERIFY",
+)
+_MOCK_HOSTS = {"", "mock-cdp", "127.0.0.1", "localhost"}
 _JDBC_SECRET_KEYS = {"password", "passwd"}
+
+
+def impala_warehouse_host(env: dict[str, str]) -> str:
+    """CDW Impala coordinator when inventoried; empty means Knox `{prefix}/impala`."""
+    host = (env.get("IMPALA_HOST") or "").strip()
+    if host in _MOCK_HOSTS:
+        return ""
+    return host
+
 
 LOCAL_UPSTREAM = {
     "GATEWAY_MODE": "local",
@@ -39,6 +60,12 @@ LOCAL_UPSTREAM = {
     "HIVE_KNOX_PREFIX": "",
     "HIVE_KNOX_TOPOLOGY": "",
     "HIVE_KNOX_SERVICE": "",
+    "IMPALA_JDBC_URL": "",
+    "IMPALA_HOST": "",
+    "IMPALA_PORT": "",
+    "IMPALA_SCHEME": "",
+    "IMPALA_HTTP_PATH": "",
+    "IMPALA_TLS_VERIFY": "",
 }
 
 
@@ -136,6 +163,65 @@ def parse_hive_jdbc(jdbc: str, *, tls_verify: bool = False) -> dict[str, str]:
         "KNOX_JWKS_URL": parsed["KNOX_JWKS_URL"],
         "KNOX_TOPOLOGY": parsed["KNOX_TOPOLOGY"],
     }
+
+
+def parse_impala_jdbc(jdbc: str, *, tls_verify: bool = False) -> dict[str, str]:
+    """Inventory a CDW Impala Virtual Warehouse JDBC URL. Agents still send a Knox JWT."""
+    raw = jdbc.strip()
+    if not raw.lower().startswith(JDBC_IMPALA):
+        raise ValueError("Need a jdbc:impala:// URL with transportMode=http")
+    rest = raw[len(JDBC_IMPALA) :]
+    authority_and_path, _, prop_blob = rest.partition(";")
+    props = _jdbc_props(prop_blob)
+    transport = props.get("transportmode", "binary")
+    if transport != "http":
+        raise ValueError("Impala JDBC must use transportMode=http")
+    http_path = (props.get("httppath") or "cliservice").strip()
+    if not http_path:
+        raise ValueError("Impala JDBC needs httpPath (CDW uses cliservice)")
+    http_path = http_path.lstrip("/")
+    hostport = authority_and_path.split("/", 1)[0]
+    if not hostport:
+        raise ValueError("Impala JDBC is missing host")
+    if ":" in hostport:
+        host, port_s = hostport.rsplit(":", 1)
+        port = int(port_s)
+    else:
+        host = hostport
+        port = 443 if props.get("ssl", "false").lower() in {"true", "1", "yes"} else 80
+    if not host:
+        raise ValueError("Impala JDBC is missing host")
+    ssl = props.get("ssl", "false").lower() in {"true", "1", "yes"}
+    scheme = "https" if ssl or port == 443 else "http"
+    auth = (props.get("auth") or "").strip().lower()
+    mech = (props.get("authmech") or "").strip()
+    if auth and auth not in {"browser", "jwt"}:
+        raise ValueError(f"Unsupported Impala JDBC auth={props.get('auth')!r}; agents use Knox JWT")
+    if mech and mech not in {"12"}:
+        raise ValueError("Impala JDBC AuthMech must be 12 (JWT); do not store browser passwords")
+    return {
+        "IMPALA_JDBC_URL": raw,
+        "IMPALA_HOST": host,
+        "IMPALA_PORT": str(port),
+        "IMPALA_SCHEME": scheme,
+        "IMPALA_HTTP_PATH": http_path,
+        "IMPALA_TLS_VERIFY": "true" if tls_verify else "false",
+    }
+
+
+def impala_jdbc_updates(_existing: dict[str, str], jdbc: str, *, tls_verify: bool = False) -> dict[str, str]:
+    parsed = parse_impala_jdbc(jdbc, tls_verify=tls_verify)
+    return {key: parsed[key] for key in IMPALA_ENV_KEYS}
+
+
+def jdbc_inventory_updates(existing: dict[str, str], jdbc: str, *, tls_verify: bool = False) -> dict[str, str]:
+    raw = jdbc.strip()
+    lowered = raw.lower()
+    if lowered.startswith(JDBC_IMPALA):
+        return impala_jdbc_updates(existing, raw, tls_verify=tls_verify)
+    if lowered.startswith(JDBC_HIVE2):
+        return hive_jdbc_updates(existing, raw, tls_verify=tls_verify)
+    raise ValueError("Need jdbc:hive2:// (Hive) or jdbc:impala:// (CDW Impala) with transportMode=http")
 
 
 def hive_jdbc_updates(existing: dict[str, str], jdbc: str, *, tls_verify: bool = False) -> dict[str, str]:

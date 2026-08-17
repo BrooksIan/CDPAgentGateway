@@ -23,13 +23,16 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert "2_job-smoke-knox/smoke_knox.py" in scripts
     assert "3_app-mcp-spark/app.py" in scripts
     assert "5_app-mcp-hive/app.py" in scripts
+    assert "6_app-mcp-impala/app.py" in scripts
     assert "4_app-operator-admin/app.py" in scripts
 
     mcp = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-spark")
     hive = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-hive")
+    impala = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-impala")
     admin = next(task for task in amp["tasks"] if task.get("subdomain") == "gateway-admin")
     assert mcp["bypass_authentication"] is True
     assert hive["bypass_authentication"] is True
+    assert impala["bypass_authentication"] is True
     assert admin["bypass_authentication"] is False
 
 
@@ -47,6 +50,7 @@ def test_amp_layout_and_catalog_exist() -> None:
         ROOT / "3_app-mcp-spark" / "app.py",
         ROOT / "4_app-operator-admin" / "app.py",
         ROOT / "5_app-mcp-hive" / "app.py",
+        ROOT / "6_app-mcp-impala" / "app.py",
         ROOT / "src" / "agentgateway" / "knox_jwt.py",
         ROOT / "src" / "agentgateway" / "amp.py",
     ):

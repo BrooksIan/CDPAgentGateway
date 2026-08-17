@@ -31,6 +31,16 @@ def load_env() -> dict[str, str]:
     return {key: str(value) for key, value in values.items() if value is not None}
 
 
+def lab_test_env(existing: dict[str, str] | None = None) -> dict[str, str]:
+    """Mock-CDP overlay for `gateway test`. Does not write `.env`."""
+    from agentgateway.knox import LOCAL_UPSTREAM
+
+    merged = dict(existing or load_env())
+    merged.update(LOCAL_UPSTREAM)
+    merged["KNOX_TOKEN_STATE_URL"] = ""
+    return merged
+
+
 def ensure_dotenv() -> Path:
     root = repo_root()
     dest = root / ".env"

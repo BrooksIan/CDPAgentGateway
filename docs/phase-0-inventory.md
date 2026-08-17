@@ -46,7 +46,7 @@ Start with Spark. Mark the others as later. Gateway path is `/cdp/<knox-service>
 | Spark / Livy for Spark 3 | `.../cdp-proxy-token/livy_for_spark3/` | `GET /sessions` → `gateway spark` | **yes** — [spark.md](spark.md) |
 | HDFS / WebHDFS | `.../cdp-proxy-token/webhdfs/v1/` | `GET ?op=LISTSTATUS` → `gateway webhdfs ls` | **yes** (operator staging) — [spark.md](spark.md) |
 | Hive / HS2 HTTP | `gateway jdbc add '<jdbc:hive2://…;httpPath=…/cdp-proxy-api/hive>'` then `/mcp/hive` | `hive_list_databases` | **yes (Phase 2 MCP)**; `/cdp/hive` 404 — [hive.md](hive.md) |
-| Impala | | | no |
+| Impala / CDW VW | `gateway jdbc add '<jdbc:impala://…;httpPath=cliservice>'` then `/mcp/impala` | `impala_list_databases` | **yes (Phase 2 MCP)**; `/cdp/impala` 404 — [impala.md](impala.md) |
 | Ozone / S3 | | list bucket or prefix | no |
 | Atlas | | search or type def | no |
 | NiFi | | read flow / about | no |
@@ -64,8 +64,8 @@ Start with Spark. Mark the others as later. Gateway path is `/cdp/<knox-service>
 
 | Item | Value |
 | --- | --- |
-| Intended first agent host | Cursor (MCP `/mcp/spark` and `/mcp/hive`) |
-| Tool names to allow later | Spark list/get/log/submit; Hive list/describe/select |
+| Intended first agent host | Cursor (MCP `/mcp/spark`, `/mcp/hive`, `/mcp/impala`) |
+| Tool names to allow later | Spark list/get/log/submit; Hive and Impala list/describe/select |
 | Data that must never return to a model | Raw Knox bearer; unbounded Hive/Spark result sets |
 
 ## Threat model (Phase 0 notes)

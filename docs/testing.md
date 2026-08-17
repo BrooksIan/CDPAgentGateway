@@ -73,6 +73,7 @@ Against mock CDP unless noted. Spark URI is `/cdp/livy_for_spark3/sessions`.
 | P2-10 | `spark_submit_batch` rejects inline `code` | `isError=true`; file URI required | `tests/test_mcp_spark.py`, `tests/test_mcpspark_livy.py` |
 | P2-11 | Operator admin UI on `:9090` | `GET /health` 200; `GET /admin` on APISIX is 404 | `tests/test_admin_gateway.py` |
 | P2-12 | Per-user submit quota | `daily_submits=0` → admin admit `429`; MCP `isError` when mock PEM is in use | `tests/test_admin_gateway.py`, `tests/test_admin_store.py` |
+| P2-13 | MCP burst rate limit | Authenticated `/mcp/spark` returns `429` after `MCP_RATE_COUNT` per Knox `sub`; Livy GET is not capped | `tests/test_gateway_ratelimit.py`, `tests/test_apisix_render.py` |
 
 ## Later phases (do not implement yet)
 

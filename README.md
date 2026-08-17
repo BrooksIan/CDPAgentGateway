@@ -1,6 +1,6 @@
 # Cloudera Blueprint: CDP Agent Gateway
 
-Bring third-party agents to [Cloudera Data Platform](https://www.cloudera.com/) through a north-south gateway. Agents present [Apache Knox](https://knox.apache.org/) JWTs; this gateway never exposes Hive, Impala, Ozone, or NiFi directly. Catalog fields live in [`METADATA.yaml`](METADATA.yaml).
+Bring third-party agents to [Cloudera Data Platform](https://www.cloudera.com/) through a north-south gateway. Agents present [Apache Knox](https://knox.apache.org/) JWTs. They never talk to Livy, HiveServer2, Impala, Ozone, or NiFi hostnames. Catalog fields live in [`METADATA.yaml`](METADATA.yaml).
 
 This repo follows the [Cloudera Blueprints Standard](https://github.com/kevinbtalbert/Cloudera-Blueprints-Standard). After reading this page you should know what the blueprint does, who it is for, and how to run the local demo.
 
@@ -20,31 +20,35 @@ This repo follows the [Cloudera Blueprints Standard](https://github.com/kevinbta
 
 ## Overview
 
-CDP Agent Gateway sits in front of Cloudera Data Platform so Cursor, Claude, and other MCP hosts can call Spark without learning cluster topology. Apache APISIX terminates agent HTTP, validates Knox-issued RS256 JWTs, and forwards the same bearer into Knox `cdp-proxy-token` **Livy for Spark 3**. Knox Trusted Proxy and Apache Ranger remain the authorization source of truth. Hive, Impala, Ozone, and NiFi stay unpublished. Cloudera value is unchanged identity and data policy: agents do not get a parallel credential path into the lakehouse.
+CDP Agent Gateway sits in front of Cloudera Data Platform so Cursor, Claude, and other MCP hosts can run Spark without learning cluster topology. Apache APISIX terminates agent HTTP, validates Knox-issued RS256 JWTs, and forwards the same bearer into Knox `cdp-proxy-token` **Livy for Spark 3**. Agents use MCP at `/mcp/spark`. Operators can `GET` Livy for tests. Knox Trusted Proxy and Apache Ranger remain the authorization source of truth.
+
+Hive is inventoried (`gateway jdbc add`) and operators can `SHOW DATABASES` with `gateway hive`. `/cdp/hive` is not an agent route. Impala, Ozone, and NiFi stay unpublished. Cloudera value is unchanged identity and data policy: agents do not get a parallel credential path into the lakehouse.
 
 ## Demo
 
-A recorded Reprise walkthrough is not published yet. The current end-to-end path is the local Docker stack in [Quickstart](#quickstart): mock Knox plus APISIX on `localhost:9080`, Spark MCP at `/mcp/spark`, with pytest covering missing bearer, `alg=none`, expired tokens, and subject forwarding.
+A recorded Reprise walkthrough is not published yet. The current path is the local Docker stack in [Quickstart](#quickstart): mock Knox, APISIX on `localhost:9080`, Spark MCP at `/mcp/spark`, operator admin UI on `127.0.0.1:9090`. Pytest covers missing bearer, `alg=none`, expired tokens, subject forwarding, and MCP tool list.
 
 ## Use Case
 
-Enterprises want third-party coding and analytics agents to run Spark on CDP, but they cannot publish Livy, HiveServer2, Impala, Ozone, or NiFi to those tools. The outcome of this blueprint is a single agent-facing address that allowlists **Livy for Spark 3**, enforces Knox user identity, keeps Ranger in charge of data access, and leaves a path to MCP adapters without replacing the CDP perimeter.
+Enterprises want coding and analytics agents to submit Spark jobs on CDP, but they cannot publish Livy or HiveServer2 to those tools. This blueprint gives one agent-facing address that allowlists Livy for Spark 3, enforces Knox user identity, keeps Ranger in charge of data access, and inventories Hive JDBC for a later MCP adapter without replacing the CDP perimeter.
 
 ## Key Features
 
 - Knox JWT at the agent edge — no second token format, no APISIX-minted user credentials
 - Dual identity — registered agent (caller key or mTLS later) plus CDP user (`sub` / `knox.id`)
 - Fail-closed proxy — missing, expired, wrong-issuer, and algorithm-confused tokens never reach Knox
-- Spark-only allowlist — Livy for Spark 3 GET/HEAD (`/cdp/livy_for_spark3*`) and MCP (`/mcp/spark`); Hive JDBC is inventoried only (`/cdp/hive` 404)
-- Local-to-live path — `gateway knox <url>` points the same Compose file at external Knox
-- Ranger stays authoritative — the gateway does not impersonate a different user than the token subject
+- Spark allowlist — MCP `/mcp/spark` (list, get, log, submit); Livy HTTP is GET/HEAD only
+- Hive inventory — `gateway jdbc add` stores Knox JDBC; `gateway hive` lists databases; `/cdp/hive` stays 404
+- Local-to-live — `gateway knox <livy-url>` points the same Compose file at external Knox
 - Operator admin UI — usage by Knox user and per-user Spark tool quotas on localhost `:9090`
+- MCP burst cap — `limit-count` on `/mcp/spark` keyed by Knox `sub` (default 60/minute)
+- Ranger stays authoritative — the gateway does not impersonate a different user than the token subject
 
 ## Quickstart
 
 1. Clone the repository.
 2. Install Docker and Python 3.11+ (`make` is optional).
-3. Create a virtualenv and install test dependencies:
+3. Create a virtualenv and install the CLI:
 
    ```bash
    python3 -m venv .venv
@@ -52,7 +56,7 @@ Enterprises want third-party coding and analytics agents to run Spark on CDP, bu
    pip install -e ".[dev]"
    ```
 
-4. Initialize config and start the local stack:
+4. Start the local stack and run tests:
 
    ```bash
    cp .env.example .env
@@ -61,55 +65,48 @@ Enterprises want third-party coding and analytics agents to run Spark on CDP, bu
    gateway test
    ```
 
-   `gateway` is the operator CLI (`python -m agentgateway` also works). Full command list: [docs/operator-cli.md](docs/operator-cli.md). `gateway test` renders APISIX config, starts Compose, and runs pytest (excluding live CDP). `make test` calls the same CLI.
+   `gateway` is the operator CLI (`python -m agentgateway` also works). `gateway test` renders APISIX config, starts Compose, and runs pytest (excluding live CDP). Commands: [docs/operator-cli.md](docs/operator-cli.md).
 
-5. Optional: point the same gateway at an external Knox proxy:
+5. Optional — point the same gateway at a live cluster:
 
    ```bash
    gateway knox https://knox.example.com/env/cdp-proxy-token/livy_for_spark3/
    gateway fetch-jwks --insecure
+   gateway token set
    gateway up
+   gateway spark
+   gateway mcp
+   gateway hive              # SHOW DATABASES; needs pip install -e ".[hive]"
+   gateway admin --open      # http://127.0.0.1:9090
    ```
 
-   `gateway knox` writes the host, port, `cdp-proxy-token` prefix, and JWKS URL into `.env`. Paste the Knox Livy-for-Spark3 URL. Do not commit `.env`.
+   `gateway knox` writes host, port, `cdp-proxy-token` prefix, and JWKS URL into `.env`. Spark: [docs/spark.md](docs/spark.md). Hive: [docs/hive.md](docs/hive.md). Do not commit `.env`.
 
-Useful local commands:
-
-```bash
-gateway doctor --ping
-gateway knox https://knox-host/env/cdp-proxy-token/livy_for_spark3/
-gateway jdbc add 'jdbc:hive2://knox-host/;ssl=true;transportMode=http;httpPath=env/cdp-proxy-api/hive'
-gateway fetch-jwks --insecure
-gateway token set          # paste JWT, or: gateway token set eyJ...
-gateway token show         # claims only, never the raw JWT
-gateway spark              # GET /cdp/livy_for_spark3/sessions
-gateway mcp                # list Spark MCP tools
-gateway mcp --tool spark_list_batches
-gateway mcp --tool spark_submit_batch --arg file=hdfs:///user/you/examples/count_to_10.py
-gateway admin              # usage and quotas at http://127.0.0.1:9090
-gateway logs -f
-gateway down
-```
-
-Do not commit `.env`, Knox tokens, or private keys.
+Do not commit Knox tokens, JDBC passwords, or private keys.
 
 ## Architecture / Software Components
 
-Agents terminate at APISIX. The `mcp-spark` adapter sits behind the gateway and forwards the caller's Knox bearer to Livy. Knox remains the only hop that presents cluster credentials.
+Agents terminate at APISIX. The `mcp-spark` adapter sits behind the gateway and forwards the caller's Knox bearer to Livy. Knox remains the only hop that presents cluster credentials. The admin UI is bound to localhost and is not an agent route.
 
 ![CDP Agent Gateway traffic path](assets/architecture.svg)
 
 | Component | Role |
 | --- | --- |
-| Apache APISIX | Agent-facing HTTP edge: TLS, Knox JWT plugin, allowlisted routes, audit |
-| `knox-jwt` plugin | Verifies RS256, `iss=KNOXSSO`, expiry; pins JWKS/public key; forwards `Authorization` |
-| Mock CDP (lab) | Stand-in Knox JWKS and probe paths for `gateway test` |
+| Apache APISIX | Agent-facing HTTP edge: Knox JWT plugin, allowlisted routes, request IDs |
+| `knox-jwt` plugin | RS256, `iss=KNOXSSO`, expiry; pinned PEM; forwards `Authorization` |
+| `mcp-spark` | Livy MCP tools (list/get/log/submit); not an APISIX plugin |
+| Mock CDP (lab) | Stand-in Knox JWKS and Livy probes for `gateway test` |
+| Operator admin | Local UI on `:9090`: usage by Knox `sub`, daily quotas, audit by `X-Request-Id` |
 | Apache Knox | Token issuance, `cdp-proxy-token`, Trusted Proxy / doAs |
-| Apache Ranger | Authorization for the Knox subject on Spark (Livy) |
-| MCP adapters | `mcp-spark` Livy tools (list/get/log/submit); not APISIX plugins |
-| Operator admin | Local UI on `:9090`: usage by Knox `sub`, daily quotas, audit join by `X-Request-Id` |
+| Apache Ranger | Authorization for the Knox subject on Spark (and Hive when probed) |
 
-Extended design: [docs/architecture.md](docs/architecture.md), [docs/spark.md](docs/spark.md), [docs/hive.md](docs/hive.md), [docs/admin.md](docs/admin.md), and [docs/identity-and-auth.md](docs/identity-and-auth.md).
+| Agent URI | Methods | Upstream |
+| --- | --- | --- |
+| `/mcp/spark` | POST JSON-RPC | `mcp-spark` → Knox Livy |
+| `/cdp/livy_for_spark3*` | GET, HEAD | Knox Livy (operators/tests) |
+| `/cdp/hive` | — | **404** (not published) |
+
+Extended design: [docs/architecture.md](docs/architecture.md), [docs/spark.md](docs/spark.md), [docs/hive.md](docs/hive.md), [docs/admin.md](docs/admin.md), [docs/identity-and-auth.md](docs/identity-and-auth.md).
 
 ## Target Audience
 
@@ -122,18 +119,17 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/spark.md](d
 | Path | Description |
 | --- | --- |
 | `assets/` | Architecture diagram and catalog media |
-| `deploy/` | Docker Compose for local APISIX + mock CDP |
-| `docs/` | Architecture, Spark, Hive, identity, phases, inventory, tests |
+| `deploy/` | Docker Compose (APISIX, mock CDP, mcp-spark, admin) |
+| `docs/` | Architecture, Spark, Hive, admin, identity, phases, tests |
 | `METADATA.yaml` | Catalog metadata for the Cloudera blueprint website |
 | `conf/` | APISIX standalone config templates |
 | `plugins/` | Custom `knox-jwt` APISIX plugin |
 | `inventory/` | Phase 0 CDP inventory consumed by tests |
 | `src/agentgateway/` | Operator CLI (`gateway` / `python -m agentgateway`) |
-| `scripts/` | Thin wrappers around the CLI for compatibility |
-| `tests/` | Phase 0 schema tests and gateway pytest |
-| `mcp-spark/` | Livy Spark 3 MCP adapter (upstream of APISIX) |
-| `admin/` | Operator usage/quota UI (`localhost:9090`) |
+| `mcp-spark/` | Livy Spark 3 MCP adapter |
+| `admin/` | Operator usage/quota UI (`127.0.0.1:9090`) |
 | `examples/spark/` | Sample Spark 3 batch (`count_to_10.py`) |
+| `tests/` | Inventory, CLI, gateway, and MCP pytest |
 | `AGENTS.md` | Instructions for coding agents |
 | `.cursor/rules/` | Cursor project rules |
 | `AgentGateway.code-workspace` | Cursor / VS Code workspace |
@@ -144,8 +140,9 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 
 - Git, Docker Desktop (or Engine + Compose v2), Python 3.11+
 - `pip install -e ".[dev]"` installs the `gateway` CLI (`make` is optional)
-- For the local demo: no CDP entitlement; mock Knox runs in Compose
-- For a live cluster: CDP Private Cloud Base or Public Cloud access, VPN or allowlisted laptop, Knox Token API / Token Generation, JWKS URL, and a Ranger-allowed test user
+- `pip install -e ".[hive]"` only if you run `gateway hive` (impyla)
+- Local demo: no CDP entitlement; mock Knox runs in Compose
+- Live cluster: CDP Private Cloud Base or Public Cloud, VPN or allowlisted laptop, Knox Token API / Token Generation, JWKS URL, Ranger-allowed test user
 - Secrets belong in `.env` (from `.env.example`), never in git or inventory markdown
 
 ## Hardware Requirements
@@ -159,8 +156,8 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 
 - [Architecture](docs/architecture.md)
 - [Working with Spark](docs/spark.md)
-- [Operator admin UI](docs/admin.md)
 - [Working with Hive](docs/hive.md)
+- [Operator admin UI](docs/admin.md)
 - [Identity and authentication](docs/identity-and-auth.md)
 - [Operator CLI](docs/operator-cli.md)
 - [Build phases](docs/phases.md)

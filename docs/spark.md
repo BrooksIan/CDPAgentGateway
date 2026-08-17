@@ -119,6 +119,8 @@ Agents should call `/mcp/spark` only. Do not teach them the Knox URL, `/cdp/hive
 
 Operators set per-user daily call/submit quotas in [admin.md](admin.md). A denied submit is an MCP tool error and does not reach Livy. Operators look up a call by APISIX `X-Request-Id` (`GET /api/audit`) to join tool, `sub`, and `knox.id`.
 
+APISIX also applies a per-`sub` burst cap on `/mcp/spark` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW` in `.env`, default 60 per 60s). Exceeding it is HTTP `429` (`mcp rate limit`). Livy GET is not capped this way.
+
 ## What Spark does not do
 
 - No Hive SQL (see [hive.md](hive.md))

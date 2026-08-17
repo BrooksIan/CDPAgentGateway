@@ -16,6 +16,8 @@ REQUIRED_RENDER_KEYS = [
     "KNOX_EXPECTED_ALG",
     "KNOX_CLOCK_SKEW",
     "KNOX_PROXY_PREFIX",
+    "MCP_RATE_COUNT",
+    "MCP_RATE_WINDOW",
 ]
 
 
@@ -74,19 +76,33 @@ def admin_url(values: dict[str, str] | None = None) -> str:
     return env.get("ADMIN_URL") or f"http://127.0.0.1:{env.get('ADMIN_PORT', '9090')}"
 
 
+def _positive_int(values: dict[str, str], key: str, default: str) -> str:
+    raw = values.get(key) or default
+    try:
+        number = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{key} must be an integer") from exc
+    if number < 1:
+        raise ValueError(f"{key} must be >= 1")
+    return str(number)
+
+
 def render_apisix_yaml(template: str, values: dict[str, str]) -> str:
-    missing = [key for key in REQUIRED_RENDER_KEYS if not values.get(key)]
+    merged = dict(values)
+    merged["MCP_RATE_COUNT"] = _positive_int(merged, "MCP_RATE_COUNT", "60")
+    merged["MCP_RATE_WINDOW"] = _positive_int(merged, "MCP_RATE_WINDOW", "60")
+    missing = [key for key in REQUIRED_RENDER_KEYS if not merged.get(key)]
     if missing:
         raise ValueError(f"Missing config values: {', '.join(missing)}")
 
-    if values["UPSTREAM_SCHEME"] == "https":
-        tls_block = f"    tls:\n      verify: {values['UPSTREAM_TLS_VERIFY'].lower()}\n"
+    if merged["UPSTREAM_SCHEME"] == "https":
+        tls_block = f"    tls:\n      verify: {merged['UPSTREAM_TLS_VERIFY'].lower()}\n"
     else:
         tls_block = ""
 
     rendered = template.replace("{{TLS_BLOCK}}", tls_block)
     for key in REQUIRED_RENDER_KEYS:
-        rendered = rendered.replace("{{" + key + "}}", values[key])
+        rendered = rendered.replace("{{" + key + "}}", merged[key])
     if "{{" in rendered:
         raise ValueError("Unrendered template placeholders remain")
     return rendered

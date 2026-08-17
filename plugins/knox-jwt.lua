@@ -129,6 +129,7 @@ function _M.rewrite(conf, ctx)
 
     ctx.knox_user = payload.sub
     ctx.knox_token_id = payload["knox.id"]
+    ctx.var.knox_user = payload.sub
     core.request.set_header(ctx, "X-Knox-User", payload.sub)
     if payload["knox.id"] then
         core.request.set_header(ctx, "X-Knox-Token-Id", payload["knox.id"])

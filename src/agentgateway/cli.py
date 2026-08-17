@@ -307,6 +307,7 @@ def cmd_test(args: argparse.Namespace) -> int:
                 "tests/test_spark_example.py",
                 "tests/test_admin_store.py",
                 "tests/test_quota_client.py",
+                "tests/test_apisix_render.py",
             ]
         )
     else:

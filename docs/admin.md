@@ -36,6 +36,8 @@ Empty fields mean unlimited. Per-user rows override the default `*` quota.
 
 If the admin service is down, `mcp-spark` **fails open** (allows the call) so a laptop UI outage does not brick Spark. Restart `admin` to enforce again.
 
+APISIX also caps **bursts** on `/mcp/spark` (`limit-count`, keyed by Knox `sub`). Default `MCP_RATE_COUNT=60` per `MCP_RATE_WINDOW=60` seconds. That is HTTP `429` at the edge, before the adapter. Daily quotas above are a different layer. Livy GET on `/cdp/livy_for_spark3*` is not burst-capped.
+
 ## What it is not
 
 - Not Ranger and not a CDP user directory

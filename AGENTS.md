@@ -32,7 +32,7 @@ Call `http://127.0.0.1:9080/mcp/spark` with the **user's Knox JWT** as `Authoriz
 
 Tools: `spark_list_sessions`, `spark_list_batches`, `spark_get_batch`, `spark_get_log`, `spark_submit_batch`. Submit `examples/spark/count_to_10.py` after copying it to HDFS/Ozone. Poll with `spark_get_batch`. Do not run interactive Livy `code`.
 
-Operator usage, quotas, and audit join: [docs/admin.md](docs/admin.md) (`http://127.0.0.1:9090`). Do not send agents there.
+Operator usage, quotas, and audit join: [docs/admin.md](docs/admin.md) (`http://127.0.0.1:9090`). Do not send agents there. `/mcp/spark` is burst-capped per Knox `sub` (`MCP_RATE_COUNT`).
 
 Example MCP host config (put the JWT in the host's secret store, never in git):
 

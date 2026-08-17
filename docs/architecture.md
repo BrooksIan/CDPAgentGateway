@@ -12,7 +12,7 @@ Phase 1 traffic is `agents → APISIX → Knox → Livy (Spark 3)`. Phase 2 adds
 | --- | --- | --- |
 | Operator CLI (`gateway`) | `.env`, mock keys, JWKS fetch, Compose, probes (`gateway spark`) | Cluster credentials, Ranger decisions |
 | Operator admin (`:9090`) | Usage by Knox `sub`, tool quotas, `request_id` audit join | Agent traffic, Ranger decisions, cluster credentials |
-| Agent Gateway (APISIX) | TLS (later), Knox JWT validation, allowlisted routes, request IDs | Cluster credentials, Ranger decisions, MCP tool implementations |
+| Agent Gateway (APISIX) | TLS (later), Knox JWT validation, allowlisted routes, request IDs, MCP burst cap | Cluster credentials, Ranger decisions, MCP tool implementations |
 | MCP adapters (`mcp-spark`) | Livy list/get/log/submit; forward the caller's Knox bearer | Impersonation, inline Spark code, long-lived Knox secrets |
 | Knox | Token issuance, `JWTProvider` on `cdp-proxy-token`, Trusted Proxy / doAs | Public internet exposure |
 | Ranger | Data authorization for the Knox subject on Spark | Agent-product identity |
@@ -25,7 +25,7 @@ APISIX standalone config is rendered from `conf/apisix.yaml.tpl` into `conf/gene
 | --- | --- | --- | --- |
 | `/health` | GET | None | Mock JSON on APISIX (does not call Knox) |
 | `/cdp/livy_for_spark3*` | GET, HEAD | `knox-jwt` | `{KNOX_PROXY_PREFIX}/livy_for_spark3...` |
-| `/mcp/spark*` | GET, HEAD, POST, DELETE | `knox-jwt` | `mcp-spark:8080/mcp` |
+| `/mcp/spark*` | GET, HEAD, POST, DELETE | `knox-jwt` + `limit-count` | `mcp-spark:8080/mcp` |
 
 Example: `GET http://127.0.0.1:9080/cdp/livy_for_spark3/sessions` becomes `GET {knox}/gateway/cdp-proxy-token/livy_for_spark3/sessions` (prefix varies on Public Cloud). `POST`/`PUT`/`DELETE` on that prefix return **404** (or 405). Submit and other writes go through `/mcp/spark` (`spark_submit_batch`), not raw Livy. Interactive `POST .../sessions/{id}/statements` is not a route.
 

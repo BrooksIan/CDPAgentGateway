@@ -67,6 +67,16 @@ routes:
         clock_skew: {{KNOX_CLOCK_SKEW}}
         hide_credentials: false
         realm: knox
+      limit-count:
+        count: {{MCP_RATE_COUNT}}
+        time_window: {{MCP_RATE_WINDOW}}
+        key_type: var
+        key: knox_user
+        rejected_code: 429
+        rejected_msg: mcp rate limit
+        policy: local
+        show_limit_quota_header: true
+        group: mcp-spark
       proxy-rewrite:
         regex_uri:
           - "^/mcp/spark(.*)"

@@ -50,6 +50,10 @@ def test_readme_has_blueprint_standard_sections() -> None:
     assert "assets/" in text
     assert "deploy/" in text
     assert "METADATA.yaml" in text
+    assert "docs/spark.md" in text
+    assert "docs/hive.md" in text
+    assert "/mcp/spark" in text
+    assert "127.0.0.1:9090" in text or "localhost `:9090`" in text
 
 
 def test_metadata_yaml_has_catalog_fields() -> None:

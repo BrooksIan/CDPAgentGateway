@@ -37,7 +37,7 @@ Status: local mock path is implemented. Live path is the same Compose file plus 
 
 Tools: `spark_list_sessions`, `spark_list_batches`, `spark_get_batch`, `spark_get_log`, `spark_submit_batch` (HDFS/object-store `file` only). Logs are truncated. Interactive Livy `run code` is not exposed.
 
-Status: Spark MCP catalog is implemented, including submit (2b). Livy HTTP writes are closed on the agent address (2a). Operator admin UI records usage, joins tool/`sub`/`knox.id` by `X-Request-Id` (P2-04), and enforces per-`sub` quotas. Rate limits at APISIX and partner mTLS remain.
+Status: Spark MCP catalog is implemented, including submit (2b). Livy HTTP writes are closed on the agent address (2a). Operator admin UI records usage, joins tool/`sub`/`knox.id` by `X-Request-Id` (P2-04), and enforces per-`sub` quotas. `/mcp/spark` has an APISIX `limit-count` burst cap keyed by Knox `sub` (P2-13). Partner mTLS remains.
 
 ## Phase 3 — Third-party ready
 

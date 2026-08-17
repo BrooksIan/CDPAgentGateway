@@ -8,7 +8,13 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from agentgateway.amp import BurstLimiter, KnoxJWTMiddleware, build_impala_mcp_app, build_mcp_app
+from agentgateway.amp import (
+    BurstLimiter,
+    KnoxJWTMiddleware,
+    build_impala_mcp_app,
+    build_mcp_app,
+    cml_bind_host,
+)
 from agentgateway.keys import generate_test_keys
 from agentgateway.token import knox_claims, sign_rs256, unsigned_token
 
@@ -43,6 +49,18 @@ def test_amp_health_is_public(pem_file: Path) -> None:
     client = _wrapped(pem_file)
     response = client.get("/health")
     assert response.status_code == 200
+
+
+def test_amp_healthcheck_and_head_skip_jwt(pem_file: Path) -> None:
+    inner = Starlette(
+        routes=[
+            Route("/healthcheck", lambda _r: JSONResponse({"status": "ok"}), methods=["GET", "HEAD"]),
+        ]
+    )
+    app = KnoxJWTMiddleware(inner, public_key_file=pem_file)
+    client = TestClient(app)
+    assert client.get("/healthcheck").status_code == 200
+    assert client.head("/healthcheck").status_code == 200
 
 
 @pytest.mark.parametrize(
@@ -141,3 +159,10 @@ def test_amp_prm_is_public_and_401_has_resource_metadata(pem_file: Path) -> None
     denied = client.post("/echo")
     assert denied.status_code == 401
     assert "resource_metadata=" in denied.headers.get("WWW-Authenticate", "")
+
+
+def test_cml_bind_host_is_loopback_when_app_port_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CDSW_APP_PORT", raising=False)
+    assert cml_bind_host() == "0.0.0.0"
+    monkeypatch.setenv("CDSW_APP_PORT", "8090")
+    assert cml_bind_host() == "127.0.0.1"

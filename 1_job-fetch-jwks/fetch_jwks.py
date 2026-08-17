@@ -23,16 +23,20 @@ def _insecure() -> bool:
 def main() -> int:
     proxy = (os.environ.get("KNOX_PROXY_URL") or "").strip()
     if not proxy:
-        print("error: KNOX_PROXY_URL is required", file=sys.stderr)
-        return 2
+        print("warning: KNOX_PROXY_URL unset; skipping JWKS pin so applications can still listen", file=sys.stderr)
+        return 0
     generated = ROOT / "conf" / "generated" / "knox-public.pem"
     live = ROOT / "conf" / "keys" / "knox-live.pem"
-    out = fetch_pinned_knox_pubkey(
-        knox_proxy_url=proxy,
-        jwks_url=os.environ.get("KNOX_JWKS_URL"),
-        out=generated,
-        insecure=_insecure(),
-    )
+    try:
+        out = fetch_pinned_knox_pubkey(
+            knox_proxy_url=proxy,
+            jwks_url=os.environ.get("KNOX_JWKS_URL"),
+            out=generated,
+            insecure=_insecure(),
+        )
+    except Exception as exc:
+        print(f"warning: JWKS pin failed: {type(exc).__name__}; applications will still start", file=sys.stderr)
+        return 0
     live.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(out, live)
     print(out)

@@ -26,6 +26,8 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert "6_app-mcp-impala/app.py" in scripts
     assert "4_app-operator-admin/app.py" in scripts
 
+    install = next(task for task in amp["tasks"] if task.get("script") == "0_session-install-dependencies/install_dependencies.py")
+    assert install["type"] == "run_session"
     mcp = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-spark")
     hive = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-hive")
     impala = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-impala")
@@ -34,11 +36,20 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert hive["bypass_authentication"] is True
     assert impala["bypass_authentication"] is True
     assert admin["bypass_authentication"] is False
+    for app in (mcp, hive, impala, admin):
+        assert app["environment_variables"]["CDSW_APP_POLLING_ENDPOINT"] == "/health"
+
+    install_src = (ROOT / "0_session-install-dependencies" / "install_dependencies.py").read_text()
+    assert "--user" in install_src
+    assert '[amp]' in install_src
 
 
 def test_amp_layout_and_catalog_exist() -> None:
     catalog = yaml.safe_load((ROOT / "catalog-entry.yaml").read_text())
     assert catalog["entries"][0]["label"] == "cdp-agent-gateway"
+    git_url = catalog["entries"][0]["git_url"]
+    assert git_url.startswith("https://github.com/"), git_url
+    assert git_url.endswith(".git"), git_url
     cover = ROOT / catalog["entries"][0]["image_path"]
     assert cover.is_file(), cover
     assert cover.suffix.lower() in {".jpg", ".jpeg", ".png"}
@@ -53,5 +64,6 @@ def test_amp_layout_and_catalog_exist() -> None:
         ROOT / "6_app-mcp-impala" / "app.py",
         ROOT / "src" / "agentgateway" / "knox_jwt.py",
         ROOT / "src" / "agentgateway" / "amp.py",
+        ROOT / "src" / "agentgateway" / "cml_boot.py",
     ):
         assert path.is_file(), path

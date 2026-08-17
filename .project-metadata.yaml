@@ -79,19 +79,13 @@ runtimes:
     edition: Standard
 
 tasks:
-  - type: create_job
+  - type: run_session
     name: Install dependencies
-    entity_label: install_deps
     script: 0_session-install-dependencies/install_dependencies.py
-    arguments: None
     cpu: 1
     memory: 4
     kernel: python3
-    short_summary: Install the AMP extra (Starlette, uvicorn) and the operator package.
-
-  - type: run_job
-    entity_label: install_deps
-    short_summary: Run dependency install.
+    short_summary: Install AMP extras into the project user site so applications can import them.
 
   - type: create_job
     name: Fetch pinned Knox JWKS
@@ -130,6 +124,8 @@ tasks:
     cpu: 1
     memory: 2
     kernel: python3
+    environment_variables:
+      CDSW_APP_POLLING_ENDPOINT: /health
     short_summary: MCP JSON-RPC for Livy Spark 3. Requires Knox JWT. CML session cookies are not the user credential.
     long_summary: >-
       Public to MCP hosts so Cursor can send Authorization Bearer. The application
@@ -145,6 +141,8 @@ tasks:
     cpu: 1
     memory: 2
     kernel: python3
+    environment_variables:
+      CDSW_APP_POLLING_ENDPOINT: /health
     short_summary: Read-only Hive MCP JSON-RPC. Requires Knox JWT. /cdp/hive stays unpublished.
     long_summary: >-
       Lists databases/tables, describe, and column SELECT (limit 50, no SELECT *)
@@ -160,6 +158,8 @@ tasks:
     cpu: 1
     memory: 2
     kernel: python3
+    environment_variables:
+      CDSW_APP_POLLING_ENDPOINT: /health
     short_summary: Read-only Impala MCP JSON-RPC. Requires Knox JWT. /cdp/impala stays unpublished.
     long_summary: >-
       Lists databases/tables, describe, and column SELECT (limit 50, no SELECT *)
@@ -175,4 +175,6 @@ tasks:
     cpu: 1
     memory: 2
     kernel: python3
+    environment_variables:
+      CDSW_APP_POLLING_ENDPOINT: /health
     short_summary: Usage and quotas for operators. CML login required. Not an MCP route.

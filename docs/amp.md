@@ -21,12 +21,33 @@ MCP host → CML Application (Knox JWT + MCP) → Knox cdp-proxy-token → Livy 
 
 ## Import
 
-1. In the workbench, create a project from this git repo (or add `catalog-entry.yaml` as a custom AMP source).
-2. Set project environment variables. **Required:** `KNOX_PROXY_URL` (Livy-for-Spark-3 on `cdp-proxy-token`). Optional: `KNOX_JWKS_URL` if it is not the URL derived from the proxy URL. Host must match Knox; foreign `jku` values are refused. Optional Impala CDW: `IMPALA_HOST`, `IMPALA_PORT`, `IMPALA_SCHEME`, `IMPALA_HTTP_PATH` (`cliservice`). JDBC `auth=browser` is not used; the app forwards the Knox JWT.
-3. Runtime: Workbench, Python 3.11, Standard. No GPU.
-4. Let AMP tasks run: install extras, fetch pinned JWKS, smoke-check Knox, start applications.
+Workbench project creation **clones git first**. AMP jobs do not run until that clone succeeds. `catalog-entry.yaml` `git_url` is `https://github.com/BrooksIan/CDPAgentGateway.git`. That repo is private today, so an unattended HTTPS clone fails with:
+
+```text
+Unable to clone … fatal: could not read Username for 'https://github.com': No such device or address
+```
+
+Fix clone access **before** launching the AMP:
+
+1. In GitHub, create a personal access token with `repo` scope (classic) or Contents read on `BrooksIan/CDPAgentGateway` (fine-grained). Do not put the token in git or `catalog-entry.yaml`.
+2. In the workbench, add Git credentials for `github.com` (user settings, or site administration if AMP catalog clone uses the workspace credential store). Username is the GitHub user; password is the PAT.
+3. Create the project from this git URL, or add `catalog-entry.yaml` as a custom AMP source and launch the tile.
+4. Set project environment variables. **Required:** `KNOX_PROXY_URL` (Livy-for-Spark-3 on `cdp-proxy-token`). Optional: `KNOX_JWKS_URL` if it is not the URL derived from the proxy URL. Host must match Knox; foreign `jku` values are refused. Optional Impala CDW: `IMPALA_HOST`, `IMPALA_PORT`, `IMPALA_SCHEME`, `IMPALA_HTTP_PATH` (`cliservice`). JDBC `auth=browser` is not used; the app forwards the Knox JWT.
+5. Runtime: Workbench, Python 3.11, Standard. No GPU.
+6. Let AMP tasks run: install extras (session), fetch pinned JWKS, smoke-check Knox, start applications.
+
+A public clone does not need a PAT. Do not encode a token in `git_url`.
 
 Do not put `KNOX_TOKEN` in project env or git. Paste the Knox JWT into the MCP host secret store.
+
+If the project clones but **applications stay Starting or Failed**, open Application logs. Typical causes:
+
+- Install wrote packages into the job engine instead of `/home/cdsw/.local` (`pip install --user` is required).
+- The process exited before listening on `127.0.0.1:$CDSW_APP_PORT` (CML probes loopback, not `0.0.0.0`).
+- A Knox JWKS job failed and the runbook never reached `start_application`. Fetch/smoke now warn and continue; MCP POSTs still fail closed without a PEM.
+- Static subdomains `mcp-spark`, `mcp-hive`, `mcp-impala`, or `gateway-admin` already exist from a previous AMP attempt.
+
+Push this repo to GitHub, then **Update** the AMP (or delete the project and relaunch) so the workbench picks up the app scripts.
 
 ## Applications
 
@@ -89,7 +110,7 @@ AMP is JWT-only for the agent product. Compose MCP caller keys and Phase 3 mTLS 
 | `.project-metadata.yaml` | AMP runbook (CML ignores Compose) |
 | `catalog-entry.yaml` | Optional custom catalog snippet |
 | `assets/AMP_thumbnail.jpg` | Catalog tile cover (`image_path`) |
-| `0_session-install-dependencies/` | `pip install -e ".[amp,hive]"` |
+| `0_session-install-dependencies/` | `pip install --user -e ".[amp]"` (hive extra is best-effort) |
 | `1_job-fetch-jwks/` | Pin JWKS → `conf/generated/knox-public.pem` |
 | `2_job-smoke-knox/` | PEM + JWKS reachability; optional Livy GET |
 | `3_app-mcp-spark/` | Spark MCP application |

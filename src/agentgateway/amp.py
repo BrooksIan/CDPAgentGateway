@@ -42,6 +42,13 @@ def cml_port() -> int:
         return 8080
 
 
+def cml_bind_host() -> str:
+    """CML's proxy probes 127.0.0.1:CDSW_APP_PORT. Bind 0.0.0.0 only off-workbench."""
+    if os.environ.get("CDSW_APP_PORT"):
+        return "127.0.0.1"
+    return "0.0.0.0"
+
+
 def amp_public_key_path() -> Path:
     configured = os.environ.get("KNOX_PUBLIC_KEY_FILE") or ""
     if configured:
@@ -198,11 +205,12 @@ class KnoxJWTMiddleware:
         return self._pem
 
     def _skip_jwt(self, method: str, path: str) -> bool:
-        if method != "GET":
+        if method not in {"GET", "HEAD"}:
             return False
-        return path in {"/", "/health"} or path.rstrip("/") in {"", "/health"} or path.startswith(
-            "/.well-known/oauth-protected-resource"
-        )
+        normalized = path.rstrip("/") or "/"
+        if normalized in {"/", "/health", "/healthcheck"}:
+            return True
+        return path.startswith("/.well-known/oauth-protected-resource")
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -292,8 +300,9 @@ def build_mcp_app() -> Starlette:
     app = Starlette(
         routes=[
             *_prm_routes(),
-            Route("/health", mcp.health, methods=["GET"]),
-            Route("/", root, methods=["GET", "POST"]),
+            Route("/health", mcp.health, methods=["GET", "HEAD"]),
+            Route("/healthcheck", mcp.health, methods=["GET", "HEAD"]),
+            Route("/", root, methods=["GET", "HEAD", "POST"]),
             Route("/mcp", mcp.mcp_endpoint, methods=["GET", "POST"]),
             Route("/mcp/", mcp.mcp_endpoint, methods=["GET", "POST"]),
             Route("/mcp/spark", mcp.mcp_endpoint, methods=["GET", "POST"]),
@@ -319,8 +328,9 @@ def build_hive_mcp_app() -> Starlette:
     app = Starlette(
         routes=[
             *_prm_routes(),
-            Route("/health", mcp.health, methods=["GET"]),
-            Route("/", root, methods=["GET", "POST"]),
+            Route("/health", mcp.health, methods=["GET", "HEAD"]),
+            Route("/healthcheck", mcp.health, methods=["GET", "HEAD"]),
+            Route("/", root, methods=["GET", "HEAD", "POST"]),
             Route("/mcp", mcp.mcp_endpoint, methods=["GET", "POST"]),
             Route("/mcp/", mcp.mcp_endpoint, methods=["GET", "POST"]),
             Route("/mcp/hive", mcp.mcp_endpoint, methods=["GET", "POST"]),
@@ -346,8 +356,9 @@ def build_impala_mcp_app() -> Starlette:
     app = Starlette(
         routes=[
             *_prm_routes(),
-            Route("/health", mcp.health, methods=["GET"]),
-            Route("/", root, methods=["GET", "POST"]),
+            Route("/health", mcp.health, methods=["GET", "HEAD"]),
+            Route("/healthcheck", mcp.health, methods=["GET", "HEAD"]),
+            Route("/", root, methods=["GET", "HEAD", "POST"]),
             Route("/mcp", mcp.mcp_endpoint, methods=["GET", "POST"]),
             Route("/mcp/", mcp.mcp_endpoint, methods=["GET", "POST"]),
             Route("/mcp/impala", mcp.mcp_endpoint, methods=["GET", "POST"]),
@@ -368,9 +379,38 @@ def build_admin_app():
     return _load_module("amp_admin_server", "admin").app
 
 
+def startup_error_app(service: str, exc: BaseException):
+    """Listen anyway so CML marks the application running; MCP stays fail-closed."""
+    print(
+        json.dumps(
+            {"service": service, "event": "startup_failed", "error": type(exc).__name__, "profile": "amp"}
+        ),
+        flush=True,
+    )
+
+    async def health(_request: Request) -> JSONResponse:
+        return JSONResponse(
+            {"status": "error", "service": service, "profile": "amp", "reason": "startup_failed"}
+        )
+
+    return Starlette(
+        routes=[
+            Route("/health", health, methods=["GET", "HEAD"]),
+            Route("/healthcheck", health, methods=["GET", "HEAD"]),
+            Route("/", health, methods=["GET", "HEAD"]),
+        ]
+    )
+
+
 def serve_cml_app(app, *, service: str) -> None:
     import uvicorn
 
     port = cml_port()
-    print(json.dumps({"service": service, "event": "listen", "port": port, "profile": "amp"}), flush=True)
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    host = cml_bind_host()
+    print(
+        json.dumps(
+            {"service": service, "event": "listen", "host": host, "port": port, "profile": "amp"}
+        ),
+        flush=True,
+    )
+    uvicorn.run(app, host=host, port=port, log_level="warning")

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""AMP session: install extras into the project user site so applications can import them."""
+"""AMP session: install extras into the project user site so applications can import them.
+
+CML run_session executes this in IPython; do not hide work behind __main__.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     # --user writes to /home/cdsw/.local (project filesystem). A bare -e install
-    # stays in the job engine and CML applications then fail to import starlette.
+    # stays in the session engine and CML applications then fail to import starlette.
     subprocess.check_call(
         [sys.executable, "-m", "pip", "install", "--user", "-e", f"{ROOT}[amp]"],
         cwd=ROOT,
@@ -30,5 +33,4 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+raise SystemExit(main())

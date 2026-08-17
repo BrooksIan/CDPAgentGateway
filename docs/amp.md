@@ -33,21 +33,23 @@ Fix clone access **before** launching the AMP:
 2. In the workbench, add Git credentials for `github.com` (user settings, or site administration if AMP catalog clone uses the workspace credential store). Username is the GitHub user; password is the PAT.
 3. Create the project from this git URL, or add `catalog-entry.yaml` as a custom AMP source and launch the tile.
 4. Set project environment variables. **Required:** `KNOX_PROXY_URL` (Livy-for-Spark-3 on `cdp-proxy-token`). Optional: `KNOX_JWKS_URL` if it is not the URL derived from the proxy URL. Host must match Knox; foreign `jku` values are refused. Optional Impala CDW: `IMPALA_HOST`, `IMPALA_PORT`, `IMPALA_SCHEME`, `IMPALA_HTTP_PATH` (`cliservice`). JDBC `auth=browser` is not used; the app forwards the Knox JWT.
-5. Runtime: Workbench, Python 3.11, Standard. No GPU.
-6. Let AMP tasks run: install extras (session), fetch pinned JWKS, smoke-check Knox, start applications.
+5. Runtime: Workbench or PBJ Workbench, Python 3.11, Standard. No GPU. `run_session` requires `cpu` and `memory`; `start_application` requires `subdomain` and `kernel`.
+6. AMP tasks run **in order** and **stop on the first failure**. This runbook installs extras, **starts the four applications**, then pins JWKS. If a Knox job used to run first and failed, `start_application` never ran. After a failed setup use **Resume** or **Redeploy** in the AMP setup steps ([restart a failed AMP](https://docs.cloudera.com/machine-learning/cloud/applied-ml-prototypes/topics/ml-restart-failed-amp-setup.html)).
 
 A public clone does not need a PAT. Do not encode a token in `git_url`.
 
 Do not put `KNOX_TOKEN` in project env or git. Paste the Knox JWT into the MCP host secret store.
 
-If the project clones but **applications stay Starting or Failed**, open Application logs. Typical causes:
+If the project clones but **applications are never created**, the AMP stopped on an earlier task (usually Install dependencies). Open that session/job log, then **Resume** or **Redeploy**.
 
-- Install wrote packages into the job engine instead of `/home/cdsw/.local` (`pip install --user` is required).
+If applications exist but stay Starting or Failed, open Application logs. Typical causes:
+
+- Install wrote packages into the session engine instead of `/home/cdsw/.local` (`pip install --user` is required).
 - The process exited before listening on `127.0.0.1:$CDSW_APP_PORT` (CML probes loopback, not `0.0.0.0`).
-- A Knox JWKS job failed and the runbook never reached `start_application`. Fetch/smoke now warn and continue; MCP POSTs still fail closed without a PEM.
+- User CPU/memory quota cannot schedule four apps (each 1 CPU / 1 GB). Drop other workloads or raise the quota.
 - Static subdomains `mcp-spark`, `mcp-hive`, `mcp-impala`, or `gateway-admin` already exist from a previous AMP attempt.
 
-Push this repo to GitHub, then **Update** the AMP (or delete the project and relaunch) so the workbench picks up the app scripts.
+Push this repo to GitHub, then **Redeploy** the AMP so the workbench re-imports `.project-metadata.yaml`.
 
 ## Applications
 

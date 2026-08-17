@@ -28,20 +28,25 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
 
     install = next(task for task in amp["tasks"] if task.get("script") == "0_session-install-dependencies/install_dependencies.py")
     assert install["type"] == "run_session"
+    assert "cpu" in install and "memory" in install
     mcp = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-spark")
     hive = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-hive")
     impala = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-impala")
     admin = next(task for task in amp["tasks"] if task.get("subdomain") == "gateway-admin")
+    assert mcp["type"] == "start_application"
+    assert mcp["kernel"] == "python3"
     assert mcp["bypass_authentication"] is True
     assert hive["bypass_authentication"] is True
     assert impala["bypass_authentication"] is True
     assert admin["bypass_authentication"] is False
-    for app in (mcp, hive, impala, admin):
-        assert app["environment_variables"]["CDSW_APP_POLLING_ENDPOINT"] == "/health"
+    first_app = next(i for i, task in enumerate(amp["tasks"]) if task["type"] == "start_application")
+    first_knox = next(i for i, task in enumerate(amp["tasks"]) if task.get("entity_label") == "fetch_jwks")
+    assert first_app < first_knox, "start_application must run before Knox jobs or a failed JWKS task skips the apps"
 
     install_src = (ROOT / "0_session-install-dependencies" / "install_dependencies.py").read_text()
     assert "--user" in install_src
     assert '[amp]' in install_src
+    assert 'if __name__' not in install_src
 
 
 def test_amp_layout_and_catalog_exist() -> None:

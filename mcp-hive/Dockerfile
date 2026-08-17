@@ -1,4 +1,6 @@
-FROM python:3.12-slim-bookworm
+# Python 3.11 or greater. Default 3.12. Debian slim: impyla needs glibc.
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim-bookworm
 WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt

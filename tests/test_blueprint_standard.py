@@ -78,6 +78,22 @@ def test_metadata_yaml_has_catalog_fields() -> None:
     assert "Cloudera Data Engineering" in meta["product_mapping"]
 
 
+def test_dockerfiles_use_python_311_or_greater() -> None:
+    import re
+
+    for path in (
+        ROOT / "mock-cdp" / "Dockerfile",
+        ROOT / "mcp-spark" / "Dockerfile",
+        ROOT / "mcp-hive" / "Dockerfile",
+        ROOT / "mcp-impala" / "Dockerfile",
+        ROOT / "admin" / "Dockerfile",
+    ):
+        text = path.read_text()
+        match = re.search(r"PYTHON_VERSION=(\d+)\.(\d+)", text)
+        assert match, f"{path.name} must pin PYTHON_VERSION"
+        assert (int(match.group(1)), int(match.group(2))) >= (3, 11)
+
+
 def test_blueprint_layout_dirs_exist() -> None:
     for path in (
         ROOT / "assets" / "architecture.svg",

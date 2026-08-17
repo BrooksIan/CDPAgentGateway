@@ -2,9 +2,14 @@
 #   docker compose --project-directory . -f deploy/docker-compose.yml up
 # `make up` already does this.
 
+x-python-version: &python_version "3.12"
+
 services:
   mock-cdp:
-    build: ./mock-cdp
+    build:
+      context: ./mock-cdp
+      args:
+        PYTHON_VERSION: *python_version
     environment:
       JWKS_PATH: /keys/jwks.json
       PORT: "8080"
@@ -21,7 +26,10 @@ services:
       retries: 20
 
   mcp-spark:
-    build: ./mcp-spark
+    build:
+      context: ./mcp-spark
+      args:
+        PYTHON_VERSION: *python_version
     environment:
       PORT: "8080"
       UPSTREAM_SCHEME: ${UPSTREAM_SCHEME:-http}
@@ -47,7 +55,10 @@ services:
         condition: service_healthy
 
   mcp-hive:
-    build: ./mcp-hive
+    build:
+      context: ./mcp-hive
+      args:
+        PYTHON_VERSION: *python_version
     environment:
       PORT: "8080"
       GATEWAY_MODE: ${GATEWAY_MODE:-local}
@@ -74,7 +85,10 @@ services:
         condition: service_healthy
 
   mcp-impala:
-    build: ./mcp-impala
+    build:
+      context: ./mcp-impala
+      args:
+        PYTHON_VERSION: *python_version
     environment:
       PORT: "8080"
       GATEWAY_MODE: ${GATEWAY_MODE:-local}
@@ -106,7 +120,10 @@ services:
         condition: service_healthy
 
   admin:
-    build: ./admin
+    build:
+      context: ./admin
+      args:
+        PYTHON_VERSION: *python_version
     environment:
       GATEWAY_MODE: ${GATEWAY_MODE:-local}
       UPSTREAM_HOST: ${UPSTREAM_HOST:-mock-cdp}

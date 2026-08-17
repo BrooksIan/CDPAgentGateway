@@ -77,8 +77,14 @@ runtimes:
   - editor: Workbench
     kernel: Python 3.11
     edition: Standard
+  - editor: Workbench
+    kernel: Python 3.12
+    edition: Standard
   - editor: PBJ Workbench
     kernel: Python 3.11
+    edition: Standard
+  - editor: PBJ Workbench
+    kernel: Python 3.12
     edition: Standard
 
 tasks:
@@ -86,6 +92,19 @@ tasks:
     name: Install dependencies
     script: 0_session-install-dependencies/install_dependencies.py
     kernel: python3
+    runtimes:
+      - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: Workbench
+        kernel: Python 3.12
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.12
+        edition: Standard
     cpu: 1.0
     memory: 2.0
     short_summary: Install AMP extras into the project user site so applications can import them.
@@ -96,6 +115,19 @@ tasks:
     subdomain: mcp-spark
     script: 3_app-mcp-spark/app.py
     kernel: python3
+    runtimes:
+      - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: Workbench
+        kernel: Python 3.12
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.12
+        edition: Standard
     cpu: 1.0
     memory: 1.0
     gpu: 0
@@ -114,6 +146,19 @@ tasks:
     subdomain: mcp-hive
     script: 5_app-mcp-hive/app.py
     kernel: python3
+    runtimes:
+      - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: Workbench
+        kernel: Python 3.12
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.12
+        edition: Standard
     cpu: 1.0
     memory: 1.0
     gpu: 0
@@ -132,6 +177,19 @@ tasks:
     subdomain: mcp-impala
     script: 6_app-mcp-impala/app.py
     kernel: python3
+    runtimes:
+      - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: Workbench
+        kernel: Python 3.12
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.12
+        edition: Standard
     cpu: 1.0
     memory: 1.0
     gpu: 0
@@ -150,6 +208,19 @@ tasks:
     subdomain: gateway-admin
     script: 4_app-operator-admin/app.py
     kernel: python3
+    runtimes:
+      - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: Workbench
+        kernel: Python 3.12
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.12
+        edition: Standard
     cpu: 1.0
     memory: 1.0
     gpu: 0
@@ -164,6 +235,19 @@ tasks:
     script: 1_job-fetch-jwks/fetch_jwks.py
     arguments: None
     kernel: python3
+    runtimes:
+      - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: Workbench
+        kernel: Python 3.12
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.12
+        edition: Standard
     cpu: 1.0
     memory: 1.0
     timeout: 10
@@ -179,6 +263,19 @@ tasks:
     script: 2_job-smoke-knox/smoke_knox.py
     arguments: None
     kernel: python3
+    runtimes:
+      - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: Workbench
+        kernel: Python 3.12
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.12
+        edition: Standard
     cpu: 1.0
     memory: 1.0
     timeout: 10

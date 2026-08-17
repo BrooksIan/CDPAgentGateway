@@ -8,7 +8,8 @@ _root = Path(os.environ.get("AGENTGATEWAY_ROOT") or Path.cwd()).resolve()
 if not (_root / "pyproject.toml").is_file():
     _root = Path("/home/cdsw").resolve()
 sys.path.insert(0, str(_root / "src"))
-from agentgateway.cml_boot import project_root
+from agentgateway.cml_boot import project_root, require_python
+require_python()
 ROOT = project_root()
 subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "-e", f"{ROOT}[amp]"], cwd=str(ROOT))
 try:

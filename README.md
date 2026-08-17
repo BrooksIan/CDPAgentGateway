@@ -210,7 +210,7 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 | Deployment | Minimum |
 | --- | --- |
 | Launchable / demo (local Docker) | 2 CPU, 4 GB RAM, 10 GB disk |
-| Optional CML AMP (not catalog-launchable yet) | Workbench Python 3.11: install session 1 CPU / 4 GB; each app 1 CPU / 2 GB |
+| Optional CML AMP (not catalog-launchable yet) | Workbench Python 3.11 or greater: install session 1 CPU / 2 GB; each app 1 CPU / 1 GB |
 | Production / enterprise (APISIX in front of Knox) | Size APISIX for agent QPS; CDP/Knox/Ranger sizing is unchanged. Plan extra RAM if MCP adapters and long Spark jobs share the same host |
 
 ## Documentation

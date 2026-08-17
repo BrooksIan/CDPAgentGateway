@@ -8,8 +8,17 @@ import sys
 from pathlib import Path
 
 
+def require_python() -> None:
+    if sys.version_info < (3, 11):
+        version = sys.version.split()[0]
+        raise RuntimeError(
+            f"CDP Agent Gateway requires Python 3.11 or greater; this runtime is {version}"
+        )
+
+
 def project_root() -> Path:
     """Locate the git/project root. CML IPython sessions do not define __file__ in the script."""
+    require_python()
 
     def is_root(path: Path) -> bool:
         return (path / ".project-metadata.yaml").is_file() and (path / "pyproject.toml").is_file()

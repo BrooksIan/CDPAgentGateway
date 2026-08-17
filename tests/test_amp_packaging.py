@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +27,17 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert "6_app-mcp-impala/app.py" in scripts
     assert "4_app-operator-admin/app.py" in scripts
 
+    kernels = {runtime["kernel"] for runtime in amp["runtimes"]}
+    assert "Python 3.11" in kernels
+    for runtime in amp["runtimes"]:
+        major, minor = runtime["kernel"].removeprefix("Python ").split(".")
+        assert (int(major), int(minor)) >= (3, 11)
+    for task in amp["tasks"]:
+        if task.get("kernel") != "python3":
+            continue
+        task_kernels = {runtime["kernel"] for runtime in task["runtimes"]}
+        assert "Python 3.11" in task_kernels
+        assert "Python 3.12" in task_kernels
     install = next(task for task in amp["tasks"] if task.get("script") == "0_session-install-dependencies/install_dependencies.py")
     assert install["type"] == "run_session"
     assert "cpu" in install and "memory" in install
@@ -47,10 +59,19 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert "--user" in install_src
     assert '[amp]' in install_src
     assert "if __name__" not in install_src
-    assert "Path(__file__)" not in install_src
+    assert "require_python" in install_src
 
 
-def test_cml_project_root_does_not_need_caller_file(tmp_path, monkeypatch) -> None:
+def test_require_python_rejects_old_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    from agentgateway import cml_boot
+
+    monkeypatch.setattr(cml_boot.sys, "version_info", (3, 10, 14))
+    monkeypatch.setattr(cml_boot.sys, "version", "3.10.14 (default)")
+    with pytest.raises(RuntimeError, match="3.11"):
+        cml_boot.require_python()
+
+
+def test_cml_project_root_does_not_need_caller_file(monkeypatch: pytest.MonkeyPatch) -> None:
     from agentgateway.cml_boot import project_root
 
     monkeypatch.chdir(ROOT)

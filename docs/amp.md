@@ -33,7 +33,7 @@ Fix clone access **before** launching the AMP:
 2. In the workbench, add Git credentials for `github.com` (user settings, or site administration if AMP catalog clone uses the workspace credential store). Username is the GitHub user; password is the PAT.
 3. Create the project from this git URL, or add `catalog-entry.yaml` as a custom AMP source and launch the tile.
 4. Set project environment variables. **Required:** `KNOX_PROXY_URL` (Livy-for-Spark-3 on `cdp-proxy-token`). Optional: `KNOX_JWKS_URL` if it is not the URL derived from the proxy URL. Host must match Knox; foreign `jku` values are refused. Optional Impala CDW: `IMPALA_HOST`, `IMPALA_PORT`, `IMPALA_SCHEME`, `IMPALA_HTTP_PATH` (`cliservice`). JDBC `auth=browser` is not used; the app forwards the Knox JWT.
-5. Runtime: Workbench or PBJ Workbench, Python 3.11, Standard. No GPU. `run_session` requires `cpu` and `memory`; `start_application` requires `subdomain` and `kernel`.
+5. Runtime: Workbench or PBJ Workbench, **Python 3.11 or greater** (3.12 is listed), Standard. No GPU. Do not pick Python 3.10 or older — `requires-python` is `>=3.11`. `run_session` requires `cpu` and `memory`; `start_application` requires `subdomain` and `kernel`.
 6. AMP tasks run **in order** and **stop on the first failure**. This runbook installs extras, **starts the four applications**, then pins JWKS. If a Knox job used to run first and failed, `start_application` never ran. After a failed setup use **Resume** or **Redeploy** in the AMP setup steps ([restart a failed AMP](https://docs.cloudera.com/machine-learning/cloud/applied-ml-prototypes/topics/ml-restart-failed-amp-setup.html)).
 
 A public clone does not need a PAT. Do not encode a token in `git_url`.

@@ -13,7 +13,7 @@ Deliverables:
 - Test cases in [testing.md](testing.md)
 - `.env` from `gateway init` / `gateway knox` / `gateway jdbc add` (not committed)
 
-Status: schema and local tests exist. Fill `gateway_url` / `jwks_url` in `inventory/cdp.yaml` before treating a live cluster as inventoried.
+Status: schema and local tests exist. Live Public Cloud `go01-obser-de` is inventoried (`gateway_url` / `jwks_url` in `inventory/cdp.yaml`). Worksheet: [phase-0-inventory.md](phase-0-inventory.md).
 
 ## Phase 1 — HTTP perimeter (local Docker → external CDP)
 
@@ -38,7 +38,7 @@ Status: local mock path is implemented. Live path is the same Compose file plus 
 
 Tools: Spark `spark_list_sessions`, `spark_list_batches`, `spark_get_batch`, `spark_get_log`, `spark_submit_batch` (HDFS/object-store `file` only). Hive `hive_list_databases`, `hive_list_tables`, `hive_describe_table`, `hive_select` (named columns, limit ≤ 50). Logs are truncated. Interactive Livy `run code` is not exposed.
 
-Status: Spark MCP catalog is implemented, including submit (2b). Hive MCP is read-only (P2-05). Livy HTTP writes are closed on the agent address (2a). Operator admin UI records usage, joins tool/`sub`/`knox.id` by `X-Request-Id` (P2-04), and enforces per-`sub` quotas. `/mcp/spark` and `/mcp/hive` have an APISIX `limit-count` burst cap keyed by Knox `sub` (P2-13). The MCP contract is **POST JSON-RPC**; Streamable HTTP is held. Partner mTLS remains.
+Status: Spark MCP catalog is implemented, including submit (2b). Hive MCP is read-only (P2-05). Livy HTTP writes are closed on the agent address (2a). Operator admin UI records usage, joins tool/`sub`/`knox.id` by `X-Request-Id` (P2-04), and enforces per-`sub` quotas. `/mcp/spark` and `/mcp/hive` have an APISIX `limit-count` burst cap keyed by Knox `sub` (P2-13). The MCP contract is **POST JSON-RPC**; Streamable HTTP is held. Partner mTLS remains. Live proof (P2-15, 2026-08-17): `spark_submit_batch` of `count_to_10.py` on Public Cloud `go01-obser-de` reached `state=success`; `hive_select` of `{sub}.count_to_10` returned `n` 1..10. Results: [testing.md](testing.md).
 
 ## Phase 3 — Third-party ready
 

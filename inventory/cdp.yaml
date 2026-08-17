@@ -2,19 +2,19 @@
 # Tests assert this schema. Secrets stay in .env, not here.
 
 environment:
-  name: local-lab
-  deployment: private-cloud-base  # private-cloud-base | public-cloud
-  notes: External CDP is reached from a local APISIX container.
+  name: go01-obser-de
+  deployment: public-cloud  # private-cloud-base | public-cloud
+  notes: Laptop APISIX (Compose) in front of Public Cloud Knox. Secrets stay in .env.
 
 knox:
   issuer: KNOXSSO
   expected_alg: RS256
   topology: cdp-proxy-token
-  proxy_prefix: /gateway/cdp-proxy-token
-  jwks_path: /gateway/homepage/knoxtoken/api/v1/jwks.json
-  token_api: /gateway/homepage/knoxtoken/api/v2/token
-  gateway_url: ""          # e.g. https://knox.example.com:8443
-  jwks_url: ""             # usually {gateway_url}{jwks_path}
+  proxy_prefix: /go01-obser-de/cdp-proxy-token
+  jwks_path: /go01-obser-de/homepage/knoxtoken/api/v2/jwks.json
+  token_api: /go01-obser-de/homepage/knoxtoken/api/v2/token
+  gateway_url: "https://go01-obser-de-gateway.go01-dem.ylcu-atmi.cloudera.site"
+  jwks_url: "https://go01-obser-de-gateway.go01-dem.ylcu-atmi.cloudera.site/go01-obser-de/homepage/knoxtoken/api/v2/jwks.json"
   tls_verify: false
 
 identity:

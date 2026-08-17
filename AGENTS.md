@@ -26,7 +26,7 @@ Read [docs/architecture.md](docs/architecture.md) and [docs/identity-and-auth.md
 5. Execute cases in [docs/testing.md](docs/testing.md); record results without tokens.
 6. Keep `README.md` catalog sections and `METADATA.yaml` in sync when the product story changes.
 
-Current target: **Phase 2 Spark MCP + read-only Hive MCP**. `spark_submit_batch` is a write as the Knox subject. Hive tools are list/describe/select only.
+Current target: **Phase 2 live-proven** (Spark MCP submit + read-only Hive MCP `hive_select` of `{sub}.count_to_10` on `go01-obser-de`). Next is **Phase 3** (partner mTLS/caller keys, OAuth PRM, token revocation). Hive tools stay list/describe/select only.
 
 ## Runtime agents (Cursor, Claude)
 

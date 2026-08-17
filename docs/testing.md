@@ -7,7 +7,7 @@ Assumptions:
 - `GATEWAY_URL` is `http://127.0.0.1:9080` unless `APISIX_PORT` is changed
 - Live Knox URL is set with `gateway knox <https-url>`
 - Hive JDBC (optional) is stored with `gateway jdbc add <jdbc:hive2://…>`. Agents use `/mcp/hive`; `/cdp/hive` stays 404
-- `KNOX_TOKEN` is a Knox JWT in `.env` (`gateway token set`), never in git. `--mint` is lab-only (`GATEWAY_MODE=local`)
+- `KNOX_TOKEN` is a Knox JWT in `.env` (`gateway token set`), never in git. `--mint` is lab-only (`GATEWAY_MODE=local`). Live pytest reads those keys from `.env` via `load_env()`; you do not have to export them in the shell.
 - Phase 1 probe is `GET /cdp/livy_for_spark3/sessions`
 - WebHDFS staging is `GET`/`PUT` `/cdp/webhdfs/v1/...` (`gateway webhdfs`)
 
@@ -80,6 +80,7 @@ Against mock CDP unless noted. Spark URI is `/cdp/livy_for_spark3/sessions`.
 | P2-12 | Per-user submit quota | `daily_submits=0` → admin admit `429`; MCP `isError` when mock PEM is in use | `tests/test_admin_gateway.py`, `tests/test_admin_store.py` |
 | P2-13 | MCP burst rate limit | Authenticated `/mcp/spark` or `/mcp/hive` returns `429` after `MCP_RATE_COUNT` per Knox `sub`; Livy GET is not capped | `tests/test_gateway_ratelimit.py`, `tests/test_apisix_render.py` |
 | P2-14 | `--mint` on a live stack | CLI exit 2; no POST; message names Knox JWKS / `invalid_signature` | `tests/test_cli.py` |
+| P2-15 | Live Spark `count_to_10` then Hive select `{sub}.count_to_10` | `spark_submit_batch` reaches `state=success`; `hive_select` returns `n` 1..10; `/cdp/hive` 404 | CLI submit + `tests/test_live_cdp.py` |
 
 ## Optional AMP (not catalog-launchable yet)
 
@@ -108,4 +109,4 @@ Copy a row per live run. Keep this table free of secrets.
 
 | Date | IDs run | Environment | Pass / fail | Notes |
 | --- | --- | --- | --- | --- |
-| | | | | |
+| 2026-08-17 | P2-07 (live submit), P2-14, P2-15, P1-06 | Public Cloud `go01-obser-de` via local APISIX `:9080`; Knox `sub=ibrooks` | pass | Staged `hdfs:///user/ibrooks/examples/count_to_10.py`; Livy batch `id=2` `state=success` (`application_1786294128788_3137`); Hive `ibrooks.count_to_10` `n` 1..10; `/cdp/hive` 404; `--mint` → `401 invalid_signature`. `pytest tests/test_live_cdp.py tests/test_phase0_inventory.py` 8 passed. No tokens recorded. |

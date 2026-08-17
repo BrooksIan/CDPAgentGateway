@@ -6,9 +6,9 @@ Fill this against the **external CDP** that local Docker APISIX will call. Machi
 
 | Item | Value |
 | --- | --- |
-| Deployment | Private Cloud Base / CDP Public Cloud / other: |
-| Cluster / environment name | |
-| Network path from laptop | VPN / allowlisted IP / jump host: |
+| Deployment | CDP Public Cloud |
+| Cluster / environment name | `go01-obser-de` |
+| Network path from laptop | Direct to Knox `*.cloudera.site` (laptop APISIX Compose) |
 | Operator contact | |
 
 ## Knox
@@ -22,16 +22,16 @@ gateway fetch-jwks --insecure
 
 | Item | Value |
 | --- | --- |
-| Knox homepage / gateway origin | |
-| Topology used for token APIs | usually `cdp-proxy-token` |
-| Livy for Spark 3 proxy URL | `.../cdp-proxy-token/livy_for_spark3/` |
-| Token API URL (v1 or v2) | |
-| JWKS URL (pin this host) | `.../homepage/knoxtoken/api/v1/jwks.json` |
-| Token issuer (`iss`) | expect `KNOXSSO` |
-| Signing algorithm | expect RS256 |
-| Default token TTL | |
-| Impersonation / Trusted Proxy enabled? | yes / no |
-| Can tokens be revoked/disabled while unexpired? | yes / no |
+| Knox homepage / gateway origin | `https://go01-obser-de-gateway.go01-dem.ylcu-atmi.cloudera.site` |
+| Topology used for token APIs | `cdp-proxy-token` |
+| Livy for Spark 3 proxy URL | `.../go01-obser-de/cdp-proxy-token/livy_for_spark3/` |
+| Token API URL (v1 or v2) | v2 (`.../homepage/knoxtoken/api/v2/`) |
+| JWKS URL (pin this host) | `.../go01-obser-de/homepage/knoxtoken/api/v2/jwks.json` |
+| Token issuer (`iss`) | `KNOXSSO` |
+| Signing algorithm | RS256 |
+| Default token TTL | managed token (long-lived); do not log the bearer |
+| Impersonation / Trusted Proxy enabled? | yes (Livy runs as Knox `sub`) |
+| Can tokens be revoked/disabled while unexpired? | yes (managed.token); Phase 1 still trusts `exp` only |
 
 How the operator will mint a test JWT (Token Generation UI / Token API / other):
 
@@ -55,18 +55,18 @@ Start with Spark. Mark the others as later. Gateway path is `/cdp/<knox-service>
 
 | Item | Value |
 | --- | --- |
-| Test user (`sub`) | |
-| Groups (`knox.groups` if present) | |
-| Policies that should allow Livy Spark 3 session list | |
-| Policies that should deny a negative test | |
+| Test user (`sub`) | `ibrooks` |
+| Groups (`knox.groups` if present) | not present on the live JWT |
+| Policies that should allow Livy Spark 3 session list | Ranger allows `ibrooks` Livy Spark 3 + Hive on `ibrooks.*` (observed via live submit/select) |
+| Policies that should deny a negative test | not recorded |
 
 ## Agent preview (Phase 1 is CLI/curl, not MCP)
 
 | Item | Value |
 | --- | --- |
-| Intended first agent host | Cursor / Claude / other |
-| Tool names to allow later | Spark session list, then job submit |
-| Data that must never return to a model | |
+| Intended first agent host | Cursor (MCP `/mcp/spark` and `/mcp/hive`) |
+| Tool names to allow later | Spark list/get/log/submit; Hive list/describe/select |
+| Data that must never return to a model | Raw Knox bearer; unbounded Hive/Spark result sets |
 
 ## Threat model (Phase 0 notes)
 
@@ -80,4 +80,4 @@ Record anything specific to this cluster. Defaults in [testing.md](testing.md):
 
 ## Blockers
 
-List anything that prevents Phase 1 (no JWKS, laptop cannot reach Knox, token TTL too long with no revoke, Livy not on `cdp-proxy-token`, etc.).
+None for Phase 1/2 on `go01-obser-de` (2026-08-17). Livy is on `cdp-proxy-token`; Hive MCP uses the token topology `/hive`. Do not pass `--mint` against Knox JWKS. Phase 3 still open: mTLS/caller keys, OAuth PRM, revocation check vs long-lived managed tokens.

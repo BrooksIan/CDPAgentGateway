@@ -45,6 +45,7 @@ If the project clones but **applications are never created**, the AMP stopped on
 If applications exist but stay Starting or Failed, open Application logs. Typical causes:
 
 - Install wrote packages into the session engine instead of `/home/cdsw/.local` (`pip install --user` is required).
+- CML `run_session` is IPython: `__file__` is not defined. Install/app scripts must use cwd or `/home/cdsw`, not `__file__`.
 - The process exited before listening on `127.0.0.1:$CDSW_APP_PORT` (CML probes loopback, not `0.0.0.0`).
 - User CPU/memory quota cannot schedule four apps (each 1 CPU / 1 GB). Drop other workloads or raise the quota.
 - Static subdomains `mcp-spark`, `mcp-hive`, `mcp-impala`, or `gateway-admin` already exist from a previous AMP attempt.

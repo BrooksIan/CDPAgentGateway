@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""AMP job: confirm pinned JWKS PEM exists and Knox is reachable. Never print tokens."""
-
-from __future__ import annotations
-
+# CML may execute jobs in IPython. Do not use __file__ here.
 import json
 import os
 import ssl
@@ -10,29 +7,24 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-from agentgateway.knox import parse_knox_proxy_url, trusted_jku  # noqa: E402
-from agentgateway.paths import repo_root  # noqa: E402
-
+_root = Path(os.environ.get("AGENTGATEWAY_ROOT") or Path.cwd()).resolve()
+if not (_root / "pyproject.toml").is_file():
+    _root = Path("/home/cdsw").resolve()
+sys.path.insert(0, str(_root / "src"))
+from agentgateway.cml_boot import project_root
+from agentgateway.knox import parse_knox_proxy_url, trusted_jku
+ROOT = project_root()
 
 def _insecure() -> bool:
     return os.environ.get("UPSTREAM_TLS_VERIFY", "true").lower() in {"false", "0", "no"}
-
 
 def _open(url: str, *, headers: dict[str, str] | None = None):
     context = ssl._create_unverified_context() if _insecure() else ssl.create_default_context()
     request = urllib.request.Request(url, headers=headers or {}, method="GET")
     return urllib.request.urlopen(request, context=context, timeout=20)
 
-
 def main() -> int:
-    root = repo_root()
-    pem = Path(os.environ.get("KNOX_PUBLIC_KEY_FILE") or root / "conf" / "generated" / "knox-public.pem")
+    pem = Path(os.environ.get("KNOX_PUBLIC_KEY_FILE") or ROOT / "conf" / "generated" / "knox-public.pem")
     if not pem.is_file() or not pem.read_text().strip():
         print(f"warning: missing verifying PEM at {pem}; applications will still start", file=sys.stderr)
         return 0
@@ -53,7 +45,6 @@ def main() -> int:
     except (urllib.error.URLError, TimeoutError, ssl.SSLError) as exc:
         print(f"warning: JWKS unreachable: {type(exc).__name__}; applications will still start", file=sys.stderr)
         return 0
-
     token = (os.environ.get("KNOX_TOKEN") or "").strip()
     livy_status = None
     if token:
@@ -68,7 +59,6 @@ def main() -> int:
         except (urllib.error.URLError, TimeoutError, ssl.SSLError) as exc:
             print(f"warning: Livy probe failed: {type(exc).__name__}", file=sys.stderr)
             livy_status = None
-
     print(
         json.dumps(
             {
@@ -80,7 +70,6 @@ def main() -> int:
         )
     )
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -46,7 +46,28 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     install_src = (ROOT / "0_session-install-dependencies" / "install_dependencies.py").read_text()
     assert "--user" in install_src
     assert '[amp]' in install_src
-    assert 'if __name__' not in install_src
+    assert "if __name__" not in install_src
+    assert "Path(__file__)" not in install_src
+
+
+def test_cml_project_root_does_not_need_caller_file(tmp_path, monkeypatch) -> None:
+    from agentgateway.cml_boot import project_root
+
+    monkeypatch.chdir(ROOT)
+    monkeypatch.delenv("AGENTGATEWAY_ROOT", raising=False)
+    assert project_root() == ROOT
+
+
+def test_install_script_runs_in_ipython_without_file(monkeypatch) -> None:
+    import subprocess
+
+    monkeypatch.chdir(ROOT)
+    monkeypatch.delenv("AGENTGATEWAY_ROOT", raising=False)
+    monkeypatch.setattr(subprocess, "check_call", lambda *args, **kwargs: None)
+    script = (ROOT / "0_session-install-dependencies" / "install_dependencies.py").read_text()
+    namespace: dict[str, object] = {"__name__": "__main__"}
+    exec(compile(script, "<ipython>", "exec"), namespace)
+    assert namespace["ROOT"] == ROOT
 
 
 def test_amp_layout_and_catalog_exist() -> None:

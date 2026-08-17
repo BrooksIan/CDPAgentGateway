@@ -1,0 +1,45 @@
+apisix:
+  node_listen: 9080
+  enable_ipv6: false
+  enable_admin: false
+  extra_lua_path: "/opt/custom/?.lua"
+  extra_lua_cpath: "/opt/custom/?.so"
+  proxy_mode: http
+
+nginx_config:
+  error_log_level: warn
+  worker_processes: 1
+
+plugins:
+  - real-ip
+  - request-id
+  - serverless-pre-function
+  - mocking
+  - cors
+  - ip-restriction
+  - uri-blocker
+  - request-validation
+  - knox-jwt
+  - proxy-rewrite
+  - limit-conn
+  - limit-count
+  - limit-req
+  - gzip
+  - redirect
+  - response-rewrite
+  - prometheus
+  - public-api
+  - echo
+  - ext-plugin-pre-req
+  - ext-plugin-post-req
+  - ext-plugin-post-resp
+
+plugin_attr:
+  prometheus:
+    export_uri: /apisix/prometheus/metrics
+    enable_export_server: false
+
+deployment:
+  role: data_plane
+  role_data_plane:
+    config_provider: yaml

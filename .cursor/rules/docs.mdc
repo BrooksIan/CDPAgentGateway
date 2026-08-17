@@ -1,0 +1,16 @@
+---
+description: Documentation conventions for this repo
+globs: "{docs/**/*.md,README.md,AGENTS.md,METADATA.yaml}"
+alwaysApply: false
+---
+
+# Docs
+
+- `README.md` is the Cloudera blueprint landing page. Keep Overview, Demo, Use Case, Key Features, Quickstart, Software Components, Target Audience, Repository Structure, Prerequisites, Hardware Requirements, and Documentation.
+- Catalog fields live in `METADATA.yaml`. Do not drop identity, classification, tags, product_mapping, publisher, source, or date keys.
+- Keep architecture, identity, CLI, Spark, Hive, phases, inventory, and tests as separate files under `docs/`.
+- Inventory and test result tables must never contain tokens, passcodes, or private keys.
+- When adding a phase, hop, or CLI command, update `docs/architecture.md`, `docs/phases.md`, and `docs/operator-cli.md` in the same change.
+- Spark allowlist or Livy/MCP tools: update `docs/spark.md`. Hive JDBC or `/cdp/hive`: update `docs/hive.md`. Do not imply Hive is an agent route until `mcp-hive` exists.
+- New gateway behavior needs a test ID in `docs/testing.md` before it is "done".
+- Prefer links to APISIX Learning Center and Cloudera Knox docs over copying vendor pages verbatim.

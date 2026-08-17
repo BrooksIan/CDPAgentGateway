@@ -1,0 +1,16 @@
+---
+description: APISIX and Docker gateway configuration
+globs: "{deploy/**/*,conf/**/*,plugins/**/*}"
+alwaysApply: false
+---
+
+# Gateway config
+
+- Local Phase 1 shape: Docker APISIX on a laptop. Upstream is mock CDP or live Knox from `.env`.
+- Prefer `gateway up` / `gateway knox` / `gateway test`. Compose lives in `deploy/docker-compose.yml` with `--project-directory` at the repo root.
+- Prefer file-based APISIX config and Compose. Keep Admin API bound to localhost.
+- Pin `KNOX_JWKS_URL` host. Allowlist Livy for Spark 3 `GET`/`HEAD` only (`/cdp/livy_for_spark3*`). Writes go through `/mcp/spark`.
+- Fail closed: missing/invalid bearer must not reach Knox.
+- Timeouts should assume long CDP jobs; do not use tiny defaults on probe routes without documenting why.
+
+Do not put tokens, private keys, or real hostnames with credentials in YAML committed to git. Use env substitution from `.env`.

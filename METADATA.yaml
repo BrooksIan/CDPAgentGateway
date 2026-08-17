@@ -1,0 +1,56 @@
+# Cloudera Blueprint catalog metadata
+# Populate fields used by the master blueprint website and internal catalog.
+# Schema: https://github.com/kevinbtalbert/Cloudera-Blueprints-Standard
+
+# --- Identity ---
+name: "CDP Agent Gateway"
+slug: "cdp-agent-gateway" # URL-safe repo / catalog identifier
+description: "Front third-party agents with Apache APISIX so Spark on Cloudera Data Platform stays behind Knox JWTs, Ranger, and a Livy-for-Spark-3 allowlist."
+reprise_link: "" # Public reprise link — add when the demo recording is published
+
+# --- Classification (website filters) ---
+catalog_classification:
+  - Enterprise Blueprint # Options: Enterprise Blueprint | Research | Launchable (AMP) | Developer Example
+launchable: false # true | false — not a Cloudera AI AMP
+lifecycle_status: Active # e.g., Active | Deprecated
+
+# --- Industry & alignment ---
+industry: General # e.g., General | Telecom | Financial Services | Healthcare & Life Sciences | Retail | Media | Physical AI & Robotics
+industry_alignment: "Horizontal" # Horizontal | Vertical
+target_vertical: "" # Optional finer-grained vertical
+
+# --- Tags (website search & browse) ---
+tags:
+  - agents
+  - mcp
+  - spark
+  - livy
+  - hive
+  - apache-knox
+  - apache-apisix
+  - gateway
+  - ranger
+  - cdp
+
+# --- Relationships ---
+product_mapping: # Cloudera products used
+  - Cloudera Data Platform
+  - Cloudera Data Engineering
+  - Cloudera Data Warehouse
+# model_dependencies: # Models, embeddings, or external AI services, if any. Comment out if none.
+
+# --- Provenance ---
+publisher: cloudera # cloudera | partner-name
+source: Internal # Internal | Partner | NVIDIA Adaptation | Customer
+
+# --- Repository & assets ---
+public_github_link: "" # e.g. https://github.com/cloudera/cdp-agent-gateway
+#private_github_link: "" # If applicable, original repo during development
+
+# --- Ownership ---
+maintainer_name: "" # Catalog owner — fill before publish
+
+# --- Dates ---
+date_created: "2026-08-17"
+date_updated: "2026-08-17"
+published_date: "" # Published date / last modified

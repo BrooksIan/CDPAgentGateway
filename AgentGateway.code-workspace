@@ -1,0 +1,22 @@
+{
+  "folders": [
+    {
+      "name": "AgentGateway",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/.DS_Store": true
+    },
+    "files.insertFinalNewline": true,
+    "files.trimTrailingWhitespace": true,
+    "editor.rulers": [100]
+  },
+  "extensions": {
+    "recommendations": [
+      "redhat.vscode-yaml",
+      "ms-azuretools.vscode-docker"
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+---
+description: Dual identity and Knox JWT validation
+alwaysApply: true
+---
+
+# Identity
+
+- End user = Knox JWT (`sub`, `knox.id`). Agent API keys are not CDP users.
+- Agent platform = APISIX consumer (mTLS or caller key). Require both on partner traffic; Phase 1 may be JWT-only for curl tests.
+- Authorization = Ranger via Knox. Forward the caller's bearer unchanged.
+
+Validate Knox RS256 tokens (`iss=KNOXSSO`) with pinned JWKS or a configured public key. Do not use APISIX `jwt-auth` as the primary plugin.
+
+```text
+# ❌ BAD — second token format
+jwt-auth issues an APISIX consumer JWT, then maps that to a Knox user
+
+# ✅ GOOD — Knox bearer is the user credential
+knox-jwt verifies the pinned Knox PEM (RS256, iss, exp, sub), then proxies Authorization
+```
+
+Never log the raw token. Pin JWKS to the inventory Knox host; ignore foreign `jku` URLs.

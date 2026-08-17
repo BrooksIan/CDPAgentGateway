@@ -1,0 +1,87 @@
+# Invoke from the repo root so .env and volume paths resolve:
+#   docker compose --project-directory . -f deploy/docker-compose.yml up
+# `make up` already does this.
+
+services:
+  mock-cdp:
+    build: ./mock-cdp
+    environment:
+      JWKS_PATH: /keys/jwks.json
+      PORT: "8080"
+      KNOX_PROXY_PREFIX: ${KNOX_PROXY_PREFIX:-/gateway/cdp-proxy-token}
+    volumes:
+      - ./conf/keys:/keys:ro
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  mcp-spark:
+    build: ./mcp-spark
+    environment:
+      PORT: "8080"
+      UPSTREAM_SCHEME: ${UPSTREAM_SCHEME:-http}
+      UPSTREAM_HOST: ${UPSTREAM_HOST:-mock-cdp}
+      UPSTREAM_PORT: ${UPSTREAM_PORT:-8080}
+      UPSTREAM_TLS_VERIFY: ${UPSTREAM_TLS_VERIFY:-false}
+      KNOX_PROXY_PREFIX: ${KNOX_PROXY_PREFIX:-/gateway/cdp-proxy-token}
+      ADMIN_URL: http://admin:8080
+      ADMIN_INTERNAL_TOKEN: ${ADMIN_INTERNAL_TOKEN:-lab-admin}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    depends_on:
+      mock-cdp:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+
+  admin:
+    build: ./admin
+    environment:
+      PORT: "8080"
+      ADMIN_DB: /data/gateway.sqlite
+      ADMIN_INTERNAL_TOKEN: ${ADMIN_INTERNAL_TOKEN:-lab-admin}
+    volumes:
+      - ./data:/data
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-9090}:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  apisix:
+    image: apache/apisix:3.16.0-debian
+    depends_on:
+      mock-cdp:
+        condition: service_healthy
+      mcp-spark:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+    environment:
+      APISIX_STAND_ALONE: "true"
+    volumes:
+      - ./conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./conf/generated/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+      - ./conf/generated/knox-public.pem:/usr/local/apisix/conf/knox-public.pem:ro
+      - ./plugins/knox-jwt.lua:/opt/custom/apisix/plugins/knox-jwt.lua:ro
+    ports:
+      - "${APISIX_PORT:-9080}:9080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  default:
+    name: agent-gateway

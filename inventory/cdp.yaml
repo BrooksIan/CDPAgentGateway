@@ -1,0 +1,51 @@
+# Phase 0 inventory — fill before pointing the local gateway at a real CDP.
+# Tests assert this schema. Secrets stay in .env, not here.
+
+environment:
+  name: local-lab
+  deployment: private-cloud-base  # private-cloud-base | public-cloud
+  notes: External CDP is reached from a local APISIX container.
+
+knox:
+  issuer: KNOXSSO
+  expected_alg: RS256
+  topology: cdp-proxy-token
+  proxy_prefix: /gateway/cdp-proxy-token
+  jwks_path: /gateway/homepage/knoxtoken/api/v1/jwks.json
+  token_api: /gateway/homepage/knoxtoken/api/v2/token
+  gateway_url: ""          # e.g. https://knox.example.com:8443
+  jwks_url: ""             # usually {gateway_url}{jwks_path}
+  tls_verify: false
+
+identity:
+  user_claim: sub
+  token_id_claim: knox.id
+  groups_claim: knox.groups
+  managed_claim: managed.token
+  agent_identity: separate-from-user  # mTLS or caller key later
+
+first_tools:
+  - id: livy-spark3-sessions
+    method: GET
+    path: /livy_for_spark3/sessions
+    access: read
+    purpose: List Livy for Spark 3 sessions through Knox. Phase 1 probe.
+  - id: livy-spark3-batches
+    method: GET
+    path: /livy_for_spark3/batches
+    access: read
+    purpose: List Livy for Spark 3 batches. MCP spark_list_batches uses this path.
+
+threats:
+  - id: missing-auth
+    control: reject-401
+  - id: alg-none
+    control: reject-401
+  - id: hmac-confusion
+    control: reject-401
+  - id: expired-token
+    control: reject-401
+  - id: wrong-issuer
+    control: reject-401
+  - id: direct-knox-bypass
+    control: do-not-publish-cdp-apis

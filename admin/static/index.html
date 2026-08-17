@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent Gateway · Operator</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <p class="eyebrow">CDP Agent Gateway</p>
+        <h1>Operator</h1>
+      </div>
+      <p class="note">
+        Usage and quotas are keyed by Knox <code>sub</code>. Ranger still
+        authorizes data. This console is not on the agent listener.
+      </p>
+    </header>
+
+    <section class="stats" id="stats"></section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Quotas</h2>
+        <p>Empty fields mean unlimited. Daily window is UTC.</p>
+      </div>
+      <form id="quota-form" class="quota-form">
+        <label>
+          Knox user
+          <input name="sub" placeholder="* for default, or a username" required />
+        </label>
+        <label>
+          Daily tool calls
+          <input name="daily_calls" type="number" min="0" placeholder="unlimited" />
+        </label>
+        <label>
+          Daily submits
+          <input name="daily_submits" type="number" min="0" placeholder="unlimited" />
+        </label>
+        <div class="actions">
+          <button type="submit">Save quota</button>
+          <button type="button" id="delete-quota" class="ghost">Remove user override</button>
+        </div>
+      </form>
+      <p id="quota-status" class="status" hidden></p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>User usage</h2>
+        <p id="day-label"></p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Knox user</th>
+              <th>Calls</th>
+              <th>Submits</th>
+              <th>Denied</th>
+              <th>Errors</th>
+              <th>Quota</th>
+              <th>Last tool</th>
+              <th>Last seen</th>
+            </tr>
+          </thead>
+          <tbody id="users"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Audit join</h2>
+        <p>
+          Lookup by APISIX <code>X-Request-Id</code>. Joins tool, Knox
+          <code>sub</code>, and <code>knox.id</code>. Bearers are never stored.
+        </p>
+      </div>
+      <form id="audit-form" class="audit-form">
+        <label>
+          Request ID
+          <input name="request_id" placeholder="X-Request-Id" required />
+        </label>
+        <div class="actions">
+          <button type="submit">Lookup</button>
+        </div>
+      </form>
+      <p id="audit-status" class="status" hidden></p>
+      <pre id="audit-result" class="audit-result" hidden></pre>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Recent activity</h2>
+        <p>Tool, Knox subject, token id, and request id. Bearers are never stored.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>User</th>
+              <th>knox.id</th>
+              <th>Tool</th>
+              <th>Result</th>
+              <th>Request</th>
+            </tr>
+          </thead>
+          <tbody id="events"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

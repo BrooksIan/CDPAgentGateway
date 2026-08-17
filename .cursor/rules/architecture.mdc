@@ -1,0 +1,18 @@
+---
+description: CDP agent gateway architecture constraints
+alwaysApply: true
+---
+
+# Architecture
+
+- APISIX is the only public **agent** address (north-south). Knox stays the CDP perimeter (`cdp-proxy-token`). The operator admin UI binds `127.0.0.1:9090` and is not an agent route.
+- MCP adapters are services behind APISIX. Do not implement tools as APISIX plugins or the experimental `mcp-bridge`.
+- Do not replace Knox with AISIX or expose Hive, Impala, Ozone, or NiFi to agents.
+- Phase 1 allowlists Livy for Spark 3 only (`GET`/`HEAD` `/cdp/livy_for_spark3*`). MCP Spark is `/mcp/spark` → `mcp-spark` upstream. Do not proxy raw Livy POST/PUT/DELETE. Do not add a catch-all `/cdp/*` proxy.
+- Do not mint cluster credentials or bypass Ranger.
+
+```
+agents → APISIX → MCP adapters → Knox → CDP
+```
+
+When adding routes, allowlist a specific Knox path. Do not add a catch-all proxy to the cluster.

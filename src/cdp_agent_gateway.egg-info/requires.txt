@@ -1,0 +1,8 @@
+httpx
+PyJWT
+cryptography
+python-dotenv
+PyYAML
+
+[dev]
+pytest

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cdp-agent-gateway"
+version = "0.1.0"
+description = "Operator CLI for the CDP Agent Gateway blueprint"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx",
+  "PyJWT",
+  "cryptography",
+  "python-dotenv",
+  "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+hive = ["impyla>=0.19"]
+
+[project.scripts]
+gateway = "agentgateway.cli:main"
+ag = "agentgateway.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

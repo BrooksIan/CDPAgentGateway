@@ -1,0 +1,284 @@
+:root {
+  --bg: #10151c;
+  --surface: #18212c;
+  --surface-2: #1f2a37;
+  --stroke: #2c3948;
+  --text: #e8eef4;
+  --muted: #8b9aab;
+  --accent: #e36b2c;
+  --ok: #3d9a6a;
+  --warn: #c9a227;
+  --bad: #c45c4a;
+  --font: "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 var(--font);
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-end;
+  padding: 28px 32px 8px;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+h1,
+h2 {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+
+h2 {
+  font-size: 16px;
+}
+
+.note {
+  max-width: 420px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  padding: 20px 32px;
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  padding: 14px 16px;
+}
+
+.stat .value {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.stat .label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.panel {
+  margin: 0 32px 24px;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: baseline;
+  padding: 16px 18px 0;
+}
+
+.panel-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.quota-form,
+.audit-form {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr auto;
+  gap: 12px;
+  padding: 16px 18px 18px;
+  align-items: end;
+}
+
+.audit-form {
+  grid-template-columns: 1fr auto;
+}
+
+.audit-result {
+  margin: 0 18px 16px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--stroke);
+  color: var(--text);
+  font: 12px/1.45 var(--mono);
+  overflow: auto;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  padding: 8px 10px;
+  font: inherit;
+  width: 100%;
+}
+
+input:focus {
+  outline: 1px solid var(--accent);
+  border-color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  background: var(--accent);
+  color: #160b05;
+  border: 0;
+  padding: 9px 14px;
+  font: 600 13px var(--font);
+  cursor: pointer;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--stroke);
+}
+
+.status {
+  margin: 0 18px 16px;
+  color: var(--ok);
+  font-size: 13px;
+}
+
+.status.bad {
+  color: var(--bad);
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 18px;
+  border-top: 1px solid var(--stroke);
+  white-space: nowrap;
+}
+
+th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+tbody tr {
+  cursor: pointer;
+}
+
+tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.bar {
+  height: 6px;
+  background: var(--bg);
+  border: 1px solid var(--stroke);
+  width: 88px;
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--stroke);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.pill.ok {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.pill.bad {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+.pill.warn {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.empty {
+  color: var(--muted);
+  padding: 18px;
+}
+
+@media (max-width: 960px) {
+  .stats,
+  .quota-form,
+  .audit-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .top,
+  .stats,
+  .panel {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+  .top {
+    padding-left: 0;
+    padding-right: 0;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

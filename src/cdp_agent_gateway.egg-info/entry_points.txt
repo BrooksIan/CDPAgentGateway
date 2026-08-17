@@ -1,0 +1,3 @@
+[console_scripts]
+ag = agentgateway.cli:main
+gateway = agentgateway.cli:main

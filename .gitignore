@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+conf/keys/*.pem
+conf/keys/*.json
+conf/generated/
+data/*.sqlite
+data/*.sqlite-*
+.DS_Store
+*.log

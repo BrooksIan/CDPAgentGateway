@@ -72,6 +72,16 @@ environment_variables:
     default: "true"
     description: Verify TLS to the CDW Impala coordinator. Set false only for lab CAs.
     required: false
+  AGENT_CALLER_KEY:
+    default: ""
+    description: >-
+      Partner MCP caller key (X-Agent-Key) enforced by APISIX on /mcp/* when set. Same as Compose.
+    required: false
+  GATEWAY_PUBLIC_URL:
+    default: ""
+    description: >-
+      Public agent URL for RFC 9728 metadata. Leave empty on AMP to use https://agent-gateway.<CDSW_DOMAIN>.
+    required: false
 
 runtimes:
   - editor: Workbench
@@ -201,6 +211,37 @@ tasks:
       Lists databases/tables, describe, and column SELECT (limit 50, no SELECT *)
       as the Knox token subject. Ranger authorizes that subject. CML cookies are
       not the user credential.
+
+  - type: start_application
+    name: Agent gateway (APISIX)
+    entity_label: agent-gateway
+    subdomain: agent-gateway
+    script: 7_app-agent-gateway/app.py
+    kernel: python3
+    runtimes:
+      - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: Workbench
+        kernel: Python 3.12
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.12
+        edition: Standard
+    cpu: 1.0
+    memory: 1.5
+    gpu: 0
+    bypass_authentication: true
+    static_subdomain: true
+    short_summary: APISIX agent edge with knox-jwt.lua. Same routes as Compose on live Knox.
+    description: Public MCP and /cdp/* allowlist through Apache APISIX.
+    long_summary: >-
+      Runs the same apache/apisix image as Compose, bound to CDSW_APP_PORT. Validates Knox
+      RS256 with the pinned PEM, enforces optional X-Agent-Key on MCP, and proxies to the
+      sibling MCP applications. Requires docker on the engine and Fetch JWKS before start.
 
   - type: start_application
     name: Operator admin

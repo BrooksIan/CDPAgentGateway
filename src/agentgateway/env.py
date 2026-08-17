@@ -182,8 +182,40 @@ def _positive_int(values: dict[str, str], key: str, default: str) -> str:
     return str(number)
 
 
+def _mcp_upstream_defaults(values: dict[str, str]) -> None:
+    compose = {
+        "SPARK": ("http", "mcp-spark", "8080", "node"),
+        "HIVE": ("http", "mcp-hive", "8080", "node"),
+        "IMPALA": ("http", "mcp-impala", "8080", "node"),
+    }
+    for svc, (scheme, host, port, pass_host) in compose.items():
+        values.setdefault(f"MCP_{svc}_UPSTREAM_SCHEME", scheme)
+        values.setdefault(f"MCP_{svc}_UPSTREAM_HOST", host)
+        values.setdefault(f"MCP_{svc}_UPSTREAM_PORT", port)
+        values.setdefault(f"MCP_{svc}_PASS_HOST", pass_host)
+
+
+def _mcp_upstream_extras(values: dict[str, str]) -> dict[str, str]:
+    extras: dict[str, str] = {}
+    verify = values.get("UPSTREAM_TLS_VERIFY", "true").lower()
+    for svc in ("SPARK", "HIVE", "IMPALA"):
+        scheme = values[f"MCP_{svc}_UPSTREAM_SCHEME"]
+        host = values[f"MCP_{svc}_UPSTREAM_HOST"]
+        pass_host = values[f"MCP_{svc}_PASS_HOST"]
+        header = ""
+        if pass_host == "rewrite":
+            header = f"    upstream_host: {host}\n"
+        tls = ""
+        if scheme == "https":
+            tls = f"    tls:\n      verify: {verify}\n"
+        extras[f"MCP_{svc}_UPSTREAM_HOST_HEADER"] = header
+        extras[f"MCP_{svc}_UPSTREAM_TLS"] = tls
+    return extras
+
+
 def render_apisix_yaml(template: str, values: dict[str, str]) -> str:
     merged = dict(values)
+    _mcp_upstream_defaults(merged)
     merged["MCP_RATE_COUNT"] = _positive_int(merged, "MCP_RATE_COUNT", "60")
     merged["MCP_RATE_WINDOW"] = _positive_int(merged, "MCP_RATE_WINDOW", "60")
     missing = [key for key in REQUIRED_RENDER_KEYS if not merged.get(key)]
@@ -209,11 +241,27 @@ def render_apisix_yaml(template: str, values: dict[str, str]) -> str:
         "RESOURCE_METADATA_URL": resource_metadata_url(merged),
         "KNOX_TOKEN_STATE_URL": state_url,
         "OAUTH_PRM_JSON": prm,
+        **_mcp_upstream_extras(merged),
     }
     rendered = template
     for key, value in extras.items():
         rendered = rendered.replace("{{" + key + "}}", value)
     for key in REQUIRED_RENDER_KEYS:
+        rendered = rendered.replace("{{" + key + "}}", merged[key])
+    for key in (
+        "MCP_SPARK_UPSTREAM_SCHEME",
+        "MCP_SPARK_UPSTREAM_HOST",
+        "MCP_SPARK_UPSTREAM_PORT",
+        "MCP_SPARK_PASS_HOST",
+        "MCP_HIVE_UPSTREAM_SCHEME",
+        "MCP_HIVE_UPSTREAM_HOST",
+        "MCP_HIVE_UPSTREAM_PORT",
+        "MCP_HIVE_PASS_HOST",
+        "MCP_IMPALA_UPSTREAM_SCHEME",
+        "MCP_IMPALA_UPSTREAM_HOST",
+        "MCP_IMPALA_UPSTREAM_PORT",
+        "MCP_IMPALA_PASS_HOST",
+    ):
         rendered = rendered.replace("{{" + key + "}}", merged[key])
     if "{{" in rendered:
         raise ValueError("Unrendered template placeholders remain")

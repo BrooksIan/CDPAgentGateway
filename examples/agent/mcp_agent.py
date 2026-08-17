@@ -63,8 +63,10 @@ def mcp_base_url(adapter: str = "spark") -> str:
         return explicit.rstrip("/")
     domain = (os.environ.get("CDSW_DOMAIN") or "").strip()
     if domain:
-        subdomain = _AMP_SUBDOMAINS[key]
-        return f"https://{subdomain}.{domain.rstrip('/')}{_ADAPTERS[key]}"
+        public = (os.environ.get("GATEWAY_PUBLIC_URL") or "").strip().rstrip("/")
+        if not public:
+            public = f"https://agent-gateway.{domain.rstrip('/')}"
+        return f"{public}{_ADAPTERS[key]}"
     gateway = (os.environ.get("GATEWAY_URL") or "http://127.0.0.1:9080").rstrip("/")
     return f"{gateway}{_ADAPTERS[key]}"
 
@@ -77,6 +79,10 @@ def agent_headers(*, adapter: str = "spark") -> dict[str, str]:
     }
     if profile() == "compose":
         caller = (os.environ.get("AGENT_CALLER_KEY") or "lab-agent").strip()
+        if caller:
+            headers["X-Agent-Key"] = caller
+    else:
+        caller = (os.environ.get("AGENT_CALLER_KEY") or "").strip()
         if caller:
             headers["X-Agent-Key"] = caller
     return headers

@@ -19,31 +19,34 @@ upstreams:
 {{TLS_BLOCK}}
   - id: mcp-spark
     type: roundrobin
-    scheme: http
-    timeout:
+    scheme: {{MCP_SPARK_UPSTREAM_SCHEME}}
+    pass_host: {{MCP_SPARK_PASS_HOST}}
+{{MCP_SPARK_UPSTREAM_HOST_HEADER}}    timeout:
       connect: 6
       send: 60
       read: 60
-    nodes:
-      "mcp-spark:8080": 1
+{{MCP_SPARK_UPSTREAM_TLS}}    nodes:
+      "{{MCP_SPARK_UPSTREAM_HOST}}:{{MCP_SPARK_UPSTREAM_PORT}}": 1
   - id: mcp-hive
     type: roundrobin
-    scheme: http
-    timeout:
+    scheme: {{MCP_HIVE_UPSTREAM_SCHEME}}
+    pass_host: {{MCP_HIVE_PASS_HOST}}
+{{MCP_HIVE_UPSTREAM_HOST_HEADER}}    timeout:
       connect: 6
       send: 60
       read: 60
-    nodes:
-      "mcp-hive:8080": 1
+{{MCP_HIVE_UPSTREAM_TLS}}    nodes:
+      "{{MCP_HIVE_UPSTREAM_HOST}}:{{MCP_HIVE_UPSTREAM_PORT}}": 1
   - id: mcp-impala
     type: roundrobin
-    scheme: http
-    timeout:
+    scheme: {{MCP_IMPALA_UPSTREAM_SCHEME}}
+    pass_host: {{MCP_IMPALA_PASS_HOST}}
+{{MCP_IMPALA_UPSTREAM_HOST_HEADER}}    timeout:
       connect: 6
       send: 60
       read: 60
-    nodes:
-      "mcp-impala:8080": 1
+{{MCP_IMPALA_UPSTREAM_TLS}}    nodes:
+      "{{MCP_IMPALA_UPSTREAM_HOST}}:{{MCP_IMPALA_UPSTREAM_PORT}}": 1
 
 routes:
   - id: health

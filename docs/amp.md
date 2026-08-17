@@ -11,12 +11,14 @@ Template: [CML Community AMP Template](https://github.com/cloudera/CML_Community
 | Profile | Public agent address | JWT check | Upstream |
 | --- | --- | --- | --- |
 | Compose (default) | APISIX `:9080` | `plugins/knox-jwt.lua` | `mcp-spark` / `mcp-hive` / `mcp-impala` → Knox |
-| AMP (optional) | CML Application URLs | Python `knox-jwt` in `agentgateway.knox_jwt` | same adapter code → Knox |
+| AMP (optional) | **`agent-gateway` CML app (APISIX)** | same `knox-jwt.lua` in Docker | sibling MCP apps → Knox |
 
-AMP does **not** run Compose, APISIX, Lua plugins, or mock Knox. It is live Knox only (`--mint` does not apply). Do not use CML-native Spark jobs as the Spark path.
+AMP also publishes direct MCP application URLs (`mcp-spark`, `mcp-hive`, `mcp-impala`) with Python Knox JWT for debugging. **Agents should use `https://agent-gateway.<workspace>/mcp/spark`** (and hive/impala) so they get the same APISIX routes as Compose: `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`, optional `X-Agent-Key`, and APISIX burst caps.
+
+AMP runs the same `apache/apisix:3.16.0-debian` image as Compose (Docker on the engine, bound to `CDSW_APP_PORT`). It is live Knox only (`--mint` does not apply). Mock Knox stays Compose-only.
 
 ```text
-MCP host → CML Application (Knox JWT + MCP) → Knox cdp-proxy-token → Livy Spark 3 / Hive, or inventoried CDW Impala
+MCP host → agent-gateway (APISIX, knox-jwt.lua) → mcp-spark|hive|impala → Knox → CDP
 ```
 
 ## Import
@@ -57,18 +59,51 @@ Push this repo to GitHub, then **Redeploy** the AMP so the workbench re-imports 
 
 | Subdomain | CML login | Role |
 | --- | --- | --- |
-| `mcp-spark` | Bypassed (MCP hosts cannot send CML cookies) | POST JSON-RPC Spark. Knox JWT required. GET `/` and `/health` are public. |
+| **`agent-gateway`** | Bypassed | **APISIX agent edge.** `/mcp/spark`, `/mcp/hive`, `/mcp/impala`, `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`. Knox JWT + optional `X-Agent-Key`. Requires Docker and Fetch JWKS PEM. |
+| `mcp-spark` | Bypassed (MCP hosts cannot send CML cookies) | MCP adapter upstream. Direct URL still works (Python JWT). Prefer `agent-gateway`. |
 | `mcp-hive` | Bypassed | POST JSON-RPC Hive (read-only). Knox JWT required. `/cdp/hive` is not this app. |
 | `mcp-impala` | Bypassed | POST JSON-RPC Impala (read-only). Knox JWT required. `/cdp/impala` is not this app. CDW `HTTP code 401` after a valid JWT is warehouse trust, not APISIX. |
 | `gateway-admin` | Required | Operator usage/quotas. Shares `data/gateway.sqlite`. Not an agent route. |
 
 Quotas use sqlite on the project filesystem (`ADMIN_BACKEND=sqlite`). Compose still uses HTTP to the admin container and fails open if that container is down.
 
-Burst cap `MCP_RATE_COUNT` / `MCP_RATE_WINDOW` is enforced in the AMP JWT middleware (APISIX `limit-count` is Compose-only).
+Burst cap `MCP_RATE_COUNT` / `MCP_RATE_WINDOW` is enforced in APISIX on `agent-gateway` (same as Compose). Direct MCP app URLs still enforce Python burst limits if used without APISIX.
 
 ## MCP host config
 
-The application URL is the MCP endpoint (POST JSON-RPC, no Streamable HTTP):
+The **agent** URL is the APISIX application (POST JSON-RPC, no Streamable HTTP):
+
+```json
+{
+  "mcpServers": {
+    "cdp-spark": {
+      "url": "https://agent-gateway.<workspace>/mcp/spark",
+      "headers": {
+        "Authorization": "Bearer <knox-jwt>",
+        "X-Agent-Key": "<partner-key-when-configured>"
+      }
+    },
+    "cdp-hive": {
+      "url": "https://agent-gateway.<workspace>/mcp/hive",
+      "headers": {
+        "Authorization": "Bearer <knox-jwt>",
+        "X-Agent-Key": "<partner-key-when-configured>"
+      }
+    },
+    "cdp-impala": {
+      "url": "https://agent-gateway.<workspace>/mcp/impala",
+      "headers": {
+        "Authorization": "Bearer <knox-jwt>",
+        "X-Agent-Key": "<partner-key-when-configured>"
+      }
+    }
+  }
+}
+```
+
+Direct MCP subdomains (`mcp-spark`, etc.) remain for adapter debugging; JWT-only, no caller key unless you also set `AGENT_CALLER_KEY` and route through APISIX.
+
+Previous direct-only config (still valid for debugging):
 
 ```json
 {
@@ -102,7 +137,7 @@ The application URL is the MCP endpoint (POST JSON-RPC, no Streamable HTTP):
 | Principal | AMP |
 | --- | --- |
 | End user | Knox JWT (`sub`, `knox.id`) — same as Compose |
-| Agent platform | CML project + `mcp-spark` / `mcp-hive` / `mcp-impala` subdomain (JWT-only; Compose MCP uses `X-Agent-Key`) |
+| Agent platform | CML **`agent-gateway`** APISIX app + MCP upstreams (`X-Agent-Key` when `AGENT_CALLER_KEY` is set) |
 | Authorization | Ranger via Knox; no impersonation |
 
 AMP is JWT-only for the agent product. Compose MCP caller keys and Phase 3 mTLS do not map onto CML application URLs. AMP still publishes `/.well-known/oauth-protected-resource` and `resource_metadata` on `401`.
@@ -121,15 +156,16 @@ AMP is JWT-only for the agent product. Compose MCP caller keys and Phase 3 mTLS 
 | `4_app-operator-admin/` | Admin application |
 | `5_app-mcp-hive/` | Hive MCP application |
 | `6_app-mcp-impala/` | Impala MCP application |
+| `7_app-agent-gateway/` | APISIX application (Docker, knox-jwt.lua, same routes as Compose) |
 | `examples/agent/third_party_agent.ipynb` | Workbench notebook: simulate a third-party MCP host against the AMP apps |
 
-Set `KNOX_TOKEN` in project environment before running the notebook. Do not add `KNOX_TOKEN` to `.project-metadata.yaml` (same rule as Compose). Override MCP URLs with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if your workspace hostname differs from `https://mcp-spark.<CDSW_DOMAIN>/mcp/spark`.
+Set `KNOX_TOKEN` in project environment before running the notebook. Do not add `KNOX_TOKEN` to `.project-metadata.yaml` (same rule as Compose). Override MCP URLs with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if needed. Default is `https://agent-gateway.<CDSW_DOMAIN>/mcp/*`.
 
 ## Non-goals
 
-- Docker-in-CML, APISIX, or mock-cdp
-- Raw Livy writes, `/cdp/hive`, `/cdp/impala`, Ozone, NiFi as agent routes
-- `/cdp/webhdfs` (Compose APISIX only; AMP has no APISIX)
+- Docker-in-CML for mock-cdp or full Compose stacks (AMP uses Docker **only** for the APISIX edge container)
+- Raw Livy writes on `/cdp/livy_for_spark3*` (GET/HEAD only, same as Compose)
+- `/cdp/hive`, `/cdp/impala`, Ozone, NiFi as agent routes
 - APISIX `jwt-auth` or a CML model access key as the CDP user
 - Streamable HTTP unless a real host fails `initialize`
 

@@ -16,3 +16,6 @@ try:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "-e", f"{ROOT}[hive]"], cwd=str(ROOT))
 except subprocess.CalledProcessError as exc:
     print(f"warning: hive extra failed (exit {exc.returncode}); Spark and admin still start", file=sys.stderr)
+import shutil
+if shutil.which("docker"):
+    subprocess.run(["docker", "pull", "apache/apisix:3.16.0-debian"], check=False)

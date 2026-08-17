@@ -44,7 +44,7 @@ def test_mcp_base_url_compose(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_mcp_base_url_amp(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CDSW_DOMAIN", "ml.example.com")
     monkeypatch.delenv("MCP_HIVE_URL", raising=False)
-    assert mcp_agent.mcp_base_url("hive") == "https://mcp-hive.ml.example.com/mcp/hive"
+    assert mcp_agent.mcp_base_url("hive") == "https://agent-gateway.ml.example.com/mcp/hive"
 
 
 def test_agent_headers_compose_includes_caller_key(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -56,10 +56,18 @@ def test_agent_headers_compose_includes_caller_key(monkeypatch: pytest.MonkeyPat
     assert headers["X-Agent-Key"] == "lab-agent"
 
 
-def test_agent_headers_amp_omits_caller_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_agent_headers_amp_includes_caller_key_when_set(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CDSW_DOMAIN", "ml.example.com")
     monkeypatch.setenv("KNOX_TOKEN", "test-token")
     monkeypatch.setenv("AGENT_CALLER_KEY", "lab-agent")
+    headers = mcp_agent.agent_headers(adapter="spark")
+    assert headers["X-Agent-Key"] == "lab-agent"
+
+
+def test_agent_headers_amp_omits_caller_key_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CDSW_DOMAIN", "ml.example.com")
+    monkeypatch.setenv("KNOX_TOKEN", "test-token")
+    monkeypatch.delenv("AGENT_CALLER_KEY", raising=False)
     headers = mcp_agent.agent_headers(adapter="spark")
     assert "X-Agent-Key" not in headers
 

@@ -25,6 +25,7 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert "3_app-mcp-spark/app.py" in scripts
     assert "5_app-mcp-hive/app.py" in scripts
     assert "6_app-mcp-impala/app.py" in scripts
+    assert "7_app-agent-gateway/app.py" in scripts
     assert "4_app-operator-admin/app.py" in scripts
 
     kernels = {runtime["kernel"] for runtime in amp["runtimes"]}
@@ -44,12 +45,15 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     mcp = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-spark")
     hive = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-hive")
     impala = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-impala")
+    apisix = next(task for task in amp["tasks"] if task.get("subdomain") == "agent-gateway")
     admin = next(task for task in amp["tasks"] if task.get("subdomain") == "gateway-admin")
     assert mcp["type"] == "start_application"
     assert mcp["kernel"] == "python3"
     assert mcp["bypass_authentication"] is True
     assert hive["bypass_authentication"] is True
     assert impala["bypass_authentication"] is True
+    assert apisix["type"] == "start_application"
+    assert apisix["bypass_authentication"] is True
     assert admin["bypass_authentication"] is False
     first_app = next(i for i, task in enumerate(amp["tasks"]) if task["type"] == "start_application")
     first_knox = next(i for i, task in enumerate(amp["tasks"]) if task.get("entity_label") == "fetch_jwks")
@@ -127,8 +131,10 @@ def test_amp_layout_and_catalog_exist() -> None:
         ROOT / "4_app-operator-admin" / "app.py",
         ROOT / "5_app-mcp-hive" / "app.py",
         ROOT / "6_app-mcp-impala" / "app.py",
+        ROOT / "7_app-agent-gateway" / "app.py",
         ROOT / "src" / "agentgateway" / "knox_jwt.py",
         ROOT / "src" / "agentgateway" / "amp.py",
+        ROOT / "src" / "agentgateway" / "amp_apisix.py",
         ROOT / "src" / "agentgateway" / "cml_boot.py",
     ):
         assert path.is_file(), path

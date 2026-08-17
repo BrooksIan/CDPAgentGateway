@@ -4,7 +4,7 @@ Third-party agents must not discover Livy, Hive, Impala, Ozone, NiFi, or other C
 
 ![CDP Agent Gateway traffic path](../assets/architecture.svg)
 
-Phase 1 traffic is `agents → APISIX → Knox → Livy (Spark 3)` plus operator HDFS staging `→ APISIX → Knox → WebHDFS`. Phase 2 adds `agents → APISIX → mcp-spark → Knox → Livy`, `agents → APISIX → mcp-hive → Knox → Hive`, and `agents → APISIX → mcp-impala → Knox Impala or CDW coordinator`. `/cdp/hive` and `/cdp/impala` stay **404**. Optional AMP is `agents → CML Application → mcp-spark, mcp-hive, or mcp-impala → Knox` (Impala AMP may use inventoried `IMPALA_HOST`). AMP does not publish WebHDFS; that route is Compose APISIX.
+Phase 1 traffic is `agents → APISIX → Knox → Livy (Spark 3)` plus operator HDFS staging `→ APISIX → Knox → WebHDFS`. Phase 2 adds `agents → APISIX → mcp-spark → Knox → Livy`, `agents → APISIX → mcp-hive → Knox → Hive`, and `agents → APISIX → mcp-impala → Knox Impala or CDW coordinator`. `/cdp/hive` and `/cdp/impala` stay **404**. Optional AMP is `agents → agent-gateway (APISIX on CML) → mcp-spark, mcp-hive, or mcp-impala → Knox` (Impala AMP may use inventoried `IMPALA_HOST`). Direct MCP app URLs remain for debugging.
 
 ## What each hop owns
 
@@ -13,7 +13,8 @@ Phase 1 traffic is `agents → APISIX → Knox → Livy (Spark 3)` plus operator
 | Operator CLI (`gateway`) | `.env`, mock keys, JWKS fetch, Compose, probes (`gateway spark`, `gateway webhdfs`) | Cluster credentials, Ranger decisions |
 | Operator admin (`:9090`) | Usage by Knox `sub`, tool quotas, `request_id` audit join | Agent traffic, Ranger decisions, cluster credentials |
 | Agent Gateway (APISIX) | TLS (later), Knox JWT validation, allowlisted routes, request IDs, MCP burst cap | Cluster credentials, Ranger decisions, MCP tool implementations |
-| AMP mcp-spark / mcp-hive / mcp-impala apps (optional) | Same Knox JWT rules in Python; CML Application URL | Compose, APISIX, mock Knox, impersonation, WebHDFS |
+| AMP mcp-spark / mcp-hive / mcp-impala apps (optional) | MCP adapter upstreams; Python JWT if hit directly | Compose, mock Knox, impersonation |
+| AMP agent-gateway (optional) | APISIX + knox-jwt.lua; same allowlist as Compose on live Knox | mock Knox, `--mint` |
 | MCP adapters (`mcp-spark`, `mcp-hive`, `mcp-impala`) | Spark list/get/log/submit; Hive and Impala list/describe/select; forward the caller's Knox bearer | Impersonation, inline Spark code, free-form SQL, long-lived Knox secrets |
 | Knox | Token issuance, `JWTProvider` on `cdp-proxy-token`, Trusted Proxy / doAs, WebHDFS | Public internet exposure |
 | Ranger | Data authorization for the Knox subject on Spark, Hive, Impala, and HDFS | Agent-product identity |
@@ -68,6 +69,6 @@ A laptop runs APISIX in Docker.
 
 - **Local:** upstream is `mock-cdp`. `gateway init && gateway up && gateway test` is the lab path. `--mint` signs the lab RSA key that APISIX loads.
 - **Live:** `gateway knox <https-knox-url-with-livy_for_spark3>` writes host, `cdp-proxy-token` prefix, and JWKS URL into `.env`. `gateway token set` stores the Knox JWT. Agents and curl still hit `localhost:9080`; APISIX validates the JWT and proxies Livy, WebHDFS, `/mcp/spark`, `/mcp/hive`, and `/mcp/impala`. `--mint` is refused.
-- **Optional AMP:** Cloudera AI Workbench applications (`mcp-spark`, `mcp-hive`, `mcp-impala`, `gateway-admin`). Python Knox JWT in front of the same adapters. Live Knox only; no Compose, no mock CDP, no `/cdp/webhdfs`. `launchable` stays false until a workbench proof. How-to: [amp.md](amp.md).
+- **Optional AMP:** Cloudera AI Workbench applications: MCP adapters plus **`agent-gateway` (APISIX in Docker)**. Same allowlisted routes as Compose on live Knox. Direct MCP app URLs remain for debugging. `launchable` stays false until a workbench proof. How-to: [amp.md](amp.md).
 
 Direct Knox access from untrusted networks stays blocked at the CDP perimeter.

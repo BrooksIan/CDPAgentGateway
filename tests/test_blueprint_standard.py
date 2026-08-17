@@ -54,6 +54,7 @@ def test_readme_has_blueprint_standard_sections() -> None:
     assert "docs/spark.md" in text
     assert "docs/hive.md" in text
     assert "/mcp/spark" in text
+    assert "/mcp/hive" in text
     assert "127.0.0.1:9090" in text or "localhost `:9090`" in text
 
 
@@ -70,6 +71,7 @@ def test_metadata_yaml_has_catalog_fields() -> None:
     assert "Cloudera Data Platform" in meta["product_mapping"]
     assert "agents" in meta["tags"]
     assert "spark" in meta["tags"]
+    assert "hive" in meta["tags"]
     assert "Cloudera Data Engineering" in meta["product_mapping"]
 
 

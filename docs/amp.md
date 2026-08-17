@@ -13,7 +13,7 @@ Template: [CML Community AMP Template](https://github.com/cloudera/CML_Community
 | Compose (default) | APISIX `:9080` | `plugins/knox-jwt.lua` | `mcp-spark` / `mcp-hive` → Knox |
 | AMP (optional) | CML Application URLs | Python `knox-jwt` in `agentgateway.knox_jwt` | same adapter code → Knox |
 
-AMP does **not** run Compose, APISIX, Lua plugins, or mock Knox. It is live Knox only. Do not use CML-native Spark jobs as the Spark path.
+AMP does **not** run Compose, APISIX, Lua plugins, or mock Knox. It is live Knox only (`--mint` does not apply). Do not use CML-native Spark jobs as the Spark path.
 
 ```text
 MCP host → CML Application (Knox JWT + MCP) → Knox cdp-proxy-token → Livy Spark 3 or Hive
@@ -52,6 +52,12 @@ The application URL is the MCP endpoint (POST JSON-RPC, no Streamable HTTP):
       "headers": {
         "Authorization": "Bearer <knox-jwt>"
       }
+    },
+    "cdp-hive": {
+      "url": "https://mcp-hive.<workspace>/mcp/hive",
+      "headers": {
+        "Authorization": "Bearer <knox-jwt>"
+      }
     }
   }
 }
@@ -64,7 +70,7 @@ The application URL is the MCP endpoint (POST JSON-RPC, no Streamable HTTP):
 | Principal | AMP |
 | --- | --- |
 | End user | Knox JWT (`sub`, `knox.id`) — same as Compose |
-| Agent platform | CML project + `mcp-spark` subdomain until Phase 3 caller keys |
+| Agent platform | CML project + `mcp-spark` / `mcp-hive` subdomain until Phase 3 caller keys |
 | Authorization | Ranger via Knox; no impersonation |
 
 AMP is JWT-only. Phase 3 mTLS does not map onto CML application URLs.

@@ -6,8 +6,8 @@ Assumptions:
 
 - `GATEWAY_URL` is `http://127.0.0.1:9080` unless `APISIX_PORT` is changed
 - Live Knox URL is set with `gateway knox <https-url>`
-- Hive JDBC (optional) is stored with `gateway jdbc add <jdbc:hive2://…>` and is not an agent route
-- `KNOX_TOKEN` is a Knox JWT in `.env` (`gateway token set`), never in git
+- Hive JDBC (optional) is stored with `gateway jdbc add <jdbc:hive2://…>`. Agents use `/mcp/hive`; `/cdp/hive` stays 404
+- `KNOX_TOKEN` is a Knox JWT in `.env` (`gateway token set`), never in git. `--mint` is lab-only (`GATEWAY_MODE=local`)
 - Phase 1 probe is `GET /cdp/livy_for_spark3/sessions`
 - WebHDFS staging is `GET`/`PUT` `/cdp/webhdfs/v1/...` (`gateway webhdfs`)
 
@@ -78,7 +78,8 @@ Against mock CDP unless noted. Spark URI is `/cdp/livy_for_spark3/sessions`.
 | P2-10 | `spark_submit_batch` rejects inline `code` | `isError=true`; file URI required | `tests/test_mcp_spark.py`, `tests/test_mcpspark_livy.py` |
 | P2-11 | Operator admin UI on `:9090` | `GET /health` 200; `GET /admin` on APISIX is 404 | `tests/test_admin_gateway.py` |
 | P2-12 | Per-user submit quota | `daily_submits=0` → admin admit `429`; MCP `isError` when mock PEM is in use | `tests/test_admin_gateway.py`, `tests/test_admin_store.py` |
-| P2-13 | MCP burst rate limit | Authenticated `/mcp/spark` returns `429` after `MCP_RATE_COUNT` per Knox `sub`; Livy GET is not capped | `tests/test_gateway_ratelimit.py`, `tests/test_apisix_render.py` |
+| P2-13 | MCP burst rate limit | Authenticated `/mcp/spark` or `/mcp/hive` returns `429` after `MCP_RATE_COUNT` per Knox `sub`; Livy GET is not capped | `tests/test_gateway_ratelimit.py`, `tests/test_apisix_render.py` |
+| P2-14 | `--mint` on a live stack | CLI exit 2; no POST; message names Knox JWKS / `invalid_signature` | `tests/test_cli.py` |
 
 ## Optional AMP (not catalog-launchable yet)
 

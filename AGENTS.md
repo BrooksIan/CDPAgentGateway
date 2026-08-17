@@ -14,7 +14,7 @@ Read [docs/architecture.md](docs/architecture.md) and [docs/identity-and-auth.md
 - Ranger remains authorization. Never impersonate a different user than the token `sub`.
 - MCP adapters are upstream services, not APISIX plugins and not the experimental `mcp-bridge`.
 - Optional CML AMP packaging lives in `.project-metadata.yaml` and `docs/amp.md`. Do not flip `launchable: true` without a workbench proof. Do not run Compose inside CML.
-- Keep `/mcp/spark` as POST JSON-RPC. Do not add Streamable HTTP (GET SSE / session) unless a real host fails `initialize` and the operator asks for it.
+- Keep `/mcp/spark` and `/mcp/hive` as POST JSON-RPC. Do not add Streamable HTTP (GET SSE / session) unless a real host fails `initialize` and the operator asks for it.
 - Never commit `.env`, Knox tokens, passcodes, keytabs, or JWKS private material.
 
 ## How to work
@@ -36,7 +36,7 @@ Spark tools: `spark_list_sessions`, `spark_list_batches`, `spark_get_batch`, `sp
 
 Hive tools: `hive_list_databases`, `hive_list_tables`, `hive_describe_table`, `hive_select`. After Spark writes `{user}.count_to_10`, call `hive_select` with `database=$USER`, `table=count_to_10`, `columns=n`, `limit=10`. Named columns only (no `SELECT *`), `limit` ≤ 50. No DDL/DML.
 
-Operator usage, quotas, and audit join: [docs/admin.md](docs/admin.md) (`http://127.0.0.1:9090`). Do not send agents there. `/mcp/spark` is burst-capped per Knox `sub` (`MCP_RATE_COUNT`).
+Operator usage, quotas, and audit join: [docs/admin.md](docs/admin.md) (`http://127.0.0.1:9090`). Do not send agents there. `/mcp/spark` and `/mcp/hive` are burst-capped per Knox `sub` (`MCP_RATE_COUNT`). Live Compose uses the user's Knox JWT; do not pass `--mint` (`GATEWAY_MODE=live` refuses it).
 
 Example MCP host config (put the JWT in the host's secret store, never in git):
 

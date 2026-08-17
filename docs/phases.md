@@ -21,14 +21,14 @@ Laptop APISIX in front of mock Knox or a reachable `cdp-proxy-token` URL.
 
 - Operator CLI: [operator-cli.md](operator-cli.md)
 - Spark how-to: [spark.md](spark.md)
-- Hive inventory: [hive.md](hive.md)
+- Hive inventory and MCP: [hive.md](hive.md)
 - Knox JWT verification via `plugins/knox-jwt.lua` and a pinned PEM
 - Proxy Livy for Spark 3: `GET`/`HEAD` `/cdp/livy_for_spark3*` → `{KNOX_PROXY_PREFIX}/livy_for_spark3/...`. Writes are not on this route.
 - Proxy WebHDFS: `GET`/`HEAD`/`PUT` `/cdp/webhdfs*` → `{KNOX_PROXY_PREFIX}/webhdfs/...`. `DELETE` is not a route. Operator CLI: `gateway webhdfs`.
 - `X-Request-Id` on every route; `X-Knox-User` / `X-Knox-Token-Id` on authenticated Spark calls
 - Lab: `gateway test`. Live: `gateway knox <url>`, `gateway token set`, `gateway hive`, `gateway test --live`
 
-Success: a client can list Livy Spark 3 sessions with a Knox JWT through local APISIX, every call is audited, Hive and other CDP paths 404, and the same token against the raw Knox URL from an untrusted network remains blocked at the CDP perimeter.
+Success: a client can list Livy Spark 3 sessions with a Knox JWT through local APISIX, every call is audited, `/cdp/hive` and other unpublished CDP paths 404, and the same token against the raw Knox URL from an untrusted network remains blocked at the CDP perimeter.
 
 Status: local mock path is implemented. Live path is the same Compose file plus `.env`. TLS on the local listener is still HTTP `:9080`.
 
@@ -54,8 +54,8 @@ Status: not started.
 | `src/agentgateway/` | Operator CLI | Phase 1 proxy |
 | `mcp-spark` | Livy / Spark tools over Knox | Phase 1 Spark proxy | [spark.md](spark.md) |
 | `admin/` | Operator UI + sqlite usage/quotas | Phase 2 Spark MCP | [admin.md](admin.md) |
-| AMP (`.project-metadata.yaml`) | Optional CML apps; Python JWT; live Knox | Phase 2 Spark MCP | [amp.md](amp.md) |
-| `mcp-hive` | Read-only SQL tools over Knox Hive | `mcp-spark` + JDBC inventory | [hive.md](hive.md) |
+| AMP (`.project-metadata.yaml`) | Optional CML apps (`mcp-spark`, `mcp-hive`, admin); Python JWT; live Knox | Phase 2 MCP | [amp.md](amp.md) |
+| `mcp-hive` | Read-only SQL tools over Knox Hive | Phase 1 proxy + JDBC inventory | [hive.md](hive.md) |
 | `mcp-catalog` | Atlas / schema discovery tools | `mcp-hive` |
 | `policy` | Tool allowlists, row caps | Identity model (admin quotas + request_id audit join) |
 | `oauth-adapter` | PRM, PKCE broker, token exchange to Knox | IdP decision |
@@ -67,6 +67,6 @@ Status: not started.
 | Private Cloud vs CDP Public Cloud | `gateway knox` parses both `/gateway/cdp-proxy-token` and `/<env>/cdp-proxy-token` | Confirm JWKS path on the target cluster |
 | HTTPS on localhost APISIX | HTTP `:9080` for the laptop lab | Add TLS before partner agents leave the VPN |
 | IdP in front of Knox | None in Phase 1 | Needed when MCP OAuth onboarding starts |
-| Streamable HTTP on `/mcp/spark` | POST JSON-RPC only | Hold until a real host fails `initialize`; do not add GET SSE now |
+| Streamable HTTP on `/mcp/spark` and `/mcp/hive` | POST JSON-RPC only | Hold until a real host fails `initialize`; do not add GET SSE now |
 | AMP `launchable: true` | false | Needs a workbench import against live Knox recorded in [testing.md](testing.md) |
 | Revocation check vs short TTL | Short TTL first | Knox token-state API coupling vs leak window |

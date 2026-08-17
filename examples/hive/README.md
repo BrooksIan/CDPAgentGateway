@@ -26,7 +26,7 @@ sequenceDiagram
 
 ## After Spark succeeds
 
-Same Knox JWT as the Spark submit. Database defaults to the Spark user (`$USER` / Knox `sub`). Table is `count_to_10`, column `n`.
+Same Knox JWT as the Spark submit (`KNOX_TOKEN` / `gateway token set`). Do not pass `--mint` on a live stack. Database defaults to the Spark user (`$USER` / Knox `sub`). Table is `count_to_10`, column `n`.
 
 ```bash
 source .venv/bin/activate
@@ -71,9 +71,11 @@ If `hive_list_tables` does not list `count_to_10`, wait for `spark_get_batch` `s
 
 ## Lab mock
 
-No Iceberg. Canned `default.dual`:
+`--mint` only works after `gateway knox --local` (APISIX verifies `conf/keys/public.pem`). On a live stack it is refused: lab tokens cannot satisfy Knox JWKS (`invalid_signature`). No Iceberg in mock; canned `default.dual`:
 
 ```bash
+gateway knox --local
+gateway up
 gateway mcp --adapter hive --mint
 gateway mcp --adapter hive --tool hive_select --mint \
   --arg database=default --arg table=dual --arg columns=dummy_col --arg limit=5

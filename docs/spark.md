@@ -43,9 +43,10 @@ gateway up
 gateway spark --mint
 gateway webhdfs ls --mint /
 gateway mcp --mint
+gateway mcp --adapter hive --mint
 ```
 
-Mock Livy lives in `mock-cdp`. `gateway spark --mint` signs a local RS256 JWT. No CDP entitlement is required.
+Mock Livy and Hive live in `mock-cdp`. `gateway spark --mint` signs a local RS256 JWT. No CDP entitlement is required. `--mint` is `GATEWAY_MODE=local` only; live Knox JWKS rejects those signatures.
 
 ## Live cluster
 
@@ -229,7 +230,7 @@ Agents should call `/mcp/spark` or `/mcp/hive` only, with **POST JSON-RPC**. Str
 
 Operators set per-user daily call/submit quotas in [admin.md](admin.md). A denied submit is an MCP tool error and does not reach Livy. Operators look up a call by APISIX `X-Request-Id` (`GET /api/audit`) to join tool, `sub`, and `knox.id`.
 
-APISIX also applies a per-`sub` burst cap on `/mcp/spark` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW` in `.env`, default 60 per 60s). Exceeding it is HTTP `429` (`mcp rate limit`). Livy GET and WebHDFS are not capped this way. The AMP profile enforces the same counters in Python.
+APISIX also applies a per-`sub` burst cap on `/mcp/spark` and `/mcp/hive` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW` in `.env`, default 60 per 60s). Exceeding it is HTTP `429` (`mcp rate limit`). Livy GET and WebHDFS are not capped this way. The AMP profile enforces the same counters in Python.
 
 ## What Spark does not do
 

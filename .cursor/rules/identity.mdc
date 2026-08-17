@@ -9,7 +9,7 @@ alwaysApply: true
 - Agent platform = APISIX consumer (mTLS or caller key) on Compose, or the CML project/application on AMP. Require both on partner traffic; Phase 1 and AMP may be JWT-only.
 - Authorization = Ranger via Knox. Forward the caller's bearer unchanged.
 
-Validate Knox RS256 tokens (`iss=KNOXSSO`) with pinned JWKS or a configured public key. Do not use APISIX `jwt-auth` as the primary plugin. AMP uses `agentgateway.knox_jwt` with the same fail-closed reasons as `plugins/knox-jwt.lua`.
+Validate Knox RS256 tokens (`iss=KNOXSSO`) with pinned JWKS or a configured public key. Do not use APISIX `jwt-auth` as the primary plugin. AMP uses `agentgateway.knox_jwt` with the same fail-closed reasons as `plugins/knox-jwt.lua`. `--mint` is lab keys only; live APISIX verifies Knox JWKS.
 
 ```text
 # ❌ BAD — second token format

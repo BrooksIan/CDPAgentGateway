@@ -11,15 +11,18 @@ gateway init          # .env, mock RSA keys, APISIX yaml
 gateway up            # docker compose up --build
 gateway test          # pytest -m "not live"
 gateway doctor --ping
-gateway spark --mint  # GET /cdp/livy_for_spark3/sessions with a mock JWT
+gateway spark --mint  # lab JWT; GATEWAY_MODE=local only
 gateway webhdfs ls --mint /
-gateway mcp --mint    # list Spark MCP tools
+gateway mcp --mint    # list Spark MCP tools (lab)
+gateway mcp --adapter hive --mint
 gateway admin         # operator usage/quota/audit UI on :9090
 gateway logs -f
 gateway down
 ```
 
 `make test` calls `python -m agentgateway test`.
+
+`--mint` signs `conf/keys/private.pem` (`GATEWAY_MODE=local` only). On a live stack the CLI refuses it: APISIX verifies Knox JWKS, so a lab token is `invalid_signature`. Live commands omit `--mint` and use `KNOX_TOKEN` from `gateway token set`. Reset the lab with `gateway knox --local`.
 
 ## Live CDP
 
@@ -91,11 +94,11 @@ This talks to Knox `{KNOX_PROXY_PREFIX}/hive` with `KNOX_TOKEN`. It is not an ag
 | `knox [url]` | Write live Knox token-topology upstream into `.env` |
 | `jdbc add\|show\|clear` | Store Hive JDBC (`cdp-proxy-api` or token); does not publish `/cdp/hive` |
 | `fetch-jwks` | Download JWKS → `conf/keys/knox-live.pem` |
-| `token mint\|set\|show\|clear` | Mock mint, store, inspect, or drop `KNOX_TOKEN` |
+| `token mint\|set\|show\|clear` | Lab mint (`token mint` / `--mint` is local only); store, inspect, or drop `KNOX_TOKEN` |
 | `spark [resource]` | `GET /cdp/livy_for_spark3/<resource>` (default `sessions`). Writes are MCP-only. |
 | `webhdfs ls\|stat\|mkdir\|put` | Knox WebHDFS through `/cdp/webhdfs` (JWT). Stage Spark `file` URIs. No `DELETE`. |
 | `hive [databases]` | `SHOW DATABASES` on Knox `{prefix}/hive` (JWT; not `/cdp/hive`) |
-| `mcp [--adapter spark\|hive] [--tool NAME]` | JSON-RPC to `/mcp/spark` or `/mcp/hive` |
+| `mcp [--adapter spark\|hive] [--tool NAME]` | JSON-RPC to `/mcp/spark` or `/mcp/hive`. `--mint` is lab-only. |
 | `admin [--open]` | Operator usage/quota/audit UI at `http://127.0.0.1:9090` (not an agent route) |
 | `call [path]` | Call an arbitrary gateway path with a bearer |
 

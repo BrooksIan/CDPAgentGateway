@@ -119,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
         help=f"Gateway path (default: {SPARK_SESSIONS_PATH})",
     )
     p_call.add_argument("--method", default="GET")
-    p_call.add_argument("--mint", action="store_true", help="Sign a local mock token")
+    p_call.add_argument("--mint", action="store_true", help="Sign a lab mock token (GATEWAY_MODE=local only)")
     p_call.add_argument("--token", help="Bearer token (default: KNOX_TOKEN or --mint)")
     p_call.add_argument("--sub", default="analyst")
     p_call.add_argument("--param", action="append", default=[], metavar="KEY=VALUE")
@@ -133,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Livy path after /cdp/livy_for_spark3/ (default: sessions)",
     )
     p_spark.add_argument("--method", default="GET")
-    p_spark.add_argument("--mint", action="store_true", help="Sign a local mock token")
+    p_spark.add_argument("--mint", action="store_true", help="Sign a lab mock token (GATEWAY_MODE=local only)")
     p_spark.add_argument("--token", help="Bearer token (default: KNOX_TOKEN or --mint)")
     p_spark.add_argument("--sub", default="analyst")
     p_spark.add_argument("--param", action="append", default=[], metavar="KEY=VALUE")
@@ -181,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
         default="databases",
         help="Hive probe (default: databases)",
     )
-    p_hive.add_argument("--mint", action="store_true", help="Sign a local mock token")
+    p_hive.add_argument("--mint", action="store_true", help="Sign a lab mock token (GATEWAY_MODE=local only)")
     p_hive.add_argument("--token", help="Bearer token (default: KNOX_TOKEN or --mint)")
     p_hive.add_argument("--sub", default="analyst")
     p_hive.set_defaults(func=cmd_hive)
@@ -190,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
     p_mcp.add_argument("--adapter", choices=("spark", "hive"), default="spark", help="MCP server (default: spark)")
     p_mcp.add_argument("--tool", help="tools/call name (default: list tools)")
     p_mcp.add_argument("--arg", action="append", default=[], metavar="KEY=VALUE")
-    p_mcp.add_argument("--mint", action="store_true", help="Sign a local mock token")
+    p_mcp.add_argument("--mint", action="store_true", help="Sign a lab mock token (GATEWAY_MODE=local only)")
     p_mcp.add_argument("--token", help="Bearer token (default: KNOX_TOKEN or --mint)")
     p_mcp.add_argument("--sub", default="analyst")
     p_mcp.set_defaults(func=cmd_mcp)
@@ -423,10 +423,24 @@ def cmd_token_clear(_args: argparse.Namespace) -> int:
     return 0
 
 
-def _bearer_from_args(args: argparse.Namespace) -> str | None:
-    if args.mint:
-        return sign_rs256(knox_claims(sub=args.sub))
-    return args.token or load_env().get("KNOX_TOKEN")
+MINT_ON_LIVE_ERROR = (
+    "error: --mint signs lab keys (conf/keys/private.pem); this stack is "
+    "GATEWAY_MODE=live and APISIX verifies Knox JWKS (invalid_signature). "
+    "Retry without --mint to use KNOX_TOKEN, or: gateway knox --local"
+)
+
+
+def _require_bearer(args: argparse.Namespace) -> str | None:
+    if getattr(args, "mint", False):
+        if load_env().get("GATEWAY_MODE", "local") == "live":
+            print(MINT_ON_LIVE_ERROR, file=sys.stderr)
+            return None
+        return sign_rs256(knox_claims(sub=getattr(args, "sub", "analyst")))
+    token = getattr(args, "token", None) or load_env().get("KNOX_TOKEN")
+    if not token:
+        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
+        return None
+    return token
 
 
 def _issue_call(path: str, token: str, *, method: str, params: list[tuple[str, str]]) -> int:
@@ -443,9 +457,8 @@ def _issue_call(path: str, token: str, *, method: str, params: list[tuple[str, s
 
 
 def cmd_call(args: argparse.Namespace) -> int:
-    token = _bearer_from_args(args)
+    token = _require_bearer(args)
     if not token:
-        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
         return 2
     path = args.path or default_call_path(load_env())
     try:
@@ -457,9 +470,8 @@ def cmd_call(args: argparse.Namespace) -> int:
 
 
 def cmd_spark(args: argparse.Namespace) -> int:
-    token = _bearer_from_args(args)
+    token = _require_bearer(args)
     if not token:
-        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
         return 2
     try:
         params = parse_params(args.param)
@@ -469,14 +481,9 @@ def cmd_spark(args: argparse.Namespace) -> int:
     return _issue_call(spark_livy_path(args.resource), token, method=args.method, params=params)
 
 
-def _webhdfs_token(args: argparse.Namespace) -> str | None:
-    return _bearer_from_args(args)
-
-
 def cmd_webhdfs_ls(args: argparse.Namespace) -> int:
-    token = _webhdfs_token(args)
+    token = _require_bearer(args)
     if not token:
-        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
         return 2
     try:
         payload = list_status(args.path, token)
@@ -491,9 +498,8 @@ def cmd_webhdfs_ls(args: argparse.Namespace) -> int:
 
 
 def cmd_webhdfs_stat(args: argparse.Namespace) -> int:
-    token = _webhdfs_token(args)
+    token = _require_bearer(args)
     if not token:
-        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
         return 2
     try:
         payload = file_status(args.path, token)
@@ -512,9 +518,8 @@ def cmd_webhdfs_stat(args: argparse.Namespace) -> int:
 
 
 def cmd_webhdfs_mkdir(args: argparse.Namespace) -> int:
-    token = _webhdfs_token(args)
+    token = _require_bearer(args)
     if not token:
-        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
         return 2
     try:
         mkdir(args.path, token)
@@ -526,9 +531,8 @@ def cmd_webhdfs_mkdir(args: argparse.Namespace) -> int:
 
 
 def cmd_webhdfs_put(args: argparse.Namespace) -> int:
-    token = _webhdfs_token(args)
+    token = _require_bearer(args)
     if not token:
-        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
         return 2
     local = Path(args.local)
     if not local.is_file():
@@ -547,9 +551,8 @@ def cmd_webhdfs_put(args: argparse.Namespace) -> int:
 
 
 def cmd_hive(args: argparse.Namespace) -> int:
-    token = _bearer_from_args(args)
+    token = _require_bearer(args)
     if not token:
-        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
         return 2
     resource = (args.resource or "databases").strip().lower()
     if resource not in {"databases", "database", "dbs"}:
@@ -572,9 +575,8 @@ def cmd_hive(args: argparse.Namespace) -> int:
 
 
 def cmd_mcp(args: argparse.Namespace) -> int:
-    token = _bearer_from_args(args)
+    token = _require_bearer(args)
     if not token:
-        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
         return 2
     print(f"POST {mcp_path(args.adapter)}")
     try:

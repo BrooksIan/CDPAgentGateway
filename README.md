@@ -29,7 +29,7 @@ Hive is inventoried (`gateway jdbc add`) and agents use read-only MCP at `/mcp/h
 
 ## Demo
 
-A recorded Reprise walkthrough is not published yet. The current path is the local Docker stack in [Quickstart](#quickstart): mock Knox, APISIX on `localhost:9080`, Spark MCP at `/mcp/spark`, operator admin UI on `127.0.0.1:9090`. Pytest covers missing bearer, `alg=none`, expired tokens, subject forwarding, and MCP tool list.
+A recorded Reprise walkthrough is not published yet. The current path is the local Docker stack in [Quickstart](#quickstart): mock Knox, APISIX on `localhost:9080`, Spark MCP at `/mcp/spark`, read-only Hive MCP at `/mcp/hive`, operator admin UI on `127.0.0.1:9090`. Pytest covers missing bearer, `alg=none`, expired tokens, subject forwarding, and MCP tool list. `--mint` is the lab JWT only; live Knox uses `gateway token set`.
 
 ![Operator console: path status, health, and UTC-day usage](assets/admin-overview.png)
 
@@ -43,7 +43,7 @@ The admin console is for operators, not MCP hosts. Full walkthrough: [docs/admin
 
 ## Use Case
 
-Enterprises want coding and analytics agents to submit Spark jobs on CDP, but they cannot publish Livy or HiveServer2 to those tools. This blueprint gives one agent-facing address that allowlists Livy for Spark 3, enforces Knox user identity, keeps Ranger in charge of data access, and inventories Hive JDBC for a later MCP adapter without replacing the CDP perimeter.
+Enterprises want coding and analytics agents to submit Spark jobs and query Hive on CDP, but they cannot publish Livy or HiveServer2 to those tools. This blueprint gives one agent-facing address that allowlists Spark MCP and read-only Hive MCP, enforces Knox user identity, and keeps Ranger in charge of data access without replacing the CDP perimeter.
 
 ## Key Features
 
@@ -55,7 +55,7 @@ Enterprises want coding and analytics agents to submit Spark jobs on CDP, but th
 - Hive JDBC inventory — `gateway jdbc add` stores Knox JDBC; `gateway hive` lists databases
 - Local-to-live — `gateway knox <livy-url>` points the same Compose file at external Knox
 - Operator admin UI — UTC-day usage, quotas vs burst 429s, audit join on localhost `:9090`
-- MCP burst cap — `limit-count` on `/mcp/spark` keyed by Knox `sub` (default 60/minute)
+- MCP burst cap — `limit-count` on `/mcp/spark` and `/mcp/hive` keyed by Knox `sub` (default 60/minute)
 - Ranger stays authoritative — the gateway does not impersonate a different user than the token subject
 
 ## Quickstart
@@ -92,6 +92,7 @@ Enterprises want coding and analytics agents to submit Spark jobs on CDP, but th
    gateway webhdfs ls /
    gateway mcp
    gateway hive              # SHOW DATABASES; needs pip install -e ".[hive]"
+   gateway mcp --adapter hive --tool hive_list_databases
    gateway admin --open      # http://127.0.0.1:9090
    ```
 
@@ -103,7 +104,7 @@ Do not commit Knox tokens, JDBC passwords, or private keys.
 
 ## Architecture / Software Components
 
-Agents terminate at APISIX (Compose) or at a Cloudera AI Application (optional AMP). The `mcp-spark` adapter sits behind that edge and forwards the caller's Knox bearer to Livy. Knox remains the only hop that presents cluster credentials. The admin UI is not an agent route (localhost `:9090` on Compose; CML login on AMP).
+Agents terminate at APISIX (Compose) or at a Cloudera AI Application (optional AMP). The `mcp-spark` and `mcp-hive` adapters sit behind that edge and forward the caller's Knox bearer to Livy or Hive. Knox remains the only hop that presents cluster credentials. The admin UI is not an agent route (localhost `:9090` on Compose; CML login on AMP).
 
 ![CDP Agent Gateway traffic path](assets/architecture.svg)
 
@@ -143,12 +144,12 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 | Path | Description |
 | --- | --- |
 | `assets/` | Architecture diagram, AMP catalog cover, admin UI screenshots |
-| `deploy/` | Docker Compose (APISIX, mock CDP, mcp-spark, admin) |
+| `deploy/` | Docker Compose (APISIX, mock CDP, mcp-spark, mcp-hive, admin) |
 | `docs/` | Architecture, Spark, Hive, admin, identity, AMP, phases, tests |
 | `LICENSE` | Apache License 2.0 |
 | `METADATA.yaml` | Catalog metadata for the Cloudera blueprint website |
 | `.project-metadata.yaml` | Optional CML AMP runbook (`launchable` is still false) |
-| `0_`–`4_` AMP dirs | CML jobs/apps; ignored by Compose |
+| `0_`–`5_` AMP dirs | CML jobs/apps; ignored by Compose |
 | `conf/` | APISIX standalone config templates |
 | `plugins/` | Custom `knox-jwt` APISIX plugin |
 | `inventory/` | Phase 0 CDP inventory consumed by tests |

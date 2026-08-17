@@ -50,6 +50,8 @@ The [APISIX authentication guide](https://apisix.apache.org/learning-center/api-
 
 **JWKS pinning.** `gateway token set` and `trusted_jku()` honor `jku` only when the host matches `UPSTREAM_HOST`. Never fetch keys from an arbitrary URL in the token. APISIX itself verifies a PEM copied to `conf/generated/knox-public.pem`.
 
+**Lab `--mint` vs live Knox.** `gateway … --mint` and `gateway token mint` sign `conf/keys/private.pem`. That PEM is what APISIX loads when `GATEWAY_MODE=local`. Live mode copies Knox JWKS into `knox-public.pem`, so a minted token is `invalid_signature`. The CLI refuses `--mint` in live mode; use `KNOX_TOKEN` from `gateway token set`.
+
 **MCP OAuth.** Cursor, Claude, and VS Code expect protected-resource metadata, `401 WWW-Authenticate`, and PKCE. Phase 1 uses a pasted Knox bearer (`gateway token set`). That is a private preview, not unmanaged third-party onboarding.
 
 ## Phase 1 token path
@@ -57,12 +59,12 @@ The [APISIX authentication guide](https://apisix.apache.org/learning-center/api-
 1. Operator obtains a Knox JWT from Token Generation or Token API v2.
 2. `gateway knox https://…/cdp-proxy-token/livy_for_spark3/` writes the live upstream.
 3. `gateway token set` stores the JWT in `.env` as `KNOX_TOKEN` (never printed) and refreshes JWKS from a pinned `jku` when present.
-4. `gateway up` then `gateway spark`, `gateway webhdfs`, or `gateway mcp` (or an MCP host) sends `Authorization: Bearer` to `http://127.0.0.1:9080`.
+4. `gateway up` then `gateway spark`, `gateway webhdfs`, `gateway mcp`, or `gateway mcp --adapter hive` (or an MCP host) sends `Authorization: Bearer` to `http://127.0.0.1:9080`. Do not pass `--mint` on this path.
 5. APISIX validates signature, `iss`, `sub`, and `exp`, then forwards the same header to Knox.
 
 ## Audit
 
-APISIX assigns `X-Request-Id` on every route. `mcp-spark` records tool name, Knox `sub`, and `knox.id` (`X-Knox-Token-Id`) against that id in the operator sqlite store. Lookup:
+APISIX assigns `X-Request-Id` on every route. `mcp-spark` and `mcp-hive` record tool name, Knox `sub`, and `knox.id` (`X-Knox-Token-Id`) against that id in the operator sqlite store. Lookup:
 
 ```bash
 curl -s "http://127.0.0.1:9090/api/audit?request_id=<X-Request-Id>"

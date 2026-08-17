@@ -10,6 +10,8 @@ Hive has two surfaces. Agents never call HiveServer2 or Knox hostnames directly.
 
 MCP requires `Authorization: Bearer <knox-jwt>`. The adapter forwards that bearer to Knox Hive on the **token** topology. Ranger authorizes `sub`. JDBC inventory (`gateway jdbc add`) still stores `cdp-proxy-api` URLs for later ops; it does not publish `/cdp/hive`.
 
+Live stacks use `KNOX_TOKEN` (`gateway token set`). `--mint` is `GATEWAY_MODE=local` only; against Knox JWKS it is `invalid_signature` and the CLI refuses it.
+
 ```mermaid
 flowchart LR
   agent["Agent / CLI"]
@@ -42,14 +44,14 @@ CDP often puts Livy and Hive on **different Knox topologies**:
 ```
 Spark:  gateway knox  https://knox…/<env>/cdp-proxy-token/livy_for_spark3/
 Hive:   gateway jdbc add  'jdbc:hive2://knox…/;ssl=true;transportMode=http;httpPath=<env>/cdp-proxy-api/hive'
-MCP:    gateway mcp --adapter hive --mint
+MCP:    gateway mcp --adapter hive --tool hive_list_databases
 ```
 
 Both JDBC and Livy must resolve to the **same Knox host** once Spark is live. The CLI refuses a JDBC URL whose host does not match `UPSTREAM_HOST`.
 
 ## MCP tools
 
-Lab mock (`UPSTREAM_HOST=mock-cdp`) returns canned `default` / `analytics` data. Live Knox uses the caller's JWT on `{KNOX_PROXY_PREFIX}/hive`.
+Lab mock (`GATEWAY_MODE=local`, `UPSTREAM_HOST=mock-cdp`) returns canned `default` / `analytics` data and uses `--mint`. Live Knox uses `KNOX_TOKEN` on `{KNOX_PROXY_PREFIX}/hive`; `--mint` is refused (`invalid_signature` against Knox JWKS).
 
 | Tool | What it runs | Caps |
 | --- | --- | --- |
@@ -59,9 +61,13 @@ Lab mock (`UPSTREAM_HOST=mock-cdp`) returns canned `default` / `analytics` data.
 | `hive_select` | `SELECT cols FROM \`db\`.\`table\` LIMIT n` | named columns only; `limit` 1–50 |
 
 ```bash
+# lab
 gateway mcp --adapter hive --mint
 gateway mcp --adapter hive --tool hive_list_databases --mint
 gateway mcp --adapter hive --tool hive_select --arg database=default --arg table=dual --arg columns=dummy_col --arg limit=5 --mint
+
+# live (same JWT as Spark)
+gateway mcp --adapter hive --tool hive_list_databases
 ```
 
 After [`examples/spark/count_to_10.py`](../examples/spark/count_to_10.py) succeeds, query that Iceberg table with the same Knox JWT. Hive still cannot CREATE or INSERT. Walkthrough: [examples/hive/README.md](../examples/hive/README.md).
@@ -104,6 +110,8 @@ Must not:
 - dump unbounded result sets into an LLM context
 
 A valid Knox JWT plus `/cdp/hive` still returns **404**. That is a test case (P1-06), not a bug.
+
+`401` `invalid_signature` on `/mcp/hive` means the bearer was not signed by the PEM APISIX is verifying. On live Knox that is usually `--mint` or a JWT from a different cluster. Drop `--mint` and use `gateway token set`.
 
 ## Inventory a JDBC URL
 
@@ -176,7 +184,7 @@ sequenceDiagram
 2. Paste Hive JDBC with `gateway jdbc add`
 3. Confirm `gateway jdbc show` topology and host
 4. `gateway hive` lists databases for the Knox `sub` (token topology)
-5. `gateway mcp --adapter hive --tool hive_list_databases` as the same `sub`
+5. `gateway mcp --adapter hive --tool hive_list_databases` as the same `sub` (omit `--mint` on live Knox)
 6. Confirm Ranger policies for that `sub` on the Hive database
 7. `gateway mcp --adapter hive --tool hive_select` on `{user}.count_to_10` column `n` after Spark succeeds — [examples/hive/README.md](../examples/hive/README.md)
 8. Keep `/cdp/hive` unpublished

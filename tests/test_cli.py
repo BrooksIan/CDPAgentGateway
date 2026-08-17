@@ -89,6 +89,25 @@ def test_config_writes_apisix_yaml() -> None:
     assert 'methods: ["GET", "HEAD", "POST", "PUT", "DELETE"]' not in text
 
 
+def test_mint_refused_when_gateway_mode_live() -> None:
+    env = os.environ.copy()
+    src = str(ROOT / "src")
+    env["PYTHONPATH"] = src + ((":" + env["PYTHONPATH"]) if env.get("PYTHONPATH") else "")
+    env["GATEWAY_MODE"] = "live"
+    result = subprocess.run(
+        [sys.executable, "-m", "agentgateway", "mcp", "--adapter", "hive", "--mint"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 2
+    assert "GATEWAY_MODE=live" in result.stderr
+    assert "invalid_signature" in result.stderr
+    assert "POST /mcp/hive" not in result.stdout
+
+
 def test_tool_arguments_split_livy_args_list() -> None:
     from agentgateway.probe import tool_arguments
 

@@ -61,8 +61,8 @@ Spark jobs are long-running. Upstream send/read timeouts in APISIX are 120s; tra
 
 A laptop runs APISIX in Docker.
 
-- **Local:** upstream is `mock-cdp`. `gateway init && gateway up && gateway test` is the lab path.
-- **Live:** `gateway knox <https-knox-url-with-livy_for_spark3>` writes host, `cdp-proxy-token` prefix, and JWKS URL into `.env`. `gateway token set` stores the Knox JWT. Agents and curl still hit `localhost:9080`; APISIX validates the JWT and proxies Livy and WebHDFS only.
-- **Optional AMP:** Cloudera AI Workbench applications (`mcp-spark`, `gateway-admin`). Python Knox JWT in front of the same `mcp-spark` adapter. Live Knox only; no Compose, no mock CDP, no `/cdp/webhdfs`. `launchable` stays false until a workbench proof. How-to: [amp.md](amp.md).
+- **Local:** upstream is `mock-cdp`. `gateway init && gateway up && gateway test` is the lab path. `--mint` signs the lab RSA key that APISIX loads.
+- **Live:** `gateway knox <https-knox-url-with-livy_for_spark3>` writes host, `cdp-proxy-token` prefix, and JWKS URL into `.env`. `gateway token set` stores the Knox JWT. Agents and curl still hit `localhost:9080`; APISIX validates the JWT and proxies Livy, WebHDFS, `/mcp/spark`, and `/mcp/hive`. `--mint` is refused.
+- **Optional AMP:** Cloudera AI Workbench applications (`mcp-spark`, `mcp-hive`, `gateway-admin`). Python Knox JWT in front of the same adapters. Live Knox only; no Compose, no mock CDP, no `/cdp/webhdfs`. `launchable` stays false until a workbench proof. How-to: [amp.md](amp.md).
 
 Direct Knox access from untrusted networks stays blocked at the CDP perimeter.

@@ -40,7 +40,7 @@ Enterprises want coding and analytics agents to submit Spark jobs on CDP, but th
 - Spark allowlist — MCP `/mcp/spark` (list, get, log, submit); Livy HTTP is GET/HEAD only
 - Hive inventory — `gateway jdbc add` stores Knox JDBC; `gateway hive` lists databases; `/cdp/hive` stays 404
 - Local-to-live — `gateway knox <livy-url>` points the same Compose file at external Knox
-- Operator admin UI — usage by Knox user and per-user Spark tool quotas on localhost `:9090`
+- Operator admin UI — UTC-day usage, quotas vs burst 429s, audit join on localhost `:9090`
 - MCP burst cap — `limit-count` on `/mcp/spark` keyed by Knox `sub` (default 60/minute)
 - Ranger stays authoritative — the gateway does not impersonate a different user than the token subject
 
@@ -96,7 +96,7 @@ Agents terminate at APISIX. The `mcp-spark` adapter sits behind the gateway and 
 | `knox-jwt` plugin | RS256, `iss=KNOXSSO`, expiry; pinned PEM; forwards `Authorization` |
 | `mcp-spark` | Livy MCP tools (list/get/log/submit); not an APISIX plugin |
 | Mock CDP (lab) | Stand-in Knox JWKS and Livy probes for `gateway test` |
-| Operator admin | Local UI on `:9090`: usage by Knox `sub`, daily quotas, audit by `X-Request-Id` |
+| Operator admin | Local UI on `:9090`: UTC-day usage, quotas vs burst 429s, audit join |
 | Apache Knox | Token issuance, `cdp-proxy-token`, Trusted Proxy / doAs |
 | Apache Ranger | Authorization for the Knox subject on Spark (and Hive when probed) |
 

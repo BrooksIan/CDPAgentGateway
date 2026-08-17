@@ -71,6 +71,24 @@ def test_require_python_rejects_old_runtime(monkeypatch: pytest.MonkeyPatch) -> 
         cml_boot.require_python()
 
 
+def test_run_amp_main_does_not_systemexit_in_ipython(monkeypatch: pytest.MonkeyPatch) -> None:
+    from agentgateway import cml_boot
+
+    monkeypatch.setenv("CDSW_ENGINE_ID", "test-engine")
+    assert cml_boot.in_ipython() is True
+    assert cml_boot.run_amp_main(lambda: 0) == 0
+
+
+def test_knox_jobs_do_not_raise_systemexit() -> None:
+    fetch = (ROOT / "1_job-fetch-jwks" / "fetch_jwks.py").read_text()
+    smoke = (ROOT / "2_job-smoke-knox" / "smoke_knox.py").read_text()
+    assert "SystemExit" not in fetch
+    assert "SystemExit" not in smoke
+    assert "missing verifying PEM" not in smoke
+    assert "run_amp_main(main)" in fetch
+    assert "run_amp_main(main)" in smoke
+
+
 def test_cml_project_root_does_not_need_caller_file(monkeypatch: pytest.MonkeyPatch) -> None:
     from agentgateway.cml_boot import project_root
 

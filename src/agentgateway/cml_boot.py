@@ -8,6 +8,28 @@ import sys
 from pathlib import Path
 
 
+def in_cml() -> bool:
+    return any(os.environ.get(name) for name in ("CDSW_ENGINE_ID", "CDSW_PROJECT", "CDSW_APP_PORT"))
+
+
+def in_ipython() -> bool:
+    if in_cml():
+        return True
+    if "IPython" not in sys.modules and "ipykernel" not in sys.modules:
+        return False
+    try:
+        from IPython import get_ipython as _get_ipython
+
+        return _get_ipython() is not None
+    except Exception:
+        return True
+
+
+def run_amp_main(main_fn) -> int:
+    """Run an AMP job without sys.exit. CML IPython shows SystemExit(0) as a traceback."""
+    return int(main_fn())
+
+
 def require_python() -> None:
     if sys.version_info < (3, 11):
         version = sys.version.split()[0]

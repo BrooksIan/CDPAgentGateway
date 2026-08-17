@@ -45,7 +45,8 @@ If the project clones but **applications are never created**, the AMP stopped on
 If applications exist but stay Starting or Failed, open Application logs. Typical causes:
 
 - Install wrote packages into the session engine instead of `/home/cdsw/.local` (`pip install --user` is required).
-- CML `run_session` is IPython: `__file__` is not defined. Install/app scripts must use cwd or `/home/cdsw`, not `__file__`.
+- CML applications run in IPython, which already has an asyncio loop. AMP starts uvicorn in a background thread instead of `asyncio.run`.
+- `KNOX_PROXY_URL` must be set in **Project Settings → Environment**. An empty value skips JWKS pin; MCP POSTs then fail closed until you set it and rerun Fetch pinned Knox JWKS.
 - The process exited before listening on `127.0.0.1:$CDSW_APP_PORT` (CML probes loopback, not `0.0.0.0`).
 - User CPU/memory quota cannot schedule four apps (each 1 CPU / 1 GB). Drop other workloads or raise the quota.
 - Static subdomains `mcp-spark`, `mcp-hive`, `mcp-impala`, or `gateway-admin` already exist from a previous AMP attempt.

@@ -8,7 +8,7 @@ _root = Path(os.environ.get("AGENTGATEWAY_ROOT") or Path.cwd()).resolve()
 if not (_root / "pyproject.toml").is_file():
     _root = Path("/home/cdsw").resolve()
 sys.path.insert(0, str(_root / "src"))
-from agentgateway.cml_boot import project_root
+from agentgateway.cml_boot import project_root, run_amp_main
 from agentgateway.keys import fetch_pinned_knox_pubkey
 ROOT = project_root()
 
@@ -18,7 +18,7 @@ def _insecure() -> bool:
 def main() -> int:
     proxy = (os.environ.get("KNOX_PROXY_URL") or "").strip()
     if not proxy:
-        print("warning: KNOX_PROXY_URL unset; skipping JWKS pin so applications can still listen", file=sys.stderr)
+        print('{"event":"jwks_pin_skipped","reason":"KNOX_PROXY_URL_unset"}')
         return 0
     generated = ROOT / "conf" / "generated" / "knox-public.pem"
     live = ROOT / "conf" / "keys" / "knox-live.pem"
@@ -30,12 +30,11 @@ def main() -> int:
             insecure=_insecure(),
         )
     except Exception as exc:
-        print(f"warning: JWKS pin failed: {type(exc).__name__}; applications will still start", file=sys.stderr)
+        print(f'{{"event":"jwks_pin_skipped","reason":"{type(exc).__name__}"}}')
         return 0
     live.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(out, live)
     print(out)
     return 0
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+run_amp_main(main)

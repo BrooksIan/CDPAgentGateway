@@ -11,7 +11,7 @@ _root = Path(os.environ.get("AGENTGATEWAY_ROOT") or Path.cwd()).resolve()
 if not (_root / "pyproject.toml").is_file():
     _root = Path("/home/cdsw").resolve()
 sys.path.insert(0, str(_root / "src"))
-from agentgateway.cml_boot import project_root
+from agentgateway.cml_boot import project_root, run_amp_main
 from agentgateway.knox import parse_knox_proxy_url, trusted_jku
 ROOT = project_root()
 
@@ -26,24 +26,24 @@ def _open(url: str, *, headers: dict[str, str] | None = None):
 def main() -> int:
     pem = Path(os.environ.get("KNOX_PUBLIC_KEY_FILE") or ROOT / "conf" / "generated" / "knox-public.pem")
     if not pem.is_file() or not pem.read_text().strip():
-        print(f"warning: missing verifying PEM at {pem}; applications will still start", file=sys.stderr)
+        print('{"event":"knox_smoke_skipped","reason":"missing_pem"}')
         return 0
     proxy = (os.environ.get("KNOX_PROXY_URL") or "").strip()
     if not proxy:
-        print("warning: KNOX_PROXY_URL unset; skipping Knox smoke so applications can still listen", file=sys.stderr)
+        print('{"event":"knox_smoke_skipped","reason":"KNOX_PROXY_URL_unset"}')
         return 0
     try:
         parsed = parse_knox_proxy_url(proxy)
         jwks = (os.environ.get("KNOX_JWKS_URL") or parsed["KNOX_JWKS_URL"]).strip()
         trusted_jku(jwks, parsed["UPSTREAM_HOST"])
     except Exception as exc:
-        print(f"warning: Knox smoke failed: {type(exc).__name__}; applications will still start", file=sys.stderr)
+        print(f'{{"event":"knox_smoke_skipped","reason":"{type(exc).__name__}"}}')
         return 0
     try:
         with _open(jwks) as response:
             jwks_status = response.status
     except (urllib.error.URLError, TimeoutError, ssl.SSLError) as exc:
-        print(f"warning: JWKS unreachable: {type(exc).__name__}; applications will still start", file=sys.stderr)
+        print(f'{{"event":"knox_smoke_skipped","reason":"{type(exc).__name__}"}}')
         return 0
     token = (os.environ.get("KNOX_TOKEN") or "").strip()
     livy_status = None
@@ -57,7 +57,7 @@ def main() -> int:
         except urllib.error.HTTPError as exc:
             livy_status = exc.code
         except (urllib.error.URLError, TimeoutError, ssl.SSLError) as exc:
-            print(f"warning: Livy probe failed: {type(exc).__name__}", file=sys.stderr)
+            print(f'{{"event":"livy_probe_skipped","reason":"{type(exc).__name__}"}}')
             livy_status = None
     print(
         json.dumps(
@@ -71,5 +71,4 @@ def main() -> int:
     )
     return 0
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+run_amp_main(main)

@@ -5,6 +5,7 @@ Compose still uses APISIX + knox-jwt.lua. This profile is optional and live-Knox
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
@@ -402,7 +403,18 @@ def startup_error_app(service: str, exc: BaseException):
     )
 
 
+def event_loop_running() -> bool:
+    """True inside IPython/CML cells. uvicorn.asyncio_run cannot start a second loop there."""
+    try:
+        asyncio.get_running_loop()
+        return True
+    except RuntimeError:
+        return False
+
+
 def serve_cml_app(app, *, service: str) -> None:
+    import threading
+
     import uvicorn
 
     port = cml_port()
@@ -413,4 +425,12 @@ def serve_cml_app(app, *, service: str) -> None:
         ),
         flush=True,
     )
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+    config = uvicorn.Config(app, host=host, port=port, log_level="warning")
+    server = uvicorn.Server(config)
+    if event_loop_running():
+        server.install_signal_handlers = False
+        thread = threading.Thread(target=server.run, name=f"{service}-uvicorn", daemon=False)
+        thread.start()
+        thread.join()
+        return
+    server.run()

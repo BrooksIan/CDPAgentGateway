@@ -14,6 +14,7 @@ from agentgateway.amp import (
     build_impala_mcp_app,
     build_mcp_app,
     cml_bind_host,
+    event_loop_running,
 )
 from agentgateway.keys import generate_test_keys
 from agentgateway.token import knox_claims, sign_rs256, unsigned_token
@@ -166,3 +167,7 @@ def test_cml_bind_host_is_loopback_when_app_port_set(monkeypatch: pytest.MonkeyP
     assert cml_bind_host() == "0.0.0.0"
     monkeypatch.setenv("CDSW_APP_PORT", "8090")
     assert cml_bind_host() == "127.0.0.1"
+
+
+def test_event_loop_running_is_false_in_sync_tests() -> None:
+    assert event_loop_running() is False

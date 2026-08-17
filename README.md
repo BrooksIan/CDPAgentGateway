@@ -21,6 +21,8 @@ This repo follows the [Cloudera Blueprints Standard](https://github.com/kevinbta
 
 ## Overview
 
+![CDP Agent Gateway catalog cover](assets/AMP_thumbnail.jpg)
+
 CDP Agent Gateway sits in front of Cloudera Data Platform so Cursor, Claude, and other MCP hosts can run Spark without learning cluster topology. Apache APISIX terminates agent HTTP, validates Knox-issued RS256 JWTs, and forwards the same bearer into Knox `cdp-proxy-token` **Livy for Spark 3**. Agents use MCP at `/mcp/spark`. Operators can `GET` Livy for tests. Knox Trusted Proxy and Apache Ranger remain the authorization source of truth.
 
 Hive is inventoried (`gateway jdbc add`) and operators can `SHOW DATABASES` with `gateway hive`. `/cdp/hive` is not an agent route. Impala, Ozone, and NiFi stay unpublished. Cloudera value is unchanged identity and data policy: agents do not get a parallel credential path into the lakehouse.
@@ -28,6 +30,16 @@ Hive is inventoried (`gateway jdbc add`) and operators can `SHOW DATABASES` with
 ## Demo
 
 A recorded Reprise walkthrough is not published yet. The current path is the local Docker stack in [Quickstart](#quickstart): mock Knox, APISIX on `localhost:9080`, Spark MCP at `/mcp/spark`, operator admin UI on `127.0.0.1:9090`. Pytest covers missing bearer, `alg=none`, expired tokens, subject forwarding, and MCP tool list.
+
+![Operator console: path status, health, and UTC-day usage](assets/admin-overview.png)
+
+![Default quota and per-user override](assets/admin-quotas.png)
+
+![UTC-day usage by Knox sub and audit join](assets/admin-usage-audit.png)
+
+![Activity log keyed by Knox user and request id](assets/admin-activity.png)
+
+The admin console is for operators, not MCP hosts. Full walkthrough: [docs/admin.md](docs/admin.md).
 
 ## Use Case
 
@@ -92,6 +104,8 @@ Do not commit Knox tokens, JDBC passwords, or private keys.
 Agents terminate at APISIX (Compose) or at a Cloudera AI Application (optional AMP). The `mcp-spark` adapter sits behind that edge and forwards the caller's Knox bearer to Livy. Knox remains the only hop that presents cluster credentials. The admin UI is not an agent route (localhost `:9090` on Compose; CML login on AMP).
 
 ![CDP Agent Gateway traffic path](assets/architecture.svg)
+
+Spark MCP is the published agent path. Hive JDBC is inventoried (`gateway jdbc add` / `gateway hive`); `/cdp/hive` stays **404**.
 
 | Component | Role |
 | --- | --- |

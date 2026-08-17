@@ -33,6 +33,9 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
 def test_amp_layout_and_catalog_exist() -> None:
     catalog = yaml.safe_load((ROOT / "catalog-entry.yaml").read_text())
     assert catalog["entries"][0]["label"] == "cdp-agent-gateway"
+    cover = ROOT / catalog["entries"][0]["image_path"]
+    assert cover.is_file(), cover
+    assert cover.suffix.lower() in {".jpg", ".jpeg", ".png"}
     for path in (
         ROOT / "docs" / "amp.md",
         ROOT / "0_session-install-dependencies" / "install_dependencies.py",

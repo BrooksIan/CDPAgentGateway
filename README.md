@@ -123,7 +123,7 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 
 | Path | Description |
 | --- | --- |
-| `assets/` | Architecture diagram, admin UI screenshots, and catalog media |
+| `assets/` | Architecture diagram, AMP catalog cover, admin UI screenshots |
 | `deploy/` | Docker Compose (APISIX, mock CDP, mcp-spark, admin) |
 | `docs/` | Architecture, Spark, Hive, admin, identity, AMP, phases, tests |
 | `LICENSE` | Apache License 2.0 |

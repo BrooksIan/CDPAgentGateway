@@ -1,9 +1,9 @@
 name: CDP Agent Gateway
 description: >-
   Optional Cloudera AI Workbench profile of CDP Agent Gateway. Agents send Knox JWTs
-  to a Spark MCP application; the adapter forwards the same bearer to Knox Livy for
-  Spark 3. Ranger authorizes the token subject. This is not Docker Compose and does
-  not replace Apache Knox.
+  to MCP applications; adapters forward the same bearer to Knox. Spark is the published
+  AMP app. Hive stays inventoried. Ranger authorizes the token subject. This is not
+  Docker Compose and does not replace Apache Knox.
 author: Cloudera
 specification_version: "1.0"
 prototype_version: "0.1"

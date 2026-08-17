@@ -5,7 +5,7 @@
 # --- Identity ---
 name: "CDP Agent Gateway"
 slug: "cdp-agent-gateway" # URL-safe repo / catalog identifier
-description: "Front third-party agents with Apache APISIX so Spark on Cloudera Data Platform stays behind Knox JWTs, Ranger, Livy-for-Spark-3 MCP, and an unpublished Hive path."
+description: "Front third-party agents with Apache APISIX so Cloudera Data Platform stays behind Knox JWTs and Ranger. Spark MCP is the published agent path; Hive is inventoried and unpublished."
 reprise_link: "" # Public reprise link — add when the demo recording is published
 
 # --- Classification (website filters) ---

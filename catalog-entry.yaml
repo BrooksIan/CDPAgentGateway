@@ -4,23 +4,25 @@ entries:
   - title: CDP Agent Gateway
     label: cdp-agent-gateway
     short_description: |
-      Front third-party agents with Knox JWTs so Spark on CDP stays behind Ranger.
-      Optional Cloudera AI Workbench application (not Docker Compose).
+      Front third-party agents with Knox JWTs so Cloudera Data Platform stays behind Ranger.
+      Spark MCP is published; Hive is inventoried. Optional Cloudera AI Workbench application.
     long_description: |
-      CDP Agent Gateway lets Cursor and other MCP hosts submit Spark jobs as the Knox
-      token subject. The AMP profile runs mcp-spark as a CML Application with in-process
-      Knox JWT validation. Apache Knox remains the CDP perimeter. Compose/APISIX remains
-      the laptop and production-shaped edge. This catalog entry is packaging only until
-      a workbench proof sets METADATA.yaml launchable to true.
+      CDP Agent Gateway lets Cursor and other MCP hosts reach CDP as the Knox token
+      subject. Spark MCP is the published agent path. Hive JDBC is inventoried for operators;
+      Impala, Ozone, and NiFi stay unpublished. The AMP profile runs MCP as a CML Application
+      with in-process Knox JWT validation. Apache Knox remains the CDP perimeter.
+      Compose/APISIX remains the laptop and production-shaped edge. This catalog entry is
+      packaging only until a workbench proof sets METADATA.yaml launchable to true.
     long_description_html: |
-      <p>CDP Agent Gateway lets Cursor and other MCP hosts submit Spark jobs as the Knox
-      token subject. The AMP profile runs mcp-spark as a CML Application with in-process
-      Knox JWT validation. Apache Knox remains the CDP perimeter.</p>
-    image_path: assets/architecture.svg
+      <p>CDP Agent Gateway lets Cursor and other MCP hosts reach CDP as the Knox token
+      subject. Spark MCP is the published agent path. Hive is inventoried. Apache Knox
+      remains the CDP perimeter.</p>
+    image_path: assets/AMP_thumbnail.jpg # Use a raw HTTPS URL once the repo is public
     tags:
       - agents
       - mcp
       - spark
+      - hive
       - knox
       - gateway
     git_url: ""

@@ -4,7 +4,7 @@ Third-party agents must not discover Livy, Hive, Impala, Ozone, NiFi, or other C
 
 ![CDP Agent Gateway traffic path](../assets/architecture.svg)
 
-Phase 1 traffic is `agents → APISIX → Knox → Livy (Spark 3)`. Phase 2 adds `agents → APISIX → mcp-spark → Knox → Livy`. Optional AMP is `agents → CML Application → mcp-spark → Knox → Livy`.
+Phase 1 traffic is `agents → APISIX → Knox → Livy (Spark 3)`. Phase 2 adds `agents → APISIX → mcp-spark → Knox → Livy`. Hive JDBC is inventoried on the same Knox host (`gateway jdbc add` / `gateway hive`); `/cdp/hive` stays **404**. Optional AMP is `agents → CML Application → mcp-spark → Knox → Livy`.
 
 ## What each hop owns
 

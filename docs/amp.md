@@ -74,6 +74,7 @@ AMP is JWT-only. Phase 3 mTLS does not map onto CML application URLs.
 | --- | --- |
 | `.project-metadata.yaml` | AMP runbook (CML ignores Compose) |
 | `catalog-entry.yaml` | Optional custom catalog snippet |
+| `assets/AMP_thumbnail.jpg` | Catalog tile cover (`image_path`) |
 | `0_session-install-dependencies/` | `pip install -e ".[amp]"` |
 | `1_job-fetch-jwks/` | Pin JWKS → `conf/generated/knox-public.pem` |
 | `2_job-smoke-knox/` | PEM + JWKS reachability; optional Livy GET |

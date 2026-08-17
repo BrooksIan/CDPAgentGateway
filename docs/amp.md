@@ -10,13 +10,13 @@ Template: [CML Community AMP Template](https://github.com/cloudera/CML_Community
 
 | Profile | Public agent address | JWT check | Upstream |
 | --- | --- | --- | --- |
-| Compose (default) | APISIX `:9080` | `plugins/knox-jwt.lua` | `mcp-spark` container → Knox |
-| AMP (optional) | CML Application `https://mcp-spark.<workspace>/` | Python `knox-jwt` in `agentgateway.knox_jwt` | same `mcp-spark` code → Knox |
+| Compose (default) | APISIX `:9080` | `plugins/knox-jwt.lua` | `mcp-spark` / `mcp-hive` → Knox |
+| AMP (optional) | CML Application URLs | Python `knox-jwt` in `agentgateway.knox_jwt` | same adapter code → Knox |
 
 AMP does **not** run Compose, APISIX, Lua plugins, or mock Knox. It is live Knox only. Do not use CML-native Spark jobs as the Spark path.
 
 ```text
-MCP host → CML Application (Knox JWT + MCP) → Knox cdp-proxy-token → Livy Spark 3
+MCP host → CML Application (Knox JWT + MCP) → Knox cdp-proxy-token → Livy Spark 3 or Hive
 ```
 
 ## Import
@@ -32,8 +32,9 @@ Do not put `KNOX_TOKEN` in project env or git. Paste the Knox JWT into the MCP h
 
 | Subdomain | CML login | Role |
 | --- | --- | --- |
-| `mcp-spark` | Bypassed (MCP hosts cannot send CML cookies) | POST JSON-RPC. Knox JWT required. GET `/` and `/health` are public. |
-| `gateway-admin` | Required | Operator usage/quotas. Shares `data/gateway.sqlite` with mcp-spark. Not an agent route. |
+| `mcp-spark` | Bypassed (MCP hosts cannot send CML cookies) | POST JSON-RPC Spark. Knox JWT required. GET `/` and `/health` are public. |
+| `mcp-hive` | Bypassed | POST JSON-RPC Hive (read-only). Knox JWT required. `/cdp/hive` is not this app. |
+| `gateway-admin` | Required | Operator usage/quotas. Shares `data/gateway.sqlite`. Not an agent route. |
 
 Quotas use sqlite on the project filesystem (`ADMIN_BACKEND=sqlite`). Compose still uses HTTP to the admin container and fails open if that container is down.
 
@@ -75,16 +76,18 @@ AMP is JWT-only. Phase 3 mTLS does not map onto CML application URLs.
 | `.project-metadata.yaml` | AMP runbook (CML ignores Compose) |
 | `catalog-entry.yaml` | Optional custom catalog snippet |
 | `assets/AMP_thumbnail.jpg` | Catalog tile cover (`image_path`) |
-| `0_session-install-dependencies/` | `pip install -e ".[amp]"` |
+| `0_session-install-dependencies/` | `pip install -e ".[amp,hive]"` |
 | `1_job-fetch-jwks/` | Pin JWKS → `conf/generated/knox-public.pem` |
 | `2_job-smoke-knox/` | PEM + JWKS reachability; optional Livy GET |
-| `3_app-mcp-spark/` | MCP application |
+| `3_app-mcp-spark/` | Spark MCP application |
 | `4_app-operator-admin/` | Admin application |
+| `5_app-mcp-hive/` | Hive MCP application |
 
 ## Non-goals
 
 - Docker-in-CML, APISIX, or mock-cdp
-- Raw Livy writes, Hive, Impala, Ozone, NiFi as agent routes
+- Raw Livy writes, `/cdp/hive`, Impala, Ozone, NiFi as agent routes
+- `/cdp/webhdfs` (Compose APISIX only; AMP has no APISIX)
 - APISIX `jwt-auth` or a CML model access key as the CDP user
 - Streamable HTTP unless a real host fails `initialize`
 

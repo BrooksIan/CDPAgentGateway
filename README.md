@@ -23,9 +23,9 @@ This repo follows the [Cloudera Blueprints Standard](https://github.com/kevinbta
 
 ![CDP Agent Gateway catalog cover](assets/AMP_thumbnail.jpg)
 
-CDP Agent Gateway sits in front of Cloudera Data Platform so Cursor, Claude, and other MCP hosts can run Spark without learning cluster topology. Apache APISIX terminates agent HTTP, validates Knox-issued RS256 JWTs, and forwards the same bearer into Knox `cdp-proxy-token` **Livy for Spark 3**. Agents use MCP at `/mcp/spark`. Operators can `GET` Livy for tests. Knox Trusted Proxy and Apache Ranger remain the authorization source of truth.
+CDP Agent Gateway sits in front of Cloudera Data Platform so Cursor, Claude, and other MCP hosts can run Spark without learning cluster topology. Apache APISIX terminates agent HTTP, validates Knox-issued RS256 JWTs, and forwards the same bearer into Knox `cdp-proxy-token` **Livy for Spark 3**. Agents use MCP at `/mcp/spark`. Operators can `GET` Livy for tests and stage job files with **WebHDFS** (`/cdp/webhdfs*`). Knox Trusted Proxy and Apache Ranger remain the authorization source of truth.
 
-Hive is inventoried (`gateway jdbc add`) and operators can `SHOW DATABASES` with `gateway hive`. `/cdp/hive` is not an agent route. Impala, Ozone, and NiFi stay unpublished. Cloudera value is unchanged identity and data policy: agents do not get a parallel credential path into the lakehouse.
+Hive is inventoried (`gateway jdbc add`) and agents use read-only MCP at `/mcp/hive`. `/cdp/hive` is not an agent route. Impala, Ozone, and NiFi stay unpublished. Cloudera value is unchanged identity and data policy: agents do not get a parallel credential path into the lakehouse.
 
 ## Demo
 
@@ -50,8 +50,9 @@ Enterprises want coding and analytics agents to submit Spark jobs on CDP, but th
 - Knox JWT at the agent edge — no second token format, no APISIX-minted user credentials
 - Dual identity — registered agent (caller key or mTLS later) plus CDP user (`sub` / `knox.id`)
 - Fail-closed proxy — missing, expired, wrong-issuer, and algorithm-confused tokens never reach Knox
-- Spark allowlist — MCP `/mcp/spark` (list, get, log, submit); Livy HTTP is GET/HEAD only
-- Hive inventory — `gateway jdbc add` stores Knox JDBC; `gateway hive` lists databases; `/cdp/hive` stays 404
+- Spark allowlist — MCP `/mcp/spark` (list, get, log, submit); Livy HTTP is GET/HEAD only; WebHDFS GET/HEAD/PUT for operator file staging
+- Hive MCP — `/mcp/hive` list/describe/select (no `SELECT *`, limit 50); `/cdp/hive` stays 404
+- Hive JDBC inventory — `gateway jdbc add` stores Knox JDBC; `gateway hive` lists databases
 - Local-to-live — `gateway knox <livy-url>` points the same Compose file at external Knox
 - Operator admin UI — UTC-day usage, quotas vs burst 429s, audit join on localhost `:9090`
 - MCP burst cap — `limit-count` on `/mcp/spark` keyed by Knox `sub` (default 60/minute)
@@ -88,6 +89,7 @@ Enterprises want coding and analytics agents to submit Spark jobs on CDP, but th
    gateway token set
    gateway up
    gateway spark
+   gateway webhdfs ls /
    gateway mcp
    gateway hive              # SHOW DATABASES; needs pip install -e ".[hive]"
    gateway admin --open      # http://127.0.0.1:9090
@@ -105,7 +107,7 @@ Agents terminate at APISIX (Compose) or at a Cloudera AI Application (optional A
 
 ![CDP Agent Gateway traffic path](assets/architecture.svg)
 
-Spark MCP is the published agent path. Hive JDBC is inventoried (`gateway jdbc add` / `gateway hive`); `/cdp/hive` stays **404**.
+Spark MCP is the published Spark path. Operators stage HDFS files at `/cdp/webhdfs*`. Hive MCP is read-only at `/mcp/hive`. `/cdp/hive` stays **404**. JDBC inventory is `gateway jdbc add` / `gateway hive`.
 
 | Component | Role |
 | --- | --- |
@@ -113,6 +115,7 @@ Spark MCP is the published agent path. Hive JDBC is inventoried (`gateway jdbc a
 | Python `knox-jwt` | Same RS256 / `iss` / `exp` / `sub` checks for the optional CML AMP profile |
 | `knox-jwt` plugin | RS256, `iss=KNOXSSO`, expiry; pinned PEM; forwards `Authorization` |
 | `mcp-spark` | Livy MCP tools (list/get/log/submit); not an APISIX plugin |
+| `mcp-hive` | Hive MCP tools (list/describe/select); not an APISIX plugin |
 | Mock CDP (lab) | Stand-in Knox JWKS and Livy probes for `gateway test` |
 | Operator admin | Local UI on `:9090`: UTC-day usage, quotas vs burst 429s, audit join |
 | Apache Knox | Token issuance, `cdp-proxy-token`, Trusted Proxy / doAs |
@@ -121,7 +124,9 @@ Spark MCP is the published agent path. Hive JDBC is inventoried (`gateway jdbc a
 | Agent URI | Methods | Upstream |
 | --- | --- | --- |
 | `/mcp/spark` | POST JSON-RPC | `mcp-spark` → Knox Livy |
+| `/mcp/hive` | POST JSON-RPC | `mcp-hive` → Knox Hive (read-only) |
 | `/cdp/livy_for_spark3*` | GET, HEAD | Knox Livy (operators/tests) |
+| `/cdp/webhdfs*` | GET, HEAD, PUT | Knox WebHDFS (operator staging) |
 | `/cdp/hive` | — | **404** (not published) |
 
 Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](docs/amp.md), [docs/spark.md](docs/spark.md), [docs/hive.md](docs/hive.md), [docs/admin.md](docs/admin.md), [docs/identity-and-auth.md](docs/identity-and-auth.md).
@@ -149,8 +154,9 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 | `inventory/` | Phase 0 CDP inventory consumed by tests |
 | `src/agentgateway/` | Operator CLI (`gateway` / `python -m agentgateway`) |
 | `mcp-spark/` | Livy Spark 3 MCP adapter |
+| `mcp-hive/` | Hive MCP adapter (read-only) |
 | `admin/` | Operator usage/quota UI (`127.0.0.1:9090`) |
-| `examples/spark/` | Sample Spark 3 batch (`count_to_10.py`) |
+| `examples/spark/` | Sample Spark 3 batch (`count_to_10.py`) that writes Iceberg for Hive |
 | `tests/` | Inventory, CLI, gateway, and MCP pytest |
 | `AGENTS.md` | Instructions for coding agents |
 | `.cursor/rules/` | Cursor project rules |

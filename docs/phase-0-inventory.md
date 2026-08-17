@@ -44,6 +44,7 @@ Start with Spark. Mark the others as later. Gateway path is `/cdp/<knox-service>
 | Service | Knox path / topology | Read-only probe | In Phase 1? |
 | --- | --- | --- | --- |
 | Spark / Livy for Spark 3 | `.../cdp-proxy-token/livy_for_spark3/` | `GET /sessions` → `gateway spark` | **yes** — [spark.md](spark.md) |
+| HDFS / WebHDFS | `.../cdp-proxy-token/webhdfs/v1/` | `GET ?op=LISTSTATUS` → `gateway webhdfs ls` | **yes** (operator staging) — [spark.md](spark.md) |
 | Hive / HS2 HTTP | `gateway jdbc add '<jdbc:hive2://…;httpPath=…/cdp-proxy-api/hive>'` | inventoried only | no agent route — [hive.md](hive.md) |
 | Impala | | | no |
 | Ozone / S3 | | list bucket or prefix | no |

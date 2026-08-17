@@ -35,6 +35,16 @@ first_tools:
     path: /livy_for_spark3/batches
     access: read
     purpose: List Livy for Spark 3 batches. MCP spark_list_batches uses this path.
+  - id: hive-mcp-databases
+    method: POST
+    path: /mcp/hive
+    access: read
+    purpose: Read-only Hive MCP (list databases/tables, describe, capped select). /cdp/hive stays 404.
+  - id: webhdfs-list
+    method: GET
+    path: /cdp/webhdfs/v1/
+    access: read
+    purpose: List HDFS through Knox WebHDFS on the gateway. Operator staging for Spark file URIs.
 
 threats:
   - id: missing-auth

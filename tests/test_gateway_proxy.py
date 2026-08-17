@@ -58,3 +58,43 @@ def test_livy_http_writes_are_not_proxied(client, method: str, path: str) -> Non
         kwargs["json"] = {"code": "print(1)"}
     response = client.request(method, path, **kwargs)
     assert response.status_code in {404, 405}, response.text
+
+
+def test_webhdfs_list_is_proxied_for_authenticated_user(client) -> None:
+    token = sign_rs256(knox_claims(sub="analyst"))
+    response = client.get(
+        "/cdp/webhdfs/v1/",
+        params={"op": "LISTSTATUS"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["knox_user"] == "analyst"
+    assert "FileStatuses" in body
+
+
+def test_webhdfs_mkdir_put_is_proxied(client) -> None:
+    token = sign_rs256(knox_claims(sub="analyst"))
+    headers = {"Authorization": f"Bearer {token}"}
+    mkdir = client.put(
+        "/cdp/webhdfs/v1/user/analyst/examples",
+        params={"op": "MKDIRS"},
+        headers=headers,
+    )
+    assert mkdir.status_code == 200, mkdir.text
+    assert mkdir.json().get("boolean") is True
+
+
+def test_webhdfs_delete_is_not_proxied(client) -> None:
+    token = sign_rs256(knox_claims(sub="analyst"))
+    response = client.delete(
+        "/cdp/webhdfs/v1/user/analyst/examples/job.py",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code in {404, 405}
+
+
+def test_webhdfs_requires_bearer(client) -> None:
+    response = client.get("/cdp/webhdfs/v1/", params={"op": "LISTSTATUS"})
+    assert response.status_code == 401
+    assert response.json()["error"] == "unauthorized"

@@ -6,14 +6,14 @@ alwaysApply: true
 # Architecture
 
 - APISIX is the public **agent** address on Compose (north-south). The optional CML AMP profile uses a workbench Application URL instead; both still validate Knox JWTs. Knox stays the CDP perimeter (`cdp-proxy-token`). The operator admin UI is not an agent route (`127.0.0.1:9090` on Compose; CML login on AMP).
-- MCP adapters are services (Compose upstreams or CML apps). Do not implement tools as APISIX plugins or the experimental `mcp-bridge`. Do not add Streamable HTTP on `/mcp/spark` unless asked.
-- Do not replace Knox with AISIX or expose Hive, Impala, Ozone, or NiFi to agents. Do not run Compose/APISIX inside CML; AMP is Python-only against live Knox.
-- Phase 1 allowlists Livy for Spark 3 only (`GET`/`HEAD` `/cdp/livy_for_spark3*`). MCP Spark is `/mcp/spark` → `mcp-spark` upstream. Do not proxy raw Livy POST/PUT/DELETE. Do not add a catch-all `/cdp/*` proxy.
+- MCP adapters are services (Compose upstreams or CML apps). Do not implement tools as APISIX plugins or the experimental `mcp-bridge`. Do not add Streamable HTTP on `/mcp/spark` or `/mcp/hive` unless asked.
+- Do not replace Knox with AISIX. Do not proxy raw Hive (`/cdp/hive` stays 404), Impala, Ozone, or NiFi. Hive agents use `/mcp/hive` only. Do not run Compose/APISIX inside CML; AMP is Python-only against live Knox.
+- Phase 1 allowlists Livy for Spark 3 (`GET`/`HEAD` `/cdp/livy_for_spark3*`) and WebHDFS (`GET`/`HEAD`/`PUT` `/cdp/webhdfs*`). MCP Spark is `/mcp/spark` → `mcp-spark`. MCP Hive is `/mcp/hive` → `mcp-hive` (read-only). Do not proxy raw Livy POST/PUT/DELETE. Do not proxy WebHDFS DELETE. Do not add a catch-all `/cdp/*` proxy.
 - Do not mint cluster credentials or bypass Ranger.
 
 ```
 agents → APISIX → MCP adapters → Knox → CDP
-agents → CML Application (AMP) → mcp-spark → Knox → CDP
+agents → CML Application (AMP) → mcp-spark / mcp-hive → Knox → CDP
 ```
 
 When adding routes, allowlist a specific Knox path. Do not add a catch-all proxy to the cluster.

@@ -79,6 +79,7 @@ def test_blueprint_layout_dirs_exist() -> None:
         ROOT / "deploy" / "docker-compose.yml",
         ROOT / "docs" / "architecture.md",
         ROOT / "mcp-spark" / "server.py",
+        ROOT / "mcp-hive" / "server.py",
         ROOT / "admin" / "server.py",
         ROOT / "examples" / "spark" / "count_to_10.py",
         ROOT / "docs" / "operator-cli.md",

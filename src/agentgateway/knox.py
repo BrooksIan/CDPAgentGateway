@@ -12,6 +12,7 @@ HIVE_SERVICE = "hive"
 SPARK_LIVY_SERVICE = "livy_for_spark3"
 SPARK_SESSIONS_PATH = f"/cdp/{SPARK_LIVY_SERVICE}/sessions"
 SPARK_MCP_PATH = "/mcp/spark"
+HIVE_MCP_PATH = "/mcp/hive"
 HIVE_ENV_KEYS = (
     "HIVE_JDBC_URL",
     "HIVE_KNOX_URL",

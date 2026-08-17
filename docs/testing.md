@@ -9,6 +9,7 @@ Assumptions:
 - Hive JDBC (optional) is stored with `gateway jdbc add <jdbc:hive2://…>` and is not an agent route
 - `KNOX_TOKEN` is a Knox JWT in `.env` (`gateway token set`), never in git
 - Phase 1 probe is `GET /cdp/livy_for_spark3/sessions`
+- WebHDFS staging is `GET`/`PUT` `/cdp/webhdfs/v1/...` (`gateway webhdfs`)
 
 ## How to run
 
@@ -44,11 +45,14 @@ Against mock CDP unless noted. Spark URI is `/cdp/livy_for_spark3/sessions`.
 | P1-03 | Valid Knox-shaped JWT + sessions path | `2xx`; `Authorization` forwarded; `knox_user` matches `sub` | `tests/test_gateway_auth.py`, `tests/test_gateway_proxy.py` |
 | P1-04 | Expired JWT | `401` `expired` | `tests/test_gateway_auth.py` |
 | P1-05 | Wrong `iss`, `alg=none`, or HS256 confusion | `401` | `tests/test_gateway_auth.py` |
-| P1-06 | Valid JWT, path outside Spark allowlist (`/cdp/hive`) | `404` | `tests/test_gateway_proxy.py` |
+| P1-06 | Valid JWT, path outside Spark/WebHDFS allowlist (`/cdp/hive`) | `404` | `tests/test_gateway_proxy.py` |
 | P1-07 | Request ID present | `X-Request-Id` on `/health` and Spark routes | `tests/test_gateway_auth.py`, `tests/test_gateway_proxy.py` |
 | P1-08 | Auth failure reason is visible | `X-Agent-Gateway-Reason` / JSON `reason`; **no raw token** | `tests/test_gateway_auth.py` |
 | P1-09 | Auth success binds the user | `X-Knox-User` and `X-Knox-Token-Id` forwarded upstream | mock CDP echoes `knox_user` / `token_id` |
 | P1-10 | JWKS host pinning | Token `jku` on a foreign host is refused by the CLI | `tests/test_knox_url.py` (not the Lua plugin) |
+| P1-14 | WebHDFS LISTSTATUS through the gateway | Authenticated `GET /cdp/webhdfs/v1/` → `2xx`; missing bearer `401` | `tests/test_gateway_proxy.py` |
+| P1-15 | WebHDFS PUT MKDIRS through the gateway | Authenticated `PUT ...?op=MKDIRS` → `2xx`; `DELETE` → `404`/`405` | `tests/test_gateway_proxy.py` |
+| P1-16 | CREATE Location host pin | Foreign `Location` host refused; Knox host rewritten to `/cdp/webhdfs` | `tests/test_webhdfs.py` |
 
 ## Phase 1 — CDP still behind Knox
 
@@ -66,6 +70,7 @@ Against mock CDP unless noted. Spark URI is `/cdp/livy_for_spark3/sessions`.
 | P2-02 | MCP without bearer | `401` | `tests/test_mcp_spark.py` |
 | P2-03 | `spark_list_batches` forwards `sub` | JSON result includes `knox_user`; no raw token | `tests/test_mcp_spark.py` |
 | P2-04 | Audit record joins tool, `sub`, `knox.id` | `GET /api/audit?request_id=` returns those fields; no bearer | `tests/test_admin_store.py`, `tests/test_admin_gateway.py` |
+| P2-05 | Hive MCP through APISIX | `tools/list` + `hive_list_databases`; `/cdp/hive` still 404 | `tests/test_mcp_hive.py` |
 | P2-06 | Raw Livy writes on the agent listener | Authenticated `POST .../sessions/0/statements`, `POST .../batches`, `PUT`, `DELETE` → `404` or `405` | `tests/test_gateway_proxy.py` |
 | P2-07 | `spark_submit_batch` accepts cluster file URI | HDFS (or other allowlisted scheme) submit `isError=false`; `submitted=true` | `tests/test_mcp_spark.py` |
 | P2-08 | `spark_submit_batch` rejects remote HTTP file | `isError=true`; error names HDFS/object-store | `tests/test_mcp_spark.py` |
@@ -91,8 +96,7 @@ Python Knox JWT and CML packaging. Compose tests above stay the source of truth 
 
 | ID | Case | Phase |
 | --- | --- | --- |
-| P2-05 | Hive MCP through APISIX | 2 (`mcp-hive` not started) |
-| — | Streamable HTTP / GET SSE / MCP session | Held; POST JSON-RPC is the `/mcp/spark` contract |
+| — | Streamable HTTP / GET SSE / MCP session | Held; POST JSON-RPC is the `/mcp/spark` and `/mcp/hive` contract |
 | P3-01 | `401` includes RFC 9728 resource metadata | 3 |
 | P3-02 | Revoked-but-unexpired Knox token is rejected | 3 |
 | P3-03 | Partner without mTLS/caller key is rejected | 3 |

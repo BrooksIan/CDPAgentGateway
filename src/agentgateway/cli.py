@@ -18,6 +18,7 @@ from agentgateway.knox import (
     HIVE_ENV_KEYS,
     LOCAL_UPSTREAM,
     SPARK_MCP_PATH,
+    HIVE_MCP_PATH,
     SPARK_SESSIONS_PATH,
     agent_paths,
     default_call_path,
@@ -30,10 +31,11 @@ from agentgateway.knox import (
     trusted_jku,
 )
 from agentgateway.hive import HiveError, hive_http_path, show_databases
-from agentgateway.mcp import mcp_rpc
+from agentgateway.mcp import mcp_path, mcp_rpc
 from agentgateway.paths import repo_root
 from agentgateway.probe import parse_params, request_path
 from agentgateway.token import inspect_bearer, knox_claims, public_claims, sign_rs256
+from agentgateway.webhdfs import WebHdfsError, file_status, format_listing, list_status, mkdir, put_file
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -49,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
             "  gateway knox https://knox.example.com/env/cdp-proxy-token/livy_for_spark3/\n"
             "  gateway jdbc add 'jdbc:hive2://knox.example/;ssl=true;transportMode=http;httpPath=env/cdp-proxy-api/hive'\n"
             "  gateway spark\n"
+            "  gateway webhdfs put examples/spark/count_to_10.py /user/you/examples/count_to_10.py\n"
             "  gateway hive\n"
             "  gateway mcp\n"
             "  gateway admin\n"
@@ -136,6 +139,41 @@ def main(argv: list[str] | None = None) -> int:
     p_spark.add_argument("--param", action="append", default=[], metavar="KEY=VALUE")
     p_spark.set_defaults(func=cmd_spark)
 
+    p_webhdfs = sub.add_parser(
+        "webhdfs",
+        help="Stage files on HDFS through the gateway (/cdp/webhdfs, Knox JWT)",
+    )
+    webhdfs_sub = p_webhdfs.add_subparsers(dest="webhdfs_cmd", required=True)
+
+    p_webhdfs_ls = webhdfs_sub.add_parser("ls", help="LISTSTATUS a path")
+    p_webhdfs_ls.add_argument("path", nargs="?", default="/", help="HDFS path (default: /)")
+    p_webhdfs_ls.add_argument("--mint", action="store_true")
+    p_webhdfs_ls.add_argument("--token", help="Bearer token (default: KNOX_TOKEN or --mint)")
+    p_webhdfs_ls.add_argument("--sub", default="analyst")
+    p_webhdfs_ls.set_defaults(func=cmd_webhdfs_ls)
+
+    p_webhdfs_stat = webhdfs_sub.add_parser("stat", help="GETFILESTATUS a path")
+    p_webhdfs_stat.add_argument("path", help="HDFS path")
+    p_webhdfs_stat.add_argument("--mint", action="store_true")
+    p_webhdfs_stat.add_argument("--token", help="Bearer token (default: KNOX_TOKEN or --mint)")
+    p_webhdfs_stat.add_argument("--sub", default="analyst")
+    p_webhdfs_stat.set_defaults(func=cmd_webhdfs_stat)
+
+    p_webhdfs_mkdir = webhdfs_sub.add_parser("mkdir", help="MKDIRS a path")
+    p_webhdfs_mkdir.add_argument("path", help="HDFS directory path")
+    p_webhdfs_mkdir.add_argument("--mint", action="store_true")
+    p_webhdfs_mkdir.add_argument("--token", help="Bearer token (default: KNOX_TOKEN or --mint)")
+    p_webhdfs_mkdir.add_argument("--sub", default="analyst")
+    p_webhdfs_mkdir.set_defaults(func=cmd_webhdfs_mkdir)
+
+    p_webhdfs_put = webhdfs_sub.add_parser("put", help="PUT a local file (CREATE overwrite)")
+    p_webhdfs_put.add_argument("local", help="Local file path")
+    p_webhdfs_put.add_argument("path", help="HDFS destination path")
+    p_webhdfs_put.add_argument("--mint", action="store_true")
+    p_webhdfs_put.add_argument("--token", help="Bearer token (default: KNOX_TOKEN or --mint)")
+    p_webhdfs_put.add_argument("--sub", default="analyst")
+    p_webhdfs_put.set_defaults(func=cmd_webhdfs_put)
+
     p_hive = sub.add_parser("hive", help="Run SHOW DATABASES on Knox Hive (token topology, not /cdp/hive)")
     p_hive.add_argument(
         "resource",
@@ -148,7 +186,8 @@ def main(argv: list[str] | None = None) -> int:
     p_hive.add_argument("--sub", default="analyst")
     p_hive.set_defaults(func=cmd_hive)
 
-    p_mcp = sub.add_parser("mcp", help="Call the Spark MCP adapter through the gateway")
+    p_mcp = sub.add_parser("mcp", help="Call Spark or Hive MCP through the gateway")
+    p_mcp.add_argument("--adapter", choices=("spark", "hive"), default="spark", help="MCP server (default: spark)")
     p_mcp.add_argument("--tool", help="tools/call name (default: list tools)")
     p_mcp.add_argument("--arg", action="append", default=[], metavar="KEY=VALUE")
     p_mcp.add_argument("--mint", action="store_true", help="Sign a local mock token")
@@ -303,6 +342,8 @@ def cmd_test(args: argparse.Namespace) -> int:
                 "tests/test_cli.py",
                 "tests/test_knox_url.py",
                 "tests/test_hive.py",
+                "tests/test_hive_sql.py",
+                "tests/test_webhdfs.py",
                 "tests/test_mcpspark_livy.py",
                 "tests/test_spark_example.py",
                 "tests/test_admin_store.py",
@@ -428,6 +469,83 @@ def cmd_spark(args: argparse.Namespace) -> int:
     return _issue_call(spark_livy_path(args.resource), token, method=args.method, params=params)
 
 
+def _webhdfs_token(args: argparse.Namespace) -> str | None:
+    return _bearer_from_args(args)
+
+
+def cmd_webhdfs_ls(args: argparse.Namespace) -> int:
+    token = _webhdfs_token(args)
+    if not token:
+        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
+        return 2
+    try:
+        payload = list_status(args.path, token)
+    except WebHdfsError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    lines = format_listing(payload)
+    for line in lines:
+        print(line)
+    print(f"count {len(lines)}")
+    return 0
+
+
+def cmd_webhdfs_stat(args: argparse.Namespace) -> int:
+    token = _webhdfs_token(args)
+    if not token:
+        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
+        return 2
+    try:
+        payload = file_status(args.path, token)
+    except WebHdfsError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    status = payload.get("FileStatus") or payload
+    length = status.get("length")
+    owner = status.get("owner")
+    kind = status.get("type")
+    print(f"path {args.path}")
+    print(f"type {kind}")
+    print(f"owner {owner}")
+    print(f"length {length}")
+    return 0
+
+
+def cmd_webhdfs_mkdir(args: argparse.Namespace) -> int:
+    token = _webhdfs_token(args)
+    if not token:
+        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
+        return 2
+    try:
+        mkdir(args.path, token)
+    except WebHdfsError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(f"mkdir {args.path}")
+    return 0
+
+
+def cmd_webhdfs_put(args: argparse.Namespace) -> int:
+    token = _webhdfs_token(args)
+    if not token:
+        print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
+        return 2
+    local = Path(args.local)
+    if not local.is_file():
+        print(f"error: local file not found: {local}", file=sys.stderr)
+        return 2
+    try:
+        status = put_file(local, args.path, token)
+    except WebHdfsError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    meta = status.get("FileStatus") or status
+    print(f"put {local} -> hdfs://{args.path}")
+    print(f"length {meta.get('length')}")
+    print(f"owner {meta.get('owner')}")
+    return 0
+
+
 def cmd_hive(args: argparse.Namespace) -> int:
     token = _bearer_from_args(args)
     if not token:
@@ -458,15 +576,25 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     if not token:
         print("error: no token; run gateway token set or pass --mint", file=sys.stderr)
         return 2
-    print(f"POST {SPARK_MCP_PATH}")
+    print(f"POST {mcp_path(args.adapter)}")
     try:
         if args.tool:
             arguments: dict[str, object] = {}
             for key, value in parse_params(args.arg):
-                arguments[key] = int(value) if key == "batch_id" and value.isdigit() else value
-            response = mcp_rpc("tools/call", token=token, params={"name": args.tool, "arguments": arguments})
+                if key in {"batch_id", "limit"} and value.isdigit():
+                    arguments[key] = int(value)
+                elif key == "columns":
+                    arguments[key] = [part.strip() for part in value.split(",") if part.strip()]
+                else:
+                    arguments[key] = value
+            response = mcp_rpc(
+                "tools/call",
+                token=token,
+                params={"name": args.tool, "arguments": arguments},
+                adapter=args.adapter,
+            )
         else:
-            listed = mcp_rpc("tools/list", token=token)
+            listed = mcp_rpc("tools/list", token=token, adapter=args.adapter)
             print(listed.status_code)
             print(listed.text)
             return 0 if listed.status_code < 400 else 1
@@ -555,11 +683,12 @@ def _print_knox(env: dict[str, str]) -> None:
     for path in agent_paths(env, gateway_url(env)):
         print(f"agent {path}")
     print(f"mcp {gateway_url(env).rstrip('/')}{SPARK_MCP_PATH}")
+    print(f"mcp {gateway_url(env).rstrip('/')}{HIVE_MCP_PATH}")
     print(f"admin {admin_url(env)}")
     hive_url = env.get("HIVE_KNOX_URL") or ""
     if hive_url:
         print(f"hive {hive_url}")
-        print("hive_agent unpublished (/mcp/hive later; /cdp/hive stays 404)")
+        print("hive_agent /mcp/hive (read-only); /cdp/hive stays 404")
 
 
 def cmd_jdbc_add(args: argparse.Namespace) -> int:
@@ -584,7 +713,7 @@ def cmd_jdbc_add(args: argparse.Namespace) -> int:
             insecure=args.insecure or not args.tls_verify,
         )
         print(f"jwks {out}")
-    print("note: Hive JDBC is inventoried only; /cdp/hive stays unpublished")
+    print("note: Hive JDBC is inventoried; agents use /mcp/hive. /cdp/hive stays unpublished")
     return 0
 
 

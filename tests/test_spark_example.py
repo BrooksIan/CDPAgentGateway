@@ -13,3 +13,6 @@ def test_count_to_10_example_is_valid_python() -> None:
     assert "range(1, 11)" in source
     assert "count=" in source
     assert "SparkSession" in source
+    assert "iceberg" in source
+    assert "hive_select" in source
+    assert "enableHiveSupport" in source

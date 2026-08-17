@@ -2,14 +2,15 @@
 
 Agents reach Spark only through this gateway. They never call Livy or Knox hostnames directly.
 
-Two surfaces share the same Knox JWT and the same Ranger subject:
+Two surfaces share the same Knox JWT and the same Ranger subject. Operators also stage job files through WebHDFS on this gateway (not a laptop `hdfs dfs` client):
 
 | Surface | URI | Methods | Who uses it |
 | --- | --- | --- | --- |
 | Livy HTTP | `/cdp/livy_for_spark3*` | GET, HEAD | Operators (`gateway spark`), tests |
+| WebHDFS | `/cdp/webhdfs*` | GET, HEAD, PUT | Operators (`gateway webhdfs`) to put `file` URIs |
 | MCP | `/mcp/spark` | POST (JSON-RPC) | Cursor, Claude, `gateway mcp` |
 
-Both require `Authorization: Bearer <knox-jwt>`. Compose: APISIX `knox-jwt` validates the token, then either rewrites to Knox Livy or forwards to the `mcp-spark` adapter. AMP: the CML `mcp-spark` application validates the same JWT in Python. Hive and other CDP paths stay **404**.
+Both require `Authorization: Bearer <knox-jwt>`. Compose: APISIX `knox-jwt` validates the token, then either rewrites to Knox Livy or WebHDFS, or forwards to the `mcp-spark` adapter. AMP: the CML `mcp-spark` application validates the same JWT in Python (no WebHDFS route). `/cdp/hive` stays **404**; Hive MCP is `/mcp/hive` ([hive.md](hive.md)).
 
 ```mermaid
 flowchart LR
@@ -18,15 +19,20 @@ flowchart LR
   mcp["mcp-spark"]
   knox["Knox cdp-proxy-token"]
   livy["Livy for Spark 3"]
+  hdfs["HDFS WebHDFS"]
   ranger["Ranger"]
 
   agent -->|"POST /mcp/spark"| apisix
   agent -->|"GET /cdp/livy_for_spark3*"| apisix
+  op["Operator CLI"] -->|"PUT /cdp/webhdfs*"| apisix
   apisix --> mcp
-  apisix -->|"rewrite GET/HEAD"| knox
+  apisix -->|"rewrite GET/HEAD Livy"| knox
+  apisix -->|"rewrite GET/PUT WebHDFS"| knox
   mcp -->|"caller bearer"| knox
   knox --> livy
+  knox --> hdfs
   livy --> ranger
+  hdfs --> ranger
 ```
 
 ## Lab
@@ -35,6 +41,7 @@ flowchart LR
 gateway init
 gateway up
 gateway spark --mint
+gateway webhdfs ls --mint /
 gateway mcp --mint
 ```
 
@@ -48,6 +55,7 @@ gateway fetch-jwks --insecure
 gateway token set
 gateway up
 gateway spark
+gateway webhdfs ls /
 gateway mcp
 ```
 
@@ -87,6 +95,40 @@ sequenceDiagram
 
 Prefer MCP for agents. Raw Livy on the agent listener is **GET/HEAD only**. `POST`/`PUT`/`DELETE` (including `.../sessions/{id}/statements` and `POST .../batches`) return 404 or 405. Submit a cluster file URI with `spark_submit_batch`.
 
+## WebHDFS (operator staging)
+
+Livy cannot read a laptop path. Put the job on HDFS through this gateway, then submit that URI. Native `hdfs dfs` needs a Hadoop client, Kerberos, and datanode IPs; WebHDFS uses the same Knox JWT as Spark.
+
+Rewrite: `/cdp/webhdfs/...` → `{KNOX_PROXY_PREFIX}/webhdfs/...`. That covers both `/webhdfs/v1` and Knox's `/webhdfs/data/v1` CREATE follow-up. `DELETE` is not a route.
+
+```bash
+gateway webhdfs mkdir /user/$USER/examples
+gateway webhdfs put examples/spark/count_to_10.py /user/$USER/examples/count_to_10.py
+gateway webhdfs stat /user/$USER/examples/count_to_10.py
+gateway webhdfs ls /user/$USER/examples
+```
+
+`gateway webhdfs put` calls `MKDIRS` on the parent, `CREATE` with `noredirect=true`, then `PUT`s the body to the Location **only after** rewriting it onto `http://127.0.0.1:9080/cdp/webhdfs/...`. A Location host other than the pinned Knox host is refused.
+
+```mermaid
+sequenceDiagram
+  participant Op as gateway webhdfs put
+  participant GW as APISIX :9080
+  participant Knox as Knox
+  participant NN as HDFS
+
+  Op->>GW: PUT /cdp/webhdfs/v1/user/you/examples?op=MKDIRS Bearer JWT
+  GW->>Knox: PUT {prefix}/webhdfs/v1/... same Bearer
+  Knox->>NN: as sub
+  Op->>GW: PUT .../count_to_10.py?op=CREATE&noredirect=true
+  Knox-->>Op: Location on Knox webhdfs/data/v1
+  Op->>Op: rewrite Location to /cdp/webhdfs/data/v1
+  Op->>GW: PUT body onto rewritten Location
+  Knox->>NN: create file as sub
+```
+
+Agents should not call `/cdp/webhdfs`. MCP hosts submit an `hdfs://` URI that is already on the cluster.
+
 ## MCP tools
 
 `mcp-spark` is a Compose upstream (APISIX strips `/mcp/spark` to `/mcp`) and the same module behind the optional CML AMP application. Tools forward the **caller** bearer; they hold no cluster secrets.
@@ -120,7 +162,7 @@ sequenceDiagram
   participant Livy as Livy
   participant FS as HDFS / Ozone
 
-  Note over FS: Operator already put count_to_10.py on cluster
+  Note over FS: Operator put count_to_10.py via gateway webhdfs
   Ag->>GW: POST /mcp/spark spark_submit_batch file=hdfs://...
   GW->>GW: knox-jwt plus limit-count by sub
   GW->>MCP: POST /mcp same Bearer X-Knox-User
@@ -138,18 +180,18 @@ sequenceDiagram
 
 Allowed `file` schemes: `hdfs`, `viewfs`, `s3a`, `s3`, `abfs`, `abfss`, `o3fs`, `ofs`. Rejected: `http`, `file` (unless `SPARK_ALLOW_FILE_SCHEME=true` for a closed lab), `..` in the path, inline `code`, `proxyUser`.
 
-Sample job: [`examples/spark/count_to_10.py`](../examples/spark/count_to_10.py).
+Sample job: [`examples/spark/count_to_10.py`](../examples/spark/count_to_10.py). It prints `n=1` … `n=10`, then `CREATE OR REPLACE`s Iceberg table `{user}.count_to_10` (column `n`) in the Hive catalog so [Hive MCP](hive.md) can `hive_select` it. Pass `--arg args=$USER,count_to_10` (or another writable database) if the default Spark user database is not allowed by Ranger.
 
 ```bash
-hdfs dfs -mkdir -p /user/$USER/examples
-hdfs dfs -put -f examples/spark/count_to_10.py /user/$USER/examples/count_to_10.py
+gateway webhdfs put examples/spark/count_to_10.py /user/$USER/examples/count_to_10.py
 
 gateway mcp --tool spark_submit_batch \
   --arg file=hdfs:///user/$USER/examples/count_to_10.py \
-  --arg name=count-to-10
+  --arg name=count-to-10 \
+  --arg args=$USER,count_to_10
 ```
 
-Poll with `spark_get_batch` until `state` is `success` or `dead`. Then `spark_get_log`.
+Poll with `spark_get_batch` until `state` is `success` or `dead`. Then `spark_get_log` and look for `iceberg_table=`. Hive follow-up is in [hive.md](hive.md).
 
 Do not expose interactive Livy `POST /sessions/{id}/statements` (run code). That is how prompt injection becomes a cluster shell. APISIX does not match that method on `/cdp/livy_for_spark3*`; mcp-spark has no statements tool.
 
@@ -170,17 +212,18 @@ Put the Knox JWT in the host secret store, never in git.
 }
 ```
 
-Agents should call `/mcp/spark` only, with **POST JSON-RPC**. Streamable HTTP (GET SSE, MCP session) is **not** implemented and is held. Do not teach them the Knox URL, `/cdp/hive`, or the operator admin UI (`:9090`). AMP hosts use `https://mcp-spark.<workspace>/mcp/spark` instead of localhost; see [amp.md](amp.md).
+Agents should call `/mcp/spark` or `/mcp/hive` only, with **POST JSON-RPC**. Streamable HTTP (GET SSE, MCP session) is **not** implemented and is held. Do not teach them the Knox URL, `/cdp/webhdfs`, `/cdp/hive`, or the operator admin UI (`:9090`). AMP hosts use `https://mcp-spark.<workspace>/mcp/spark` or `https://mcp-hive.<workspace>/mcp/hive` instead of localhost; see [amp.md](amp.md).
 
 Operators set per-user daily call/submit quotas in [admin.md](admin.md). A denied submit is an MCP tool error and does not reach Livy. Operators look up a call by APISIX `X-Request-Id` (`GET /api/audit`) to join tool, `sub`, and `knox.id`.
 
-APISIX also applies a per-`sub` burst cap on `/mcp/spark` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW` in `.env`, default 60 per 60s). Exceeding it is HTTP `429` (`mcp rate limit`). Livy GET is not capped this way. The AMP profile enforces the same counters in Python.
+APISIX also applies a per-`sub` burst cap on `/mcp/spark` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW` in `.env`, default 60 per 60s). Exceeding it is HTTP `429` (`mcp rate limit`). Livy GET and WebHDFS are not capped this way. The AMP profile enforces the same counters in Python.
 
 ## What Spark does not do
 
-- No Hive SQL (see [hive.md](hive.md))
+- No Hive SQL through Spark tools (see [hive.md](hive.md) for `/mcp/hive`)
 - No Streamable HTTP (GET SSE / MCP session); hosts POST JSON-RPC to `/mcp/spark`
 - No catch-all `/cdp/*`
 - No raw Livy writes on `/cdp/livy_for_spark3*` (GET/HEAD only)
+- No WebHDFS `DELETE` (GET/HEAD/PUT only)
 - No gateway-held keytab or impersonation
 - No full executor log dump into an LLM context

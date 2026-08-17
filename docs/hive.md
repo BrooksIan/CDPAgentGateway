@@ -1,8 +1,31 @@
 # Working with Hive
 
-Hive is **inventoried**, not published. Agents cannot call HiveServer2, Beeline, or `/cdp/hive` through this gateway today. Spark remains the only CDP service on the allowlist ([spark.md](spark.md)).
+Hive has two surfaces. Agents never call HiveServer2 or Knox hostnames directly.
 
-This page is how operators store a Knox Hive JDBC URL so a future `mcp-hive` adapter can use the same cluster without guessing topologies.
+| Surface | URI | Who uses it |
+| --- | --- | --- |
+| MCP | `POST /mcp/hive` | Cursor, Claude, `gateway mcp --adapter hive` |
+| Operator probe | `gateway hive` → Knox `{KNOX_PROXY_PREFIX}/hive` | Operators |
+| HTTP allowlist | `GET /cdp/hive` | **404** (unpublished) |
+
+MCP requires `Authorization: Bearer <knox-jwt>`. The adapter forwards that bearer to Knox Hive on the **token** topology. Ranger authorizes `sub`. JDBC inventory (`gateway jdbc add`) still stores `cdp-proxy-api` URLs for later ops; it does not publish `/cdp/hive`.
+
+```mermaid
+flowchart LR
+  agent["Agent / CLI"]
+  apisix["APISIX knox-jwt"]
+  mcp["mcp-hive"]
+  knox["Knox cdp-proxy-token"]
+  hs2["HiveServer2"]
+  ranger["Ranger"]
+
+  agent -->|"POST /mcp/hive"| apisix
+  agent -.->|"GET /cdp/hive 404"| apisix
+  apisix --> mcp
+  mcp -->|"caller bearer"| knox
+  knox --> hs2
+  hs2 --> ranger
+```
 
 ## Why Hive is separate from Spark
 
@@ -11,41 +34,55 @@ CDP often puts Livy and Hive on **different Knox topologies**:
 | Service | Typical topology | Agent route today |
 | --- | --- | --- |
 | Livy for Spark 3 | `cdp-proxy-token` | `/cdp/livy_for_spark3*`, `/mcp/spark` |
-| HiveServer2 HTTP | `cdp-proxy-api` (sometimes `cdp-proxy-token`) | **none** (`/cdp/hive` → 404) |
+| HDFS WebHDFS | `cdp-proxy-token` | `/cdp/webhdfs*` (operators; `gateway webhdfs`) |
+| HiveServer2 HTTP | `cdp-proxy-api` (sometimes `cdp-proxy-token`) | `/mcp/hive` (JWT uses **token** `/hive`); `/cdp/hive` → 404 |
 
 `gateway knox` pins the **token** topology for Livy. A `cdp-proxy-api` URL is rejected there on purpose. Hive JDBC goes through `gateway jdbc add` so it cannot overwrite the Spark upstream.
-
-```mermaid
-flowchart TB
-  host["Same Knox host"]
-  token["cdp-proxy-token"]
-  api["cdp-proxy-api"]
-  livy["livy_for_spark3"]
-  hive["hive"]
-  sparkRoute["Agent: /mcp/spark and GET Livy"]
-  hiveInv[".env HIVE_* inventory"]
-  hive404["Agent: /cdp/hive 404"]
-  hiveOp["Operator: gateway hive SHOW DATABASES"]
-
-  host --> token
-  host --> api
-  token --> livy
-  token --> hive
-  api --> hive
-  livy --> sparkRoute
-  hive --> hiveInv
-  hive --> hive404
-  token --> hiveOp
-```
 
 ```
 Spark:  gateway knox  https://knox…/<env>/cdp-proxy-token/livy_for_spark3/
 Hive:   gateway jdbc add  'jdbc:hive2://knox…/;ssl=true;transportMode=http;httpPath=<env>/cdp-proxy-api/hive'
+MCP:    gateway mcp --adapter hive --mint
 ```
 
-Both must resolve to the **same Knox host** once Spark is live. The CLI refuses a JDBC URL whose host does not match `UPSTREAM_HOST`.
+Both JDBC and Livy must resolve to the **same Knox host** once Spark is live. The CLI refuses a JDBC URL whose host does not match `UPSTREAM_HOST`.
+
+## MCP tools
+
+Lab mock (`UPSTREAM_HOST=mock-cdp`) returns canned `default` / `analytics` data. Live Knox uses the caller's JWT on `{KNOX_PROXY_PREFIX}/hive`.
+
+| Tool | What it runs | Caps |
+| --- | --- | --- |
+| `hive_list_databases` | `SHOW DATABASES` | 100 names |
+| `hive_list_tables` | `SHOW TABLES IN \`db\`` | identifier required |
+| `hive_describe_table` | `DESCRIBE \`db\`.\`table\`` | identifier required |
+| `hive_select` | `SELECT cols FROM \`db\`.\`table\` LIMIT n` | named columns only; `limit` 1–50 |
+
+```bash
+gateway mcp --adapter hive --mint
+gateway mcp --adapter hive --tool hive_list_databases --mint
+gateway mcp --adapter hive --tool hive_select --arg database=default --arg table=dual --arg columns=dummy_col --arg limit=5 --mint
+```
+
+After [`examples/spark/count_to_10.py`](../examples/spark/count_to_10.py) succeeds, the same Knox `sub` can read the Iceberg table Spark registered in HMS. Hive MCP still cannot run DDL.
+
+```bash
+gateway mcp --adapter hive --tool hive_select \
+  --arg database=$USER --arg table=count_to_10 --arg columns=n --arg limit=10
+```
+
+Must not:
+
+- run DDL/DML or free-form SQL
+- accept `SELECT *` or a `WHERE` clause
+- accept JDBC passwords from the agent
+- impersonate a different Hive user than the Knox `sub`
+- dump unbounded result sets into an LLM context
+
+A valid Knox JWT plus `/cdp/hive` still returns **404**. That is a test case (P1-06), not a bug.
 
 ## Inventory a JDBC URL
+
 
 Copy the JDBC string from Hue, Data Warehouse, or a working Beeline session. It must use HTTP transport through Knox:
 
@@ -104,47 +141,10 @@ sequenceDiagram
 
 ## What is not enabled
 
-- No APISIX route for `/cdp/hive` (operator `gateway hive` talks to Knox directly)
-- No `/mcp/hive` adapter (`mcp-hive` is a later slice)
+- No APISIX route for `/cdp/hive` (MCP is `/mcp/hive`; operator `gateway hive` talks to Knox directly)
 - No Beeline/JDBC from agents
+- No free-form SQL, `WHERE`, or `SELECT *`
 - Binary Hive (`transportMode` not `http`) cannot be proxied
-
-A valid Knox JWT plus `/cdp/hive` still returns **404**. That is a test case (P1-06), not a bug.
-
-## Planned `mcp-hive` (not implemented)
-
-When it lands, it should look like Spark: APISIX `knox-jwt` on `/mcp/hive`, adapter uses the caller bearer against `{HIVE_KNOX_URL}`, Ranger authorizes `sub`.
-
-```mermaid
-flowchart LR
-  agent["Agent"]
-  apisix["APISIX knox-jwt"]
-  mcp["mcp-hive planned"]
-  knox["Knox"]
-  hs2["HiveServer2"]
-  ranger["Ranger"]
-
-  agent -->|"POST /mcp/hive"| apisix
-  apisix --> mcp
-  mcp -->|"caller bearer"| knox
-  knox --> hs2
-  hs2 --> ranger
-  agent -.->|"GET /cdp/hive today"| apisix
-  apisix -.->|"404"| agent
-```
-
-Expected first tools (read-only):
-
-- list databases / tables (capped)
-- describe table
-- `SELECT` with a hard row limit — never `SELECT *` unbounded
-
-Must not:
-
-- run DDL/DML
-- accept JDBC passwords from the agent
-- impersonate a different Hive user than the Knox `sub`
-- dump wide result sets into an LLM context
 
 ## Operator checklist
 
@@ -152,5 +152,6 @@ Must not:
 2. Paste Hive JDBC with `gateway jdbc add`
 3. Confirm `gateway jdbc show` topology and host
 4. `gateway hive` lists databases for the Knox `sub` (token topology)
-5. Confirm Ranger policies for the same `sub` on the Hive database you will allow later
-6. Leave `/cdp/hive` unpublished until `mcp-hive` exists and has tests in [testing.md](testing.md)
+5. `gateway mcp --adapter hive --tool hive_list_databases` as the same `sub`
+6. Confirm Ranger policies for that `sub` on the Hive database
+7. Keep `/cdp/hive` unpublished

@@ -37,7 +37,7 @@ curl -s "http://127.0.0.1:9090/api/status"
 
 If this admin service is down, `mcp-spark` **fails open** (allows the call). The UI badge is honest: quotas are enforcing only while you can load this page.
 
-Livy GET on `/cdp/livy_for_spark3*` is not burst-capped. Ranger still authorizes data for allowed calls.
+Livy GET on `/cdp/livy_for_spark3*` and WebHDFS on `/cdp/webhdfs*` are not burst-capped. Ranger still authorizes data for allowed calls.
 
 ## Quotas
 

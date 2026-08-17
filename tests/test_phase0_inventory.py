@@ -30,8 +30,10 @@ def test_first_tools_are_read_only() -> None:
     assert tools, "Phase 0 needs at least one tool"
     for tool in tools:
         assert tool["access"] == "read"
-        assert tool["method"] in {"GET", "HEAD"}
+        assert tool["method"] in {"GET", "HEAD", "POST"}
         assert tool["path"].startswith("/")
+        if tool["method"] == "POST":
+            assert tool["path"].startswith("/mcp/")
 
 
 def test_threat_model_covers_auth_bypass_cases() -> None:

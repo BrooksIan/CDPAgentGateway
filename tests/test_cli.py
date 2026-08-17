@@ -27,7 +27,7 @@ def run_gateway(*args: str, check: bool = True) -> subprocess.CompletedProcess[s
 def test_help_lists_operator_commands() -> None:
     result = run_gateway("--help")
     assert result.returncode == 0
-    for command in ("init", "up", "down", "test", "token", "call", "spark", "hive", "mcp", "admin", "doctor", "knox", "jdbc", "fetch-jwks"):
+    for command in ("init", "up", "down", "test", "token", "call", "spark", "webhdfs", "hive", "mcp", "admin", "doctor", "knox", "jdbc", "fetch-jwks"):
         assert command in result.stdout
 
 
@@ -57,6 +57,13 @@ def test_jdbc_help_lists_add_show_clear() -> None:
         assert command in result.stdout
 
 
+def test_webhdfs_help_lists_ls_stat_mkdir_put() -> None:
+    result = run_gateway("webhdfs", "--help")
+    assert result.returncode == 0
+    for command in ("ls", "stat", "mkdir", "put"):
+        assert command in result.stdout
+
+
 def test_doctor_passes_after_init() -> None:
     run_gateway("init", check=True)
     result = run_gateway("doctor", check=False)
@@ -72,6 +79,11 @@ def test_config_writes_apisix_yaml() -> None:
     assert "knox-jwt" in text
     assert "livy_for_spark3" in text
     assert "mcp-spark" in text
+    assert "mcp-hive" in text
+    assert "uri: /mcp/hive*" in text
+    assert "uri: /cdp/hive" not in text
     assert 'uri: /cdp/livy_for_spark3*' in text
+    assert 'uri: /cdp/webhdfs*' in text
     assert 'methods: ["GET", "HEAD"]' in text
+    assert 'methods: ["GET", "HEAD", "PUT"]' in text
     assert 'methods: ["GET", "HEAD", "POST", "PUT", "DELETE"]' not in text

@@ -1,4 +1,4 @@
-"""Cloudera AI / CML AMP runtime: Python Knox JWT in front of mcp-spark.
+"""Cloudera AI / CML AMP runtime: Python Knox JWT in front of mcp-spark and mcp-hive.
 
 Compose still uses APISIX + knox-jwt.lua. This profile is optional and live-Knox only.
 """
@@ -234,6 +234,32 @@ def build_mcp_app() -> Starlette:
             Route("/mcp/", mcp.mcp_endpoint, methods=["GET", "POST"]),
             Route("/mcp/spark", mcp.mcp_endpoint, methods=["GET", "POST"]),
             Route("/mcp/spark/", mcp.mcp_endpoint, methods=["GET", "POST"]),
+        ]
+    )
+    limiter = BurstLimiter(
+        _int_env("MCP_RATE_COUNT", 60),
+        _int_env("MCP_RATE_WINDOW", 60),
+    )
+    return KnoxJWTMiddleware(app, public_key_file=amp_public_key_path(), limiter=limiter)
+
+
+def build_hive_mcp_app() -> Starlette:
+    apply_live_upstream()
+    mcp = _load_module("amp_mcp_hive_server", "mcp-hive")
+
+    async def root(request: Request) -> Response:
+        if request.method == "GET":
+            return JSONResponse({"status": "ok", "service": "mcp-hive", "profile": "amp"})
+        return await mcp.mcp_endpoint(request)
+
+    app = Starlette(
+        routes=[
+            Route("/health", mcp.health, methods=["GET"]),
+            Route("/", root, methods=["GET", "POST"]),
+            Route("/mcp", mcp.mcp_endpoint, methods=["GET", "POST"]),
+            Route("/mcp/", mcp.mcp_endpoint, methods=["GET", "POST"]),
+            Route("/mcp/hive", mcp.mcp_endpoint, methods=["GET", "POST"]),
+            Route("/mcp/hive/", mcp.mcp_endpoint, methods=["GET", "POST"]),
         ]
     )
     limiter = BurstLimiter(

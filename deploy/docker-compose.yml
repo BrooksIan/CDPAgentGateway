@@ -45,6 +45,33 @@ services:
       admin:
         condition: service_healthy
 
+  mcp-hive:
+    build: ./mcp-hive
+    environment:
+      PORT: "8080"
+      GATEWAY_MODE: ${GATEWAY_MODE:-local}
+      UPSTREAM_SCHEME: ${UPSTREAM_SCHEME:-http}
+      UPSTREAM_HOST: ${UPSTREAM_HOST:-mock-cdp}
+      UPSTREAM_PORT: ${UPSTREAM_PORT:-8080}
+      UPSTREAM_TLS_VERIFY: ${UPSTREAM_TLS_VERIFY:-false}
+      KNOX_PROXY_PREFIX: ${KNOX_PROXY_PREFIX:-/gateway/cdp-proxy-token}
+      ADMIN_URL: http://admin:8080
+      ADMIN_INTERNAL_TOKEN: ${ADMIN_INTERNAL_TOKEN:-lab-admin}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    depends_on:
+      mock-cdp:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+
   admin:
     build: ./admin
     environment:
@@ -54,6 +81,7 @@ services:
       MCP_RATE_WINDOW: ${MCP_RATE_WINDOW:-60}
       APISIX_HEALTH_URL: http://apisix:9080/health
       MCP_SPARK_HEALTH_URL: http://mcp-spark:8080/health
+      MCP_HIVE_HEALTH_URL: http://mcp-hive:8080/health
     volumes:
       - ./data:/data
     ports:
@@ -70,6 +98,8 @@ services:
       mock-cdp:
         condition: service_healthy
       mcp-spark:
+        condition: service_healthy
+      mcp-hive:
         condition: service_healthy
       admin:
         condition: service_healthy

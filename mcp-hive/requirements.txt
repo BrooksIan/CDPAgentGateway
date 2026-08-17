@@ -1,0 +1,4 @@
+httpx
+starlette
+uvicorn
+impyla>=0.19

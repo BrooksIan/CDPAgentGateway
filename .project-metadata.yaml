@@ -115,6 +115,21 @@ tasks:
       the same bearer to Knox. Do not paste tokens into git or project files.
 
   - type: start_application
+    name: Hive MCP
+    subdomain: mcp-hive
+    static_subdomain: true
+    bypass_authentication: true
+    script: 5_app-mcp-hive/app.py
+    cpu: 1
+    memory: 2
+    kernel: python3
+    short_summary: Read-only Hive MCP JSON-RPC. Requires Knox JWT. /cdp/hive stays unpublished.
+    long_summary: >-
+      Lists databases/tables, describe, and column SELECT (limit 50, no SELECT *)
+      as the Knox token subject. Ranger authorizes that subject. CML cookies are
+      not the user credential.
+
+  - type: start_application
     name: Operator admin
     subdomain: gateway-admin
     static_subdomain: true

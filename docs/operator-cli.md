@@ -12,6 +12,7 @@ gateway up            # docker compose up --build
 gateway test          # pytest -m "not live"
 gateway doctor --ping
 gateway spark --mint  # GET /cdp/livy_for_spark3/sessions with a mock JWT
+gateway webhdfs ls --mint /
 gateway mcp --mint    # list Spark MCP tools
 gateway admin         # operator usage/quota/audit UI on :9090
 gateway logs -f
@@ -30,16 +31,25 @@ gateway token set                 # paste JWT, or: gateway token set eyJ...
 gateway token show                # claims only
 gateway up
 gateway spark                     # uses KNOX_TOKEN
+gateway webhdfs put examples/spark/count_to_10.py /user/you/examples/count_to_10.py
 gateway hive                      # SHOW DATABASES via Knox token/hive
 gateway mcp                       # list Spark MCP tools
 gateway mcp --tool spark_list_batches
-gateway mcp --tool spark_submit_batch --arg file=hdfs:///user/you/examples/count_to_10.py
+gateway mcp --adapter hive --tool hive_list_databases
+gateway mcp --tool spark_submit_batch --arg file=hdfs:///user/you/examples/count_to_10.py --arg args=you,count_to_10
 gateway test --live
 ```
 
 `gateway knox --local` resets upstream to mock CDP. `gateway knox --show` prints the current upstream and the agent URL.
 
-Spark usage: [spark.md](spark.md). Hive JDBC is a separate inventory command (`cdp-proxy-api` is not the Livy token topology):
+Spark usage: [spark.md](spark.md). Stage `count_to_10.py` with WebHDFS, then submit:
+
+```bash
+gateway webhdfs put examples/spark/count_to_10.py /user/you/examples/count_to_10.py
+gateway mcp --tool spark_submit_batch --arg file=hdfs:///user/you/examples/count_to_10.py
+```
+
+Hive JDBC is a separate inventory command (`cdp-proxy-api` is not the Livy token topology):
 
 ```bash
 gateway jdbc add 'jdbc:hive2://knox.example.cloudera.site/;ssl=true;transportMode=http;httpPath=env/cdp-proxy-api/hive'
@@ -47,7 +57,7 @@ gateway jdbc show
 gateway jdbc clear
 ```
 
-That stores `HIVE_*` in `.env` for later `mcp-hive`. It does **not** publish `/cdp/hive`. Details: [hive.md](hive.md). `gateway knox` still pins `cdp-proxy-token` (Livy). `gateway knox` with a `cdp-proxy-api` URL is rejected and points at `gateway jdbc add`.
+That stores `HIVE_*` in `.env`. It does **not** publish `/cdp/hive`. Agents use `/mcp/hive`. Details: [hive.md](hive.md).
 
 Knox JWTs (`aud=cdp-proxy-token`) run Hive SQL on the **token** topology. Operator probe (needs `impyla`):
 
@@ -74,8 +84,9 @@ This talks to Knox `{KNOX_PROXY_PREFIX}/hive` with `KNOX_TOKEN`. It is not an ag
 | `fetch-jwks` | Download JWKS → `conf/keys/knox-live.pem` |
 | `token mint\|set\|show\|clear` | Mock mint, store, inspect, or drop `KNOX_TOKEN` |
 | `spark [resource]` | `GET /cdp/livy_for_spark3/<resource>` (default `sessions`). Writes are MCP-only. |
+| `webhdfs ls\|stat\|mkdir\|put` | Knox WebHDFS through `/cdp/webhdfs` (JWT). Stage Spark `file` URIs. No `DELETE`. |
 | `hive [databases]` | `SHOW DATABASES` on Knox `{prefix}/hive` (JWT; not `/cdp/hive`) |
-| `mcp [--tool NAME]` | JSON-RPC to `/mcp/spark` (`tools/list` or `tools/call`) |
+| `mcp [--adapter spark\|hive] [--tool NAME]` | JSON-RPC to `/mcp/spark` or `/mcp/hive` |
 | `admin [--open]` | Operator usage/quota/audit UI at `http://127.0.0.1:9090` (not an agent route) |
 | `call [path]` | Call an arbitrary gateway path with a bearer |
 

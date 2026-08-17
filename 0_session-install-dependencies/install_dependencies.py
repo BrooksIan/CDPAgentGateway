@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "-e", f"{ROOT}[amp]"],
+        [sys.executable, "-m", "pip", "install", "-e", f"{ROOT}[amp,hive]"],
         cwd=ROOT,
     )
     return 0

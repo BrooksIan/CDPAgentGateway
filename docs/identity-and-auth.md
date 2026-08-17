@@ -57,7 +57,7 @@ The [APISIX authentication guide](https://apisix.apache.org/learning-center/api-
 1. Operator obtains a Knox JWT from Token Generation or Token API v2.
 2. `gateway knox https://…/cdp-proxy-token/livy_for_spark3/` writes the live upstream.
 3. `gateway token set` stores the JWT in `.env` as `KNOX_TOKEN` (never printed) and refreshes JWKS from a pinned `jku` when present.
-4. `gateway up` then `gateway spark` or `gateway mcp` (or an MCP host) sends `Authorization: Bearer` to `http://127.0.0.1:9080`.
+4. `gateway up` then `gateway spark`, `gateway webhdfs`, or `gateway mcp` (or an MCP host) sends `Authorization: Bearer` to `http://127.0.0.1:9080`.
 5. APISIX validates signature, `iss`, `sub`, and `exp`, then forwards the same header to Knox.
 
 ## Audit

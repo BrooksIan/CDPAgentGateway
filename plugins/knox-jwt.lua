@@ -15,12 +15,17 @@ local schema = {
         clock_skew = {type = "integer", minimum = 0, default = 60},
         realm = {type = "string", default = "knox"},
         hide_credentials = {type = "boolean", default = false},
+        resource_metadata = {type = "string", default = ""},
+        token_state_url = {type = "string", default = ""},
+        token_state_host = {type = "string", default = ""},
+        token_state_tls_verify = {type = "boolean", default = false},
+        token_state_timeout = {type = "integer", minimum = 1, default = 2000},
     },
     required = {"public_key_file"},
 }
 
 local _M = {
-    version = 0.1,
+    version = 0.2,
     priority = 2598,
     name = plugin_name,
     schema = schema,
@@ -28,8 +33,16 @@ local _M = {
 
 local key_cache = {}
 
+local function www_authenticate(conf)
+    local value = "Bearer realm=\"" .. conf.realm .. "\""
+    if conf.resource_metadata and conf.resource_metadata ~= "" then
+        value = value .. ", resource_metadata=\"" .. conf.resource_metadata .. "\""
+    end
+    return value
+end
+
 local function unauthorized(conf, reason)
-    core.response.set_header("WWW-Authenticate", "Bearer realm=\"" .. conf.realm .. "\"")
+    core.response.set_header("WWW-Authenticate", www_authenticate(conf))
     core.response.set_header("X-Agent-Gateway-Reason", reason)
     return 401, { error = "unauthorized", reason = reason }
 end
@@ -79,6 +92,74 @@ local function bearer_token(conf, ctx)
     return nil, "missing_token"
 end
 
+local function url_host(url)
+    if not url or url == "" then
+        return nil
+    end
+    local m = ngx.re.match(url, [[^https?://([^/:]+)]], "jo")
+    if not m then
+        return nil
+    end
+    return m[1]
+end
+
+local function check_token_state(conf, token_id, managed)
+    local base = conf.token_state_url
+    if not base or base == "" then
+        return true
+    end
+    if not token_id or token_id == "" then
+        if managed == "true" or managed == true then
+            return false, "missing_token_id"
+        end
+        return true
+    end
+    local expected = conf.token_state_host
+    local host = url_host(base)
+    if not host then
+        core.log.error("knox-jwt token_state_url is not an http(s) URL")
+        return false, "token_state_unavailable"
+    end
+    if expected and expected ~= "" and host ~= expected then
+        core.log.error("knox-jwt token_state host is not the pinned Knox host")
+        return false, "token_state_unavailable"
+    end
+
+    local ok, http = pcall(require, "resty.http")
+    if not ok then
+        core.log.error("knox-jwt resty.http is unavailable")
+        return false, "token_state_unavailable"
+    end
+    local httpc = http.new()
+    httpc:set_timeout(conf.token_state_timeout or 2000)
+    local url = base:gsub("/+$", "") .. "/" .. ngx.escape_uri(token_id)
+    local res, err = httpc:request_uri(url, {
+        method = "GET",
+        ssl_verify = conf.token_state_tls_verify and true or false,
+        headers = { Accept = "application/json" },
+    })
+    if not res then
+        core.log.error("knox-jwt token_state request failed: ", err)
+        return false, "token_state_unavailable"
+    end
+    if res.status == 404 then
+        return false, "revoked"
+    end
+    if res.status ~= 200 then
+        core.log.error("knox-jwt token_state status ", res.status)
+        return false, "token_state_unavailable"
+    end
+    local body = core.json.decode(res.body)
+    if type(body) ~= "table" then
+        return false, "token_state_unavailable"
+    end
+    local enabled = body.enabled
+    if enabled == false or enabled == "false" or enabled == 0 then
+        return false, "revoked"
+    end
+    return true
+end
+
 function _M.check_schema(conf)
     return core.schema.check(schema, conf)
 end
@@ -125,6 +206,11 @@ function _M.rewrite(conf, ctx)
     end
     if payload.nbf and payload.nbf > (now + skew) then
         return unauthorized(conf, "not_yet_valid")
+    end
+
+    local ok_state, state_reason = check_token_state(conf, payload["knox.id"], payload["managed.token"])
+    if not ok_state then
+        return unauthorized(conf, state_reason)
     end
 
     ctx.knox_user = payload.sub

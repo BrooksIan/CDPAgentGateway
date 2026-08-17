@@ -25,10 +25,11 @@ APISIX standalone config is rendered from `conf/apisix.yaml.tpl` into `conf/gene
 | Gateway URI | Methods | Auth | Upstream rewrite |
 | --- | --- | --- | --- |
 | `/health` | GET | None | Mock JSON on APISIX (does not call Knox) |
+| `/.well-known/oauth-protected-resource` | GET | None | RFC 9728 protected-resource metadata (does not call Knox) |
 | `/cdp/livy_for_spark3*` | GET, HEAD | `knox-jwt` | `{KNOX_PROXY_PREFIX}/livy_for_spark3...` |
 | `/cdp/webhdfs*` | GET, HEAD, PUT | `knox-jwt` | `{KNOX_PROXY_PREFIX}/webhdfs...` (v1 and data path) |
-| `/mcp/spark*` | GET, HEAD, POST, DELETE | `knox-jwt` + `limit-count` | `mcp-spark:8080/mcp` |
-| `/mcp/hive*` | GET, HEAD, POST, DELETE | `knox-jwt` + `limit-count` | `mcp-hive:8080/mcp` |
+| `/mcp/spark*` | GET, HEAD, POST, DELETE | `knox-jwt` + `key-auth` + `limit-count` | `mcp-spark:8080/mcp` |
+| `/mcp/hive*` | GET, HEAD, POST, DELETE | `knox-jwt` + `key-auth` + `limit-count` | `mcp-hive:8080/mcp` |
 
 Example: `GET http://127.0.0.1:9080/cdp/livy_for_spark3/sessions` becomes `GET {knox}/gateway/cdp-proxy-token/livy_for_spark3/sessions` (prefix varies on Public Cloud). `POST`/`PUT`/`DELETE` on that Livy prefix return **404** (or 405). Submit goes through `/mcp/spark` (`spark_submit_batch`). Interactive `POST .../sessions/{id}/statements` is not a route.
 
@@ -51,6 +52,7 @@ Use Backend-for-Frontend routes per agent class rather than one catch-all proxy:
 - Phase 1: Livy for Spark 3 (`GET /cdp/livy_for_spark3/sessions` via `gateway spark`) — [spark.md](spark.md)
 - Phase 1: WebHDFS (`/cdp/webhdfs*`) for operator file staging (`gateway webhdfs`) — [spark.md](spark.md)
 - Phase 2: MCP Spark at `/mcp/spark` and read-only Hive at `/mcp/hive`. `/cdp/hive` stays 404.
+- Phase 3: RFC 9728 PRM; MCP caller key (`X-Agent-Key`); optional Knox token-state; Spark log redaction. PKCE broker and mTLS wait.
 - Hive: MCP `/mcp/hive` (list/describe/select); JDBC inventory; `/cdp/hive` 404 — [hive.md](hive.md)
 - Partner write (explicitly allowlisted tools only)
 - Internal ops (operator admin UI on `127.0.0.1:9090`, usage, quotas, audit join) — [admin.md](admin.md)

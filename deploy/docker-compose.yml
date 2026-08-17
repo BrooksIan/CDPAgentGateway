@@ -9,6 +9,7 @@ services:
       JWKS_PATH: /keys/jwks.json
       PORT: "8080"
       KNOX_PROXY_PREFIX: ${KNOX_PROXY_PREFIX:-/gateway/cdp-proxy-token}
+      MOCK_REVOKED_TOKEN_IDS: ${MOCK_REVOKED_TOKEN_IDS:-revoked-token-id}
     volumes:
       - ./conf/keys:/keys:ro
     expose:

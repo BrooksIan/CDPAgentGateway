@@ -80,4 +80,4 @@ Record anything specific to this cluster. Defaults in [testing.md](testing.md):
 
 ## Blockers
 
-None for Phase 1/2 on `go01-obser-de` (2026-08-17). Livy is on `cdp-proxy-token`; Hive MCP uses the token topology `/hive`. Do not pass `--mint` against Knox JWKS. Phase 3 still open: mTLS/caller keys, OAuth PRM, revocation check vs long-lived managed tokens.
+None for Phase 1/2 on `go01-obser-de` (2026-08-17). Livy is on `cdp-proxy-token`; Hive MCP uses the token topology `/hive`. Do not pass `--mint` against Knox JWKS. Phase 3: Compose MCP needs `X-Agent-Key`; live Knox token-state URL is unset (signature + `exp` only). PKCE broker and mTLS still open.

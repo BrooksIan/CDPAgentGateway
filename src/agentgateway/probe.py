@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 
-from agentgateway.env import gateway_url
+from agentgateway.env import agent_headers, gateway_url
 
 
 def request_path(
@@ -19,7 +19,7 @@ def request_path(
     return httpx.request(
         method.upper(),
         url,
-        headers={"Authorization": f"Bearer {token}"},
+        headers=agent_headers(token, path=path),
         params=params,
         timeout=timeout,
         follow_redirects=False,

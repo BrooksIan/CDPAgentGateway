@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
 
 from dotenv import dotenv_values
 
@@ -76,6 +79,88 @@ def admin_url(values: dict[str, str] | None = None) -> str:
     return env.get("ADMIN_URL") or f"http://127.0.0.1:{env.get('ADMIN_PORT', '9090')}"
 
 
+def public_gateway_url(values: dict[str, str] | None = None) -> str:
+    env = values or load_env()
+    configured = (env.get("GATEWAY_PUBLIC_URL") or env.get("GATEWAY_URL") or "").strip()
+    if configured:
+        return configured.rstrip("/")
+    return gateway_url(env).rstrip("/")
+
+
+def resource_metadata_url(values: dict[str, str] | None = None) -> str:
+    env = values or load_env()
+    configured = (env.get("RESOURCE_METADATA_URL") or "").strip()
+    if configured:
+        return configured
+    return f"{public_gateway_url(env)}/.well-known/oauth-protected-resource"
+
+
+def oauth_prm_document(values: dict[str, str] | None = None) -> dict[str, Any]:
+    env = values or load_env()
+    resource = public_gateway_url(env)
+    servers: list[str] = []
+    raw = (env.get("KNOX_AUTHORIZATION_SERVER") or "").strip()
+    if raw:
+        servers = [raw]
+    return {
+        "resource": resource,
+        "authorization_servers": servers,
+        "bearer_methods_supported": ["header"],
+        "resource_signing_alg_values_supported": ["RS256"],
+        "scopes_supported": ["cdp"],
+    }
+
+
+def agent_caller_key(values: dict[str, str] | None = None) -> str:
+    env = values or load_env()
+    return (env.get("AGENT_CALLER_KEY") or "").strip()
+
+
+def agent_headers(token: str, *, path: str = "") -> dict[str, str]:
+    headers = {"Authorization": f"Bearer {token}"}
+    if path.startswith("/mcp"):
+        key = agent_caller_key()
+        if key:
+            headers["X-Agent-Key"] = key
+    return headers
+
+
+def token_state_url(values: dict[str, str] | None = None) -> str:
+    env = values or load_env()
+    explicit = (env.get("KNOX_TOKEN_STATE_URL") or "").strip()
+    if explicit:
+        return explicit.rstrip("/")
+    mode = env.get("GATEWAY_MODE") or "local"
+    host = env.get("UPSTREAM_HOST") or "mock-cdp"
+    if mode == "local" and host == "mock-cdp":
+        return "http://mock-cdp:8080/gateway/homepage/knoxtoken/api/v2/token/state"
+    return ""
+
+
+def _consumers_block(key: str) -> str:
+    if not key:
+        return ""
+    quoted = json.dumps(key)
+    return (
+        "consumers:\n"
+        "  - username: agent-platform\n"
+        "    plugins:\n"
+        "      key-auth:\n"
+        f"        key: {quoted}\n"
+        "\n"
+    )
+
+
+def _mcp_key_auth_block(key: str) -> str:
+    if not key:
+        return ""
+    return (
+        "      key-auth:\n"
+        "        header: X-Agent-Key\n"
+        "        hide_credentials: true\n"
+    )
+
+
 def _positive_int(values: dict[str, str], key: str, default: str) -> str:
     raw = values.get(key) or default
     try:
@@ -100,7 +185,24 @@ def render_apisix_yaml(template: str, values: dict[str, str]) -> str:
     else:
         tls_block = ""
 
-    rendered = template.replace("{{TLS_BLOCK}}", tls_block)
+    caller_key = agent_caller_key(merged)
+    state_url = token_state_url(merged)
+    if state_url:
+        parsed = urlparse(state_url)
+        if parsed.hostname and parsed.hostname != merged["UPSTREAM_HOST"]:
+            raise ValueError("KNOX_TOKEN_STATE_URL host must match UPSTREAM_HOST")
+    prm = json.dumps(oauth_prm_document(merged), separators=(",", ":"))
+    extras = {
+        "TLS_BLOCK": tls_block,
+        "CONSUMERS_BLOCK": _consumers_block(caller_key),
+        "MCP_KEY_AUTH_BLOCK": _mcp_key_auth_block(caller_key),
+        "RESOURCE_METADATA_URL": resource_metadata_url(merged),
+        "KNOX_TOKEN_STATE_URL": state_url,
+        "OAUTH_PRM_JSON": prm,
+    }
+    rendered = template
+    for key, value in extras.items():
+        rendered = rendered.replace("{{" + key + "}}", value)
     for key in REQUIRED_RENDER_KEYS:
         rendered = rendered.replace("{{" + key + "}}", merged[key])
     if "{{" in rendered:

@@ -4,7 +4,7 @@ from typing import Any
 
 import httpx
 
-from agentgateway.env import gateway_url
+from agentgateway.env import agent_headers, gateway_url
 from agentgateway.knox import HIVE_MCP_PATH, SPARK_MCP_PATH
 
 ADAPTERS = {
@@ -37,7 +37,7 @@ def mcp_rpc(
         url,
         json=payload,
         headers={
-            "Authorization": f"Bearer {token}",
+            **agent_headers(token, path=mcp_path(adapter)),
             "Accept": "application/json",
             "Content-Type": "application/json",
         },

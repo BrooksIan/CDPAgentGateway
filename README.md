@@ -48,8 +48,8 @@ Enterprises want coding and analytics agents to submit Spark jobs and query Hive
 ## Key Features
 
 - Knox JWT at the agent edge — no second token format, no APISIX-minted user credentials
-- Dual identity — registered agent (caller key or mTLS later) plus CDP user (`sub` / `knox.id`)
-- Fail-closed proxy — missing, expired, wrong-issuer, and algorithm-confused tokens never reach Knox
+- Dual identity — Compose MCP `X-Agent-Key` names the agent product; Knox JWT `sub` / `knox.id` is the CDP user. AMP is JWT-only (CML project is the agent).
+- RFC 9728 PRM — `GET /.well-known/oauth-protected-resource`; `401 WWW-Authenticate` includes `resource_metadata`
 - Spark allowlist — MCP `/mcp/spark` (list, get, log, submit); Livy HTTP is GET/HEAD only; WebHDFS GET/HEAD/PUT for operator file staging
 - Hive MCP — `/mcp/hive` list/describe/select (no `SELECT *`, limit 50); `/cdp/hive` stays 404
 - Hive JDBC inventory — `gateway jdbc add` stores Knox JDBC; `gateway hive` lists databases
@@ -112,7 +112,7 @@ Spark MCP is the published Spark path. Operators stage HDFS files at `/cdp/webhd
 
 | Component | Role |
 | --- | --- |
-| Apache APISIX | Agent-facing HTTP edge (Compose): Knox JWT plugin, allowlisted routes, request IDs |
+| Apache APISIX | Agent-facing HTTP edge (Compose): Knox JWT plugin, RFC 9728 PRM, MCP caller keys, allowlisted routes, request IDs |
 | Python `knox-jwt` | Same RS256 / `iss` / `exp` / `sub` checks for the optional CML AMP profile |
 | `knox-jwt` plugin | RS256, `iss=KNOXSSO`, expiry; pinned PEM; forwards `Authorization` |
 | `mcp-spark` | Livy MCP tools (list/get/log/submit); not an APISIX plugin |

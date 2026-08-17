@@ -80,6 +80,20 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        state_prefix = "/gateway/homepage/knoxtoken/api/v2/token/state/"
+        if path.startswith(state_prefix):
+            token_id = path[len(state_prefix) :].strip("/")
+            revoked = {
+                item.strip()
+                for item in (os.environ.get("MOCK_REVOKED_TOKEN_IDS") or "revoked-token-id").split(",")
+                if item.strip()
+            }
+            if not token_id or token_id in revoked:
+                self._send(200, {"id": token_id, "enabled": False})
+                return
+            self._send(200, {"id": token_id, "enabled": True})
+            return
+
         if "/livy_for_spark3" in path:
             user = self._require_knox(parsed)
             if user is None:
@@ -218,11 +232,18 @@ class Handler(BaseHTTPRequestHandler):
             "appId": "application_1",
             "owner": user,
         }
+        forwarded = self.headers.get("X-Knox-User")
+        identity = {
+            "knox_user": user,
+            "x_knox_user": forwarded or user,
+            "token_id": self.headers.get("X-Knox-Token-Id"),
+            "authorization_present": True,
+        }
         if rest in {"/", "/sessions"}:
-            self._send(200, {"from": 0, "total": 0, "sessions": [], "knox_user": user})
+            self._send(200, {"from": 0, "total": 0, "sessions": [], **identity})
             return
         if rest == "/batches":
-            self._send(200, {"from": 0, "total": 1, "sessions": [batch], "knox_user": user})
+            self._send(200, {"from": 0, "total": 1, "sessions": [batch], **identity})
             return
         if rest == "/batches/0":
             self._send(200, batch)

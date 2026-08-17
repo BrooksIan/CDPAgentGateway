@@ -63,6 +63,6 @@ Usage is per UTC day, keyed by Knox `sub`. Click a request id in Activity (or pa
 ## What it is not
 
 - Not Ranger and not a CDP user directory
-- Not TLS, mTLS, or partner caller keys (Phase 3)
+- Not TLS or partner mTLS (caller keys are on MCP `:9080`, not this UI)
 - Not an agent route (`GET /admin` on `:9080` is 404)
 - Not a Livy / Cloudera Manager console (no job kill, no cluster metrics, no JWT paste)

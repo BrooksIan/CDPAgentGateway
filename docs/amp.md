@@ -70,10 +70,10 @@ The application URL is the MCP endpoint (POST JSON-RPC, no Streamable HTTP):
 | Principal | AMP |
 | --- | --- |
 | End user | Knox JWT (`sub`, `knox.id`) — same as Compose |
-| Agent platform | CML project + `mcp-spark` / `mcp-hive` subdomain until Phase 3 caller keys |
+| Agent platform | CML project + `mcp-spark` / `mcp-hive` subdomain (JWT-only; Compose MCP uses `X-Agent-Key`) |
 | Authorization | Ranger via Knox; no impersonation |
 
-AMP is JWT-only. Phase 3 mTLS does not map onto CML application URLs.
+AMP is JWT-only for the agent product. Compose MCP caller keys and Phase 3 mTLS do not map onto CML application URLs. AMP still publishes `/.well-known/oauth-protected-resource` and `resource_metadata` on `401`.
 
 ## Operator files
 

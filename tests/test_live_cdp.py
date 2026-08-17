@@ -6,7 +6,7 @@ import os
 import httpx
 import pytest
 
-from agentgateway.env import gateway_url, load_env
+from agentgateway.env import agent_caller_key, gateway_url, load_env
 
 pytestmark = pytest.mark.live
 
@@ -26,7 +26,11 @@ def _base() -> str:
 
 
 def _auth() -> dict[str, str]:
-    return {"Authorization": f"Bearer {_token()}", "Accept": "application/json"}
+    headers = {"Authorization": f"Bearer {_token()}", "Accept": "application/json"}
+    key = agent_caller_key(_ENV)
+    if key:
+        headers["X-Agent-Key"] = key
+    return headers
 
 
 def _mcp_payload(response) -> dict:

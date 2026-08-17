@@ -94,14 +94,22 @@ Python Knox JWT and CML packaging. Compose tests above stay the source of truth 
 | AMP-04 | JWKS host pin on AMP fetch | Foreign `jku` host refused before download | `tests/test_knox_jwt.py` |
 | AMP-05 | Workbench import against live Knox | MCP `tools/list` through the CML app HTTPS URL | Manual; record below without tokens |
 
+## Phase 3 — Third-party ready
+
+| ID | Case | Expected | Automated |
+| --- | --- | --- | --- |
+| P3-01 | `401` includes RFC 9728 resource metadata | `WWW-Authenticate` has `resource_metadata=`; `GET /.well-known/oauth-protected-resource` is public JSON | `tests/test_gateway_auth.py`, `tests/test_amp_mcp.py`, `tests/test_knox_jwt.py` |
+| P3-02 | Revoked-but-unexpired Knox token is rejected | Managed JWT with `knox.id` disabled at token-state → `401` `revoked`; foreign token-state host refused | `tests/test_knox_jwt.py`; APISIX `tests/test_gateway_auth.py` (mock-cdp) |
+| P3-03 | Partner without caller key is rejected | Valid Knox JWT on `/mcp/spark` without `X-Agent-Key` → `401`; Livy GET still `200` | `tests/test_mcp_spark.py`, `tests/test_apisix_render.py` |
+| P3-04 | Spark logs redact JWT-shaped secrets | `spark_get_log` / `truncate_log` replaces `eyJ…` and `Bearer …` with `[redacted]` | `tests/test_mcpspark_livy.py` |
+
 ## Later phases (do not implement yet)
 
 | ID | Case | Phase |
 | --- | --- | --- |
 | — | Streamable HTTP / GET SSE / MCP session | Held; POST JSON-RPC is the `/mcp/spark` and `/mcp/hive` contract |
-| P3-01 | `401` includes RFC 9728 resource metadata | 3 |
-| P3-02 | Revoked-but-unexpired Knox token is rejected | 3 |
-| P3-03 | Partner without mTLS/caller key is rejected | 3 |
+| P3-05 | MCP OAuth PKCE broker exchanges into a Knox JWT | 3 (IdP) |
+| P3-06 | Partner without mTLS is rejected on TLS listener | 3 (after HTTPS) |
 
 ## Results log
 

@@ -10,7 +10,7 @@ Read [docs/architecture.md](docs/architecture.md) and [docs/identity-and-auth.md
 
 - Keep Knox as the CDP perimeter. Do not replace it with AISIX, Kong, or a custom auth service.
 - Validate Knox-issued RS256 JWTs. Do not use APISIX `jwt-auth` as the primary authenticator (it mints APISIX tokens).
-- Bind two identities on every request: agent consumer (mTLS or caller key) and Knox `sub`.
+- Bind two identities on MCP: agent caller key (`X-Agent-Key`) and Knox `sub`. Operator Livy/WebHDFS are JWT-only. AMP is JWT-only (CML project is the agent).
 - Ranger remains authorization. Never impersonate a different user than the token `sub`.
 - MCP adapters are upstream services, not APISIX plugins and not the experimental `mcp-bridge`.
 - Optional CML AMP packaging lives in `.project-metadata.yaml` and `docs/amp.md`. Do not flip `launchable: true` without a workbench proof. Do not run Compose inside CML.
@@ -26,11 +26,11 @@ Read [docs/architecture.md](docs/architecture.md) and [docs/identity-and-auth.md
 5. Execute cases in [docs/testing.md](docs/testing.md); record results without tokens.
 6. Keep `README.md` catalog sections and `METADATA.yaml` in sync when the product story changes.
 
-Current target: **Phase 2 live-proven** (Spark MCP submit + read-only Hive MCP `hive_select` of `{sub}.count_to_10` on `go01-obser-de`). Next is **Phase 3** (partner mTLS/caller keys, OAuth PRM, token revocation). Hive tools stay list/describe/select only.
+Current target: **Phase 3 third-party ready** (RFC 9728 PRM, MCP `X-Agent-Key`, local Knox token-state, Spark log redaction). PKCE broker and mTLS wait. Spark `spark_submit_batch` is a write as the Knox subject. Hive tools stay list/describe/select only.
 
 ## Runtime agents (Cursor, Claude)
 
-Call `http://127.0.0.1:9080/mcp/spark` or `http://127.0.0.1:9080/mcp/hive` with the **user's Knox JWT** as `Authorization: Bearer`. How-to: [docs/spark.md](docs/spark.md), [docs/hive.md](docs/hive.md). Optional AMP URL: [docs/amp.md](docs/amp.md). Do not call Knox or raw Livy writes. `/cdp/livy_for_spark3*` is GET/HEAD only. `/cdp/webhdfs*` is operator staging (`gateway webhdfs`), not an MCP tool. `/cdp/hive` is 404. Do not log or echo the bearer.
+Call `http://127.0.0.1:9080/mcp/spark` or `http://127.0.0.1:9080/mcp/hive` with the **user's Knox JWT** as `Authorization: Bearer` and Compose caller key `X-Agent-Key: lab-agent` (or `$AGENT_CALLER_KEY`). How-to: [docs/spark.md](docs/spark.md), [docs/hive.md](docs/hive.md). Optional AMP URL: [docs/amp.md](docs/amp.md) (JWT only). Do not call Knox or raw Livy writes. `/cdp/livy_for_spark3*` is GET/HEAD only. `/cdp/webhdfs*` is operator staging (`gateway webhdfs`), not an MCP tool. `/cdp/hive` is 404. Do not log or echo the bearer.
 
 Spark tools: `spark_list_sessions`, `spark_list_batches`, `spark_get_batch`, `spark_get_log`, `spark_submit_batch`. Submit `examples/spark/count_to_10.py` after `gateway webhdfs put` (optional args: database, table). It writes Iceberg `{user}.count_to_10` (`n`). Poll with `spark_get_batch`. Do not run interactive Livy `code`.
 
@@ -46,13 +46,15 @@ Example MCP host config (put the JWT in the host's secret store, never in git):
     "cdp-spark": {
       "url": "http://127.0.0.1:9080/mcp/spark",
       "headers": {
-        "Authorization": "Bearer <knox-jwt>"
+        "Authorization": "Bearer <knox-jwt>",
+        "X-Agent-Key": "lab-agent"
       }
     },
     "cdp-hive": {
       "url": "http://127.0.0.1:9080/mcp/hive",
       "headers": {
-        "Authorization": "Bearer <knox-jwt>"
+        "Authorization": "Bearer <knox-jwt>",
+        "X-Agent-Key": "lab-agent"
       }
     }
   }

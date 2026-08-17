@@ -1,4 +1,4 @@
-global_rules:
+{{CONSUMERS_BLOCK}}global_rules:
   - id: request-id
     plugins:
       request-id:
@@ -48,6 +48,20 @@ routes:
         response_example: '{"status":"ok","service":"agent-gateway"}'
     upstream_id: cdp
 
+  - id: oauth-protected-resource
+    uris:
+      - /.well-known/oauth-protected-resource
+      - /.well-known/oauth-protected-resource/mcp/spark
+      - /.well-known/oauth-protected-resource/mcp/hive
+    methods: ["GET"]
+    plugins:
+      mocking:
+        delay: 0
+        content_type: "application/json"
+        response_status: 200
+        response_example: '{{OAUTH_PRM_JSON}}'
+    upstream_id: cdp
+
   - id: spark-livy
     uri: /cdp/livy_for_spark3*
     methods: ["GET", "HEAD"]
@@ -59,6 +73,10 @@ routes:
         clock_skew: {{KNOX_CLOCK_SKEW}}
         hide_credentials: false
         realm: knox
+        resource_metadata: "{{RESOURCE_METADATA_URL}}"
+        token_state_url: "{{KNOX_TOKEN_STATE_URL}}"
+        token_state_host: "{{UPSTREAM_HOST}}"
+        token_state_tls_verify: {{UPSTREAM_TLS_VERIFY}}
       proxy-rewrite:
         regex_uri:
           - "^/cdp/(.*)"
@@ -76,6 +94,10 @@ routes:
         clock_skew: {{KNOX_CLOCK_SKEW}}
         hide_credentials: false
         realm: knox
+        resource_metadata: "{{RESOURCE_METADATA_URL}}"
+        token_state_url: "{{KNOX_TOKEN_STATE_URL}}"
+        token_state_host: "{{UPSTREAM_HOST}}"
+        token_state_tls_verify: {{UPSTREAM_TLS_VERIFY}}
       proxy-rewrite:
         regex_uri:
           - "^/cdp/(.*)"
@@ -93,7 +115,11 @@ routes:
         clock_skew: {{KNOX_CLOCK_SKEW}}
         hide_credentials: false
         realm: knox
-      limit-count:
+        resource_metadata: "{{RESOURCE_METADATA_URL}}"
+        token_state_url: "{{KNOX_TOKEN_STATE_URL}}"
+        token_state_host: "{{UPSTREAM_HOST}}"
+        token_state_tls_verify: {{UPSTREAM_TLS_VERIFY}}
+{{MCP_KEY_AUTH_BLOCK}}      limit-count:
         count: {{MCP_RATE_COUNT}}
         time_window: {{MCP_RATE_WINDOW}}
         key_type: var
@@ -120,7 +146,11 @@ routes:
         clock_skew: {{KNOX_CLOCK_SKEW}}
         hide_credentials: false
         realm: knox
-      limit-count:
+        resource_metadata: "{{RESOURCE_METADATA_URL}}"
+        token_state_url: "{{KNOX_TOKEN_STATE_URL}}"
+        token_state_host: "{{UPSTREAM_HOST}}"
+        token_state_tls_verify: {{UPSTREAM_TLS_VERIFY}}
+{{MCP_KEY_AUTH_BLOCK}}      limit-count:
         count: {{MCP_RATE_COUNT}}
         time_window: {{MCP_RATE_WINDOW}}
         key_type: var

@@ -20,6 +20,7 @@ plugins:
   - uri-blocker
   - request-validation
   - knox-jwt
+  - key-auth
   - proxy-rewrite
   - limit-conn
   - limit-count

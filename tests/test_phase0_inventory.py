@@ -60,6 +60,7 @@ def test_env_example_documents_live_cdp_contract() -> None:
         "KNOX_TOKEN",
         "KNOX_SERVICES",
         "ADMIN_PORT",
+        "AGENT_CALLER_KEY",
     ):
         assert key in text
 

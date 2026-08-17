@@ -66,3 +66,38 @@ def test_mcp_hive_route_has_limit_count() -> None:
 def test_mcp_rate_count_rejects_zero() -> None:
     with pytest.raises(ValueError, match="MCP_RATE_COUNT"):
         render_apisix_yaml(TEMPLATE, {**BASE, "MCP_RATE_COUNT": "0"})
+
+
+def test_oauth_prm_and_token_state_are_rendered() -> None:
+    rendered = render_apisix_yaml(TEMPLATE, {**BASE, "GATEWAY_MODE": "local"})
+    assert "oauth-protected-resource" in rendered
+    assert "resource_metadata:" in rendered
+    assert "token_state_url: \"http://mock-cdp:8080/gateway/homepage/knoxtoken/api/v2/token/state\"" in rendered
+    livy = _route_block(rendered, "spark-livy")
+    assert "key-auth:" not in livy
+
+
+def test_mcp_key_auth_is_optional() -> None:
+    off = render_apisix_yaml(TEMPLATE, BASE)
+    assert "key-auth:" not in off
+    on = render_apisix_yaml(TEMPLATE, {**BASE, "AGENT_CALLER_KEY": "lab-agent"})
+    mcp = _route_block(on, "mcp-spark-http")
+    livy = _route_block(on, "spark-livy")
+    assert "key-auth:" in mcp
+    assert "X-Agent-Key" in mcp
+    assert "hide_credentials: true" in mcp
+    assert "key-auth:" not in livy
+    assert "username: agent-platform" in on
+
+
+def test_live_token_state_url_must_match_upstream_host() -> None:
+    with pytest.raises(ValueError, match="KNOX_TOKEN_STATE_URL"):
+        render_apisix_yaml(
+            TEMPLATE,
+            {
+                **BASE,
+                "GATEWAY_MODE": "live",
+                "UPSTREAM_HOST": "knox.example.cloudera.site",
+                "KNOX_TOKEN_STATE_URL": "http://evil.example/token/state",
+            },
+        )

@@ -8,7 +8,7 @@ Hive has two surfaces. Agents never call HiveServer2 or Knox hostnames directly.
 | Operator probe | `gateway hive` → Knox `{KNOX_PROXY_PREFIX}/hive` | Operators |
 | HTTP allowlist | `GET /cdp/hive` | **404** (unpublished) |
 
-MCP requires `Authorization: Bearer <knox-jwt>`. The adapter forwards that bearer to Knox Hive on the **token** topology. Ranger authorizes `sub`. JDBC inventory (`gateway jdbc add`) still stores `cdp-proxy-api` URLs for later ops; it does not publish `/cdp/hive`.
+MCP requires `Authorization: Bearer <knox-jwt>` and, on Compose, `X-Agent-Key`. The adapter forwards that bearer to Knox Hive on the **token** topology. Ranger authorizes `sub`. JDBC inventory (`gateway jdbc add`) still stores `cdp-proxy-api` URLs for later ops; it does not publish `/cdp/hive`.
 
 Live stacks use `KNOX_TOKEN` (`gateway token set`). `--mint` is `GATEWAY_MODE=local` only; against Knox JWKS it is `invalid_signature` and the CLI refuses it.
 

@@ -1,6 +1,6 @@
 # Build phases
 
-Each phase keeps CDP APIs unpublished except through this gateway. **Current target: Phase 2 Spark MCP + read-only Hive MCP** on the Phase 1 Livy allowlist. `spark_submit_batch` is a write as the Knox token subject. Hive MCP does not write.
+Each phase keeps CDP APIs unpublished except through this gateway. **Current target: Phase 3 third-party ready** (RFC 9728 PRM, MCP caller keys, Knox token-state, log redaction) on the Phase 2 Spark + Hive MCP.
 
 ## Phase 0 — Inventory and test cases
 
@@ -42,9 +42,11 @@ Status: Spark MCP catalog is implemented, including submit (2b). Hive MCP is rea
 
 ## Phase 3 — Third-party ready
 
-Publish `/.well-known/oauth-protected-resource` and richer `401 WWW-Authenticate`. Broker authorization to Knox or an enterprise IdP that can exchange into a Knox JWT. Require mTLS or caller keys for partner agents. Check Knox token enablement/revocation. Cap result size and redact PII before data returns to a model.
+Publish `/.well-known/oauth-protected-resource` (RFC 9728) and put `resource_metadata` on `401 WWW-Authenticate`. Require an **agent caller key** (`X-Agent-Key`) on `/mcp/spark` and `/mcp/hive` in addition to the Knox JWT. The key names the agent product; it is not a CDP user. Operator Livy GET and WebHDFS stay JWT-only. Check managed Knox token enablement against a host-pinned token-state URL (local mock; live is opt-in). Redact JWT-shaped strings in Spark logs before they return to a model.
 
-Status: not started.
+Do **not** mint a second user JWT. Do not implement PKCE token exchange until an enterprise IdP can swap into a Knox JWT. mTLS waits on HTTPS at the agent listener.
+
+Status: P3-01 (PRM + `WWW-Authenticate`), P3-03 (MCP `key-auth`), P3-04 (log redaction) are implemented on Compose. P3-02 token-state is on for `GATEWAY_MODE=local` (mock-cdp); live stacks set `KNOX_TOKEN_STATE_URL` on the pinned Knox host or skip. AMP stays JWT-only for the agent product (CML project identity) and serves the same PRM. PKCE broker and partner mTLS remain open.
 
 ## Suggested repo slices
 
@@ -58,15 +60,15 @@ Status: not started.
 | `mcp-hive` | Read-only SQL tools over Knox Hive | Phase 1 proxy + JDBC inventory | [hive.md](hive.md) |
 | `mcp-catalog` | Atlas / schema discovery tools | `mcp-hive` |
 | `policy` | Tool allowlists, row caps | Identity model (admin quotas + request_id audit join) |
-| `oauth-adapter` | PRM, PKCE broker, token exchange to Knox | IdP decision |
+| `oauth-adapter` | PRM (done); PKCE broker / token exchange to Knox | IdP decision |
 
 ## Open decisions
 
 | Decision | Default | Why it waits |
 | --- | --- | --- |
 | Private Cloud vs CDP Public Cloud | `gateway knox` parses both `/gateway/cdp-proxy-token` and `/<env>/cdp-proxy-token` | Confirm JWKS path on the target cluster |
-| HTTPS on localhost APISIX | HTTP `:9080` for the laptop lab | Add TLS before partner agents leave the VPN |
-| IdP in front of Knox | None in Phase 1 | Needed when MCP OAuth onboarding starts |
+| HTTPS on localhost APISIX | HTTP `:9080` for the laptop lab | Add TLS before partner agents leave the VPN; mTLS follows TLS |
+| IdP in front of Knox | None; PRM `authorization_servers` empty unless `KNOX_AUTHORIZATION_SERVER` is set | PKCE broker needs an IdP that can exchange into a Knox JWT |
 | Streamable HTTP on `/mcp/spark` and `/mcp/hive` | POST JSON-RPC only | Hold until a real host fails `initialize`; do not add GET SSE now |
 | AMP `launchable: true` | false | Needs a workbench import against live Knox recorded in [testing.md](testing.md) |
-| Revocation check vs short TTL | Short TTL first | Knox token-state API coupling vs leak window |
+| Live Knox token-state URL | Unset (signature + `exp` only) | Confirm TSS path on the target cluster; local mock is `KNOX_TOKEN_STATE_URL` |

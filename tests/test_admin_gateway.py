@@ -6,7 +6,7 @@ import os
 import httpx
 import pytest
 
-from jwt_util import knox_claims, sign_rs256
+from jwt_util import knox_claims, mcp_headers, sign_rs256
 
 pytestmark = pytest.mark.gateway
 
@@ -70,7 +70,7 @@ def test_submit_quota_blocks_mcp_for_that_subject(client) -> None:
                 "arguments": {"file": "hdfs:///user/quota-user/job.py"},
             },
         },
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        headers=mcp_headers(token),
     )
     if response.status_code == 401:
         httpx.delete(f"{ADMIN_URL}/api/quotas/quota-user", timeout=5.0)
@@ -126,7 +126,7 @@ def test_mcp_audit_join_uses_request_id(client) -> None:
             "method": "tools/call",
             "params": {"name": "spark_list_batches", "arguments": {}},
         },
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        headers=mcp_headers(token),
     )
     if response.status_code == 401:
         pytest.skip("APISIX is not using the local mock Knox PEM")

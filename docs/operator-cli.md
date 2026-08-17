@@ -98,7 +98,7 @@ This talks to Knox `{KNOX_PROXY_PREFIX}/hive` with `KNOX_TOKEN`. It is not an ag
 | `spark [resource]` | `GET /cdp/livy_for_spark3/<resource>` (default `sessions`). Writes are MCP-only. |
 | `webhdfs ls\|stat\|mkdir\|put` | Knox WebHDFS through `/cdp/webhdfs` (JWT). Stage Spark `file` URIs. No `DELETE`. |
 | `hive [databases]` | `SHOW DATABASES` on Knox `{prefix}/hive` (JWT; not `/cdp/hive`) |
-| `mcp [--adapter spark\|hive] [--tool NAME]` | JSON-RPC to `/mcp/spark` or `/mcp/hive`. `--mint` is lab-only. |
+| `mcp [--adapter spark\|hive] [--tool NAME]` | JSON-RPC to `/mcp/spark` or `/mcp/hive`. Sends `X-Agent-Key` when `AGENT_CALLER_KEY` is set. `--mint` is lab-only. |
 | `admin [--open]` | Operator usage/quota/audit UI at `http://127.0.0.1:9090` (not an agent route) |
 | `call [path]` | Call an arbitrary gateway path with a bearer |
 

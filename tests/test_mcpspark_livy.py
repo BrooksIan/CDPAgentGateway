@@ -12,6 +12,7 @@ from livy import (
     parse_batch_id,
     public_batch,
     public_livy_message,
+    redact_secrets,
     truncate_log,
 )
 
@@ -47,6 +48,15 @@ def test_truncate_log_caps_lines_and_chars() -> None:
     assert shaped["truncated"] is True
     assert len(shaped["log"]) <= 80
     assert sum(len(line) for line in shaped["log"]) <= 8000 + 80
+
+
+def test_truncate_log_redacts_jwt_shaped_strings() -> None:
+    jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhIn0.signaturepart"
+    shaped = truncate_log({"id": 0, "log": [f"Bonded to Knox token {jwt}"]})
+    joined = "\n".join(shaped["log"])
+    assert jwt not in joined
+    assert "[redacted]" in joined
+    assert redact_secrets(f"Authorization: Bearer {jwt}").endswith("[redacted]")
 
 
 def test_public_batch_drops_unknown_fields() -> None:

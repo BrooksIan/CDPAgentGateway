@@ -26,6 +26,7 @@ from agentgateway.knox_jwt import (
     DEFAULT_ISSUER,
     DEFAULT_REALM,
     KnoxJWTError,
+    assert_knox_token_enabled,
     extract_bearer,
     unauthorized_headers,
     verify_knox_jwt,
@@ -149,6 +150,22 @@ class KnoxJWTMiddleware:
         self.expected_alg = os.environ.get("KNOX_EXPECTED_ALG") or DEFAULT_ALG
         self.clock_skew = _int_env("KNOX_CLOCK_SKEW", DEFAULT_CLOCK_SKEW)
         self.realm = os.environ.get("KNOX_REALM") or DEFAULT_REALM
+        if os.environ.get("RESOURCE_METADATA_URL"):
+            self.resource_metadata = os.environ["RESOURCE_METADATA_URL"].strip()
+        elif os.environ.get("GATEWAY_PUBLIC_URL"):
+            self.resource_metadata = (
+                os.environ["GATEWAY_PUBLIC_URL"].rstrip("/")
+                + "/.well-known/oauth-protected-resource"
+            )
+        else:
+            self.resource_metadata = "http://127.0.0.1:9080/.well-known/oauth-protected-resource"
+        self.token_state_url = (os.environ.get("KNOX_TOKEN_STATE_URL") or "").strip()
+        self.token_state_host = (os.environ.get("UPSTREAM_HOST") or "").strip()
+        self.token_state_tls_verify = os.environ.get("UPSTREAM_TLS_VERIFY", "false").lower() in {
+            "true",
+            "1",
+            "yes",
+        }
         self._pem: str | None = None
 
     def _public_key(self) -> str:
@@ -164,7 +181,9 @@ class KnoxJWTMiddleware:
     def _skip_jwt(self, method: str, path: str) -> bool:
         if method != "GET":
             return False
-        return path in {"/", "/health"} or path.rstrip("/") in {"", "/health"}
+        return path in {"/", "/health"} or path.rstrip("/") in {"", "/health"} or path.startswith(
+            "/.well-known/oauth-protected-resource"
+        )
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -186,8 +205,18 @@ class KnoxJWTMiddleware:
                 expected_alg=self.expected_alg,
                 clock_skew=self.clock_skew,
             )
+            assert_knox_token_enabled(
+                identity,
+                token_state_url=self.token_state_url,
+                token_state_host=self.token_state_host,
+                tls_verify=self.token_state_tls_verify,
+            )
         except KnoxJWTError as extra:
-            headers = unauthorized_headers(realm=self.realm, reason=extra.reason) if extra.status == 401 else [
+            headers = unauthorized_headers(
+                realm=self.realm,
+                reason=extra.reason,
+                resource_metadata=self.resource_metadata,
+            ) if extra.status == 401 else [
                 (b"x-agent-gateway-reason", extra.reason.encode("ascii")),
                 (b"content-type", b"application/json"),
             ]
@@ -217,6 +246,20 @@ class KnoxJWTMiddleware:
         await self.app(scope, receive, send)
 
 
+def _prm_routes() -> list[Route]:
+    from agentgateway.env import load_env, oauth_prm_document
+
+    async def prm(_request: Request) -> JSONResponse:
+        return JSONResponse(oauth_prm_document(load_env()))
+
+    paths = (
+        "/.well-known/oauth-protected-resource",
+        "/.well-known/oauth-protected-resource/mcp/spark",
+        "/.well-known/oauth-protected-resource/mcp/hive",
+    )
+    return [Route(path, prm, methods=["GET"]) for path in paths]
+
+
 def build_mcp_app() -> Starlette:
     apply_live_upstream()
     mcp = _load_module("amp_mcp_spark_server", "mcp-spark")
@@ -228,6 +271,7 @@ def build_mcp_app() -> Starlette:
 
     app = Starlette(
         routes=[
+            *_prm_routes(),
             Route("/health", mcp.health, methods=["GET"]),
             Route("/", root, methods=["GET", "POST"]),
             Route("/mcp", mcp.mcp_endpoint, methods=["GET", "POST"]),
@@ -254,6 +298,7 @@ def build_hive_mcp_app() -> Starlette:
 
     app = Starlette(
         routes=[
+            *_prm_routes(),
             Route("/health", mcp.health, methods=["GET"]),
             Route("/", root, methods=["GET", "POST"]),
             Route("/mcp", mcp.mcp_endpoint, methods=["GET", "POST"]),

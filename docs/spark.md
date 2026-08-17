@@ -10,7 +10,7 @@ Two surfaces share the same Knox JWT and the same Ranger subject. Operators also
 | WebHDFS | `/cdp/webhdfs*` | GET, HEAD, PUT | Operators (`gateway webhdfs`) to put `file` URIs |
 | MCP | `/mcp/spark` | POST (JSON-RPC) | Cursor, Claude, `gateway mcp` |
 
-Both require `Authorization: Bearer <knox-jwt>`. Compose: APISIX `knox-jwt` validates the token, then either rewrites to Knox Livy or WebHDFS, or forwards to the `mcp-spark` adapter. AMP: the CML `mcp-spark` application validates the same JWT in Python (no WebHDFS route). `/cdp/hive` stays **404**; Hive MCP is `/mcp/hive` ([hive.md](hive.md)).
+Both require `Authorization: Bearer <knox-jwt>`. Compose MCP also requires `X-Agent-Key` (`AGENT_CALLER_KEY`, default `lab-agent`). Compose: APISIX `knox-jwt` validates the token, then either rewrites to Knox Livy or WebHDFS, or forwards to the `mcp-spark` adapter. AMP: the CML `mcp-spark` application validates the same JWT in Python (no WebHDFS route; no caller key). `/cdp/hive` stays **404**; Hive MCP is `/mcp/hive` ([hive.md](hive.md)).
 
 ```mermaid
 flowchart LR
@@ -213,13 +213,15 @@ Put the Knox JWT in the host secret store, never in git.
     "cdp-spark": {
       "url": "http://127.0.0.1:9080/mcp/spark",
       "headers": {
-        "Authorization": "Bearer <knox-jwt>"
+        "Authorization": "Bearer <knox-jwt>",
+        "X-Agent-Key": "lab-agent"
       }
     },
     "cdp-hive": {
       "url": "http://127.0.0.1:9080/mcp/hive",
       "headers": {
-        "Authorization": "Bearer <knox-jwt>"
+        "Authorization": "Bearer <knox-jwt>",
+        "X-Agent-Key": "lab-agent"
       }
     }
   }

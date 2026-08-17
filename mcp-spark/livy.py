@@ -32,7 +32,15 @@ DENIED_CONF_MARKERS = (
 _SECRET_MESSAGE_MARKERS = ("bearer ", "authorization", "password", "token=")
 MAX_LIVY_MESSAGE = 400
 
+_JWT_RE = re.compile(r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
+_BEARER_RE = re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-+=/]+")
 _BATCH_ID = re.compile(r"^[0-9]+$")
+
+
+def redact_secrets(text: str) -> str:
+    """Strip JWT-shaped strings and Bearer values before logs reach a model."""
+    cleaned = _JWT_RE.sub("[redacted]", text)
+    return _BEARER_RE.sub("Bearer [redacted]", cleaned)
 
 
 class LivyError(Exception):
@@ -87,7 +95,7 @@ def truncate_log(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(lines, list):
         text = str(payload.get("log") or "")
         lines = text.splitlines()
-    clipped = [str(line) for line in lines[-MAX_LOG_LINES:]]
+    clipped = [redact_secrets(str(line)) for line in lines[-MAX_LOG_LINES:]]
     joined = "\n".join(clipped)
     truncated = False
     if len(joined) > MAX_LOG_CHARS:

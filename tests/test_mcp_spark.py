@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from jwt_util import knox_claims, sign_rs256
+from jwt_util import knox_claims, mcp_headers, sign_rs256
 
 pytestmark = pytest.mark.gateway
 
@@ -21,7 +21,7 @@ def _tool_call(client, token: str, name: str, arguments: dict[str, Any], rpc_id:
             "method": "tools/call",
             "params": {"name": name, "arguments": arguments},
         },
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        headers=mcp_headers(token),
     )
 
 
@@ -44,7 +44,7 @@ def test_mcp_spark_lists_spark_tools(client) -> None:
     response = client.post(
         MCP_URL,
         json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        headers=mcp_headers(token),
     )
     assert response.status_code == 200, response.text
     tools = {item["name"] for item in response.json()["result"]["tools"]}
@@ -131,3 +131,22 @@ def test_mcp_spark_submit_rejects_inline_code(client) -> None:
     body, payload = _result_payload(response)
     assert body["isError"] is True
     assert "inline" in payload["error"] or "code" in payload["error"]
+
+
+def test_mcp_spark_requires_caller_key_when_configured(client) -> None:
+    from agentgateway.env import agent_caller_key
+
+    if not agent_caller_key():
+        pytest.skip("AGENT_CALLER_KEY is empty")
+    token = sign_rs256(knox_claims(sub="analyst"))
+    response = client.post(
+        MCP_URL,
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+    )
+    assert response.status_code == 401, response.text
+    livy = client.get(
+        "/cdp/livy_for_spark3/sessions",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert livy.status_code == 200, livy.text

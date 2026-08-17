@@ -84,6 +84,8 @@ def test_config_writes_apisix_yaml() -> None:
     assert "uri: /cdp/hive" not in text
     assert 'uri: /cdp/livy_for_spark3*' in text
     assert 'uri: /cdp/webhdfs*' in text
+    assert "oauth-protected-resource" in text
+    assert "resource_metadata" in text
     assert 'methods: ["GET", "HEAD"]' in text
     assert 'methods: ["GET", "HEAD", "PUT"]' in text
     assert 'methods: ["GET", "HEAD", "POST", "PUT", "DELETE"]' not in text

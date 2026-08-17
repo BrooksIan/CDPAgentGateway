@@ -97,6 +97,9 @@ def test_amp_mcp_tools_list(pem_file: Path, tmp_path: Path, monkeypatch: pytest.
     client = TestClient(build_mcp_app())
     public = client.get("/health")
     assert public.status_code == 200
+    prm = client.get("/.well-known/oauth-protected-resource")
+    assert prm.status_code == 200
+    assert prm.json()["bearer_methods_supported"] == ["header"]
     denied = client.post("/mcp/spark", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     assert denied.status_code == 401
     token = sign_rs256(knox_claims(sub="analyst"))
@@ -109,3 +112,10 @@ def test_amp_mcp_tools_list(pem_file: Path, tmp_path: Path, monkeypatch: pytest.
     names = [tool["name"] for tool in listed.json()["result"]["tools"]]
     assert "spark_submit_batch" in names
     assert "Authorization" not in listed.text
+
+
+def test_amp_prm_is_public_and_401_has_resource_metadata(pem_file: Path) -> None:
+    client = _wrapped(pem_file)
+    denied = client.post("/echo")
+    assert denied.status_code == 401
+    assert "resource_metadata=" in denied.headers.get("WWW-Authenticate", "")

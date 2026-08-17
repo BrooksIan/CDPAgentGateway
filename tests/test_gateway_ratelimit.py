@@ -6,7 +6,7 @@ import uuid
 import pytest
 
 from agentgateway.env import load_env
-from jwt_util import knox_claims, sign_rs256
+from jwt_util import knox_claims, mcp_headers, sign_rs256
 
 pytestmark = pytest.mark.gateway
 
@@ -17,7 +17,7 @@ def _list_tools(client, token: str, rpc_id: int = 1):
     return client.post(
         MCP_URL,
         json={"jsonrpc": "2.0", "id": rpc_id, "method": "tools/list"},
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        headers=mcp_headers(token),
     )
 
 

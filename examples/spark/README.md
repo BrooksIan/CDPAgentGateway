@@ -27,11 +27,10 @@ gateway webhdfs put examples/spark/count_to_10.py /user/$USER/examples/count_to_
 source .venv/bin/activate
 gateway mcp --tool spark_submit_batch \
   --arg file=hdfs:///user/$USER/examples/count_to_10.py \
-  --arg name=count-to-10 \
-  --arg args=$USER,count_to_10
+  --arg name=count-to-10
 ```
 
-Optional args are `<database> <table>`. Defaults: Spark user as database, table `count_to_10`. Ranger must allow that subject to create the database/table. The cluster must already expose Iceberg on `spark_catalog` (CDE Spark 3 does).
+Do not pass `--arg args=…` unless Livy on this cluster accepts batch `args` (this environment returned HTTP 400 when they were set). Defaults: Spark user as database, table `count_to_10`. Optional args, if used, are `<database> <table>`. Ranger must allow that subject to create the database/table. The cluster must already expose Iceberg on `spark_catalog` (CDE Spark 3 does).
 
 Poll:
 
@@ -41,7 +40,7 @@ gateway mcp --tool spark_get_batch --arg batch_id=0
 gateway mcp --tool spark_get_log --arg batch_id=0
 ```
 
-When the log shows `iceberg_table=…`, query Hive (same Knox JWT):
+When the log shows `iceberg_table=…` (or `spark_get_batch` is `success`), query Hive: [examples/hive/README.md](../hive/README.md).
 
 ```bash
 gateway mcp --adapter hive --tool hive_list_tables --arg database=$USER
@@ -50,5 +49,7 @@ gateway mcp --adapter hive --tool hive_describe_table \
 gateway mcp --adapter hive --tool hive_select \
   --arg database=$USER --arg table=count_to_10 --arg columns=n --arg limit=10
 ```
+
+Expected: `n` = 1 … 10. Named columns only; `limit` ≤ 50.
 
 Use `s3a://`, `abfs://`, or `o3fs://` if that is where the file lives. `http://` and laptop paths are rejected.

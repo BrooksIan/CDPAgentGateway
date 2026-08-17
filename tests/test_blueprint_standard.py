@@ -82,6 +82,7 @@ def test_blueprint_layout_dirs_exist() -> None:
         ROOT / "mcp-hive" / "server.py",
         ROOT / "admin" / "server.py",
         ROOT / "examples" / "spark" / "count_to_10.py",
+        ROOT / "examples" / "hive" / "README.md",
         ROOT / "docs" / "operator-cli.md",
         ROOT / "docs" / "spark.md",
         ROOT / "docs" / "hive.md",

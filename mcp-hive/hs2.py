@@ -20,6 +20,8 @@ from sql import (
 HIVE_SERVICE = "hive"
 TOKEN_TOPOLOGY = "cdp-proxy-token"
 REQUEST_TIMEOUT = 60.0
+_SECRET_MESSAGE_MARKERS = ("bearer ", "authorization", "password", "token=")
+MAX_HS2_MESSAGE = 400
 
 MOCK_DATABASES = ["analytics", "default"]
 MOCK_TABLES = {
@@ -80,22 +82,48 @@ def _connect_kwargs(token: str) -> dict[str, Any]:
     }
 
 
+def _public_hs2_message(exc: BaseException, *, limit: int = MAX_HS2_MESSAGE) -> str:
+    text = str(exc).strip() or exc.__class__.__name__
+    lowered = text.lower()
+    if any(marker in lowered for marker in _SECRET_MESSAGE_MARKERS):
+        return exc.__class__.__name__
+    return text[:limit]
+
+
+def hive_error_from_hs2(exc: BaseException) -> HiveError:
+    text = _public_hs2_message(exc)
+    lowered = text.lower()
+    status = 502
+    if "table not found" in lowered or "10001" in text:
+        status = 404
+    elif "database" in lowered and "not found" in lowered:
+        status = 404
+    elif "access denied" in lowered or "permission denied" in lowered:
+        status = 403
+    return HiveError(text, status=status)
+
+
 def _fetch(sql: str, *, authorization: str) -> tuple[list[str], list[tuple[Any, ...]]]:
     try:
         from impala.dbapi import connect
     except ImportError as exc:
         raise HiveError("Hive client missing; install impyla", status=500) from exc
-    conn = connect(**_connect_kwargs(_bearer(authorization)))
     try:
-        cursor = conn.cursor()
+        conn = connect(**_connect_kwargs(_bearer(authorization)))
         try:
-            cursor.execute(sql)
-            columns = [str(item[0]) for item in (cursor.description or [])]
-            rows = cursor.fetchmany(MAX_ROWS)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(sql)
+                columns = [str(item[0]) for item in (cursor.description or [])]
+                rows = cursor.fetchmany(MAX_ROWS)
+            finally:
+                cursor.close()
         finally:
-            cursor.close()
-    finally:
-        conn.close()
+            conn.close()
+    except HiveError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — HS2/thrift errors become tool errors
+        raise hive_error_from_hs2(exc) from exc
     return columns, list(rows or [])
 
 

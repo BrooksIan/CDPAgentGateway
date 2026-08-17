@@ -34,7 +34,7 @@ Call `http://127.0.0.1:9080/mcp/spark` or `http://127.0.0.1:9080/mcp/hive` with 
 
 Spark tools: `spark_list_sessions`, `spark_list_batches`, `spark_get_batch`, `spark_get_log`, `spark_submit_batch`. Submit `examples/spark/count_to_10.py` after `gateway webhdfs put` (optional args: database, table). It writes Iceberg `{user}.count_to_10` (`n`). Poll with `spark_get_batch`. Do not run interactive Livy `code`.
 
-Hive tools: `hive_list_databases`, `hive_list_tables`, `hive_describe_table`, `hive_select`. `hive_select` requires named columns (no `SELECT *`) and `limit` ≤ 50. No DDL/DML.
+Hive tools: `hive_list_databases`, `hive_list_tables`, `hive_describe_table`, `hive_select`. After Spark writes `{user}.count_to_10`, call `hive_select` with `database=$USER`, `table=count_to_10`, `columns=n`, `limit=10`. Named columns only (no `SELECT *`), `limit` ≤ 50. No DDL/DML.
 
 Operator usage, quotas, and audit join: [docs/admin.md](docs/admin.md) (`http://127.0.0.1:9090`). Do not send agents there. `/mcp/spark` is burst-capped per Knox `sub` (`MCP_RATE_COUNT`).
 

@@ -157,6 +157,7 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 | `mcp-hive/` | Hive MCP adapter (read-only) |
 | `admin/` | Operator usage/quota UI (`127.0.0.1:9090`) |
 | `examples/spark/` | Sample Spark 3 batch (`count_to_10.py`) that writes Iceberg for Hive |
+| `examples/hive/` | Query that table with Hive MCP (`hive_list_tables` / `hive_describe_table` / `hive_select`) |
 | `tests/` | Inventory, CLI, gateway, and MCP pytest |
 | `AGENTS.md` | Instructions for coding agents |
 | `.cursor/rules/` | Cursor project rules |

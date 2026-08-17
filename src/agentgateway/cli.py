@@ -33,7 +33,7 @@ from agentgateway.knox import (
 from agentgateway.hive import HiveError, hive_http_path, show_databases
 from agentgateway.mcp import mcp_path, mcp_rpc
 from agentgateway.paths import repo_root
-from agentgateway.probe import parse_params, request_path
+from agentgateway.probe import parse_params, request_path, tool_arguments
 from agentgateway.token import inspect_bearer, knox_claims, public_claims, sign_rs256
 from agentgateway.webhdfs import WebHdfsError, file_status, format_listing, list_status, mkdir, put_file
 
@@ -579,14 +579,7 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     print(f"POST {mcp_path(args.adapter)}")
     try:
         if args.tool:
-            arguments: dict[str, object] = {}
-            for key, value in parse_params(args.arg):
-                if key in {"batch_id", "limit"} and value.isdigit():
-                    arguments[key] = int(value)
-                elif key == "columns":
-                    arguments[key] = [part.strip() for part in value.split(",") if part.strip()]
-                else:
-                    arguments[key] = value
+            arguments = tool_arguments(args.arg)
             response = mcp_rpc(
                 "tools/call",
                 token=token,

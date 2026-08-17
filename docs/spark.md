@@ -180,18 +180,25 @@ sequenceDiagram
 
 Allowed `file` schemes: `hdfs`, `viewfs`, `s3a`, `s3`, `abfs`, `abfss`, `o3fs`, `ofs`. Rejected: `http`, `file` (unless `SPARK_ALLOW_FILE_SCHEME=true` for a closed lab), `..` in the path, inline `code`, `proxyUser`.
 
-Sample job: [`examples/spark/count_to_10.py`](../examples/spark/count_to_10.py). It prints `n=1` … `n=10`, then `CREATE OR REPLACE`s Iceberg table `{user}.count_to_10` (column `n`) in the Hive catalog so [Hive MCP](hive.md) can `hive_select` it. Pass `--arg args=$USER,count_to_10` (or another writable database) if the default Spark user database is not allowed by Ranger.
+Sample job: [`examples/spark/count_to_10.py`](../examples/spark/count_to_10.py). It prints `n=1` … `n=10`, then `CREATE OR REPLACE`s Iceberg table `{user}.count_to_10` (column `n`) in the Hive catalog so [Hive MCP](hive.md) can `hive_select` it. Database/table default to the Spark user and `count_to_10`. Omit Livy `args` unless this cluster accepts them.
 
 ```bash
 gateway webhdfs put examples/spark/count_to_10.py /user/$USER/examples/count_to_10.py
 
 gateway mcp --tool spark_submit_batch \
   --arg file=hdfs:///user/$USER/examples/count_to_10.py \
-  --arg name=count-to-10 \
-  --arg args=$USER,count_to_10
+  --arg name=count-to-10
 ```
 
-Poll with `spark_get_batch` until `state` is `success` or `dead`. Then `spark_get_log` and look for `iceberg_table=`. Hive follow-up is in [hive.md](hive.md).
+Poll with `spark_get_batch` until `state` is `success` or `dead`. Then query Hive (same JWT): [hive.md](hive.md), [examples/hive/README.md](../examples/hive/README.md).
+
+```bash
+gateway mcp --adapter hive --tool hive_list_tables --arg database=$USER
+gateway mcp --adapter hive --tool hive_describe_table \
+  --arg database=$USER --arg table=count_to_10
+gateway mcp --adapter hive --tool hive_select \
+  --arg database=$USER --arg table=count_to_10 --arg columns=n --arg limit=10
+```
 
 Do not expose interactive Livy `POST /sessions/{id}/statements` (run code). That is how prompt injection becomes a cluster shell. APISIX does not match that method on `/cdp/livy_for_spark3*`; mcp-spark has no statements tool.
 
@@ -204,6 +211,12 @@ Put the Knox JWT in the host secret store, never in git.
   "mcpServers": {
     "cdp-spark": {
       "url": "http://127.0.0.1:9080/mcp/spark",
+      "headers": {
+        "Authorization": "Bearer <knox-jwt>"
+      }
+    },
+    "cdp-hive": {
+      "url": "http://127.0.0.1:9080/mcp/hive",
       "headers": {
         "Authorization": "Bearer <knox-jwt>"
       }

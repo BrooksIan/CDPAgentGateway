@@ -4,7 +4,16 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from livy import LivyError, build_submit_body, livy_relpath, normalize_list, parse_batch_id, public_batch, truncate_log
+from livy import (
+    LivyError,
+    build_submit_body,
+    livy_relpath,
+    normalize_list,
+    parse_batch_id,
+    public_batch,
+    public_livy_message,
+    truncate_log,
+)
 
 
 def test_livy_paths_are_allowlisted() -> None:
@@ -68,6 +77,8 @@ def test_submit_body_requires_cluster_file_uri() -> None:
     body = build_submit_body({"file": "hdfs:///user/analyst/job.py", "args": "10"})
     assert body["file"].startswith("hdfs://")
     assert body["args"] == ["10"]
+    comma = build_submit_body({"file": "hdfs:///user/analyst/job.py", "args": "analyst,count_to_10"})
+    assert comma["args"] == ["analyst", "count_to_10"]
     with pytest.raises(LivyError):
         build_submit_body({"file": "https://evil.example/job.py"})
     with pytest.raises(LivyError):
@@ -76,3 +87,27 @@ def test_submit_body_requires_cluster_file_uri() -> None:
         build_submit_body({"file": "hdfs:///job.py", "code": "print(1)"})
     with pytest.raises(LivyError):
         build_submit_body({"file": "hdfs:///job.py", "conf": {"spark.yarn.keytab": "x"}})
+
+
+def test_public_livy_message_skips_secrets() -> None:
+    assert public_livy_message({"msg": "requirement failed: bad args"}) == "requirement failed: bad args"
+    assert public_livy_message({"message": "Authorization: Bearer abc"}) is None
+
+
+def test_post_json_includes_livy_message_on_400() -> None:
+    from livy import post_json
+
+    response = Mock()
+    response.status_code = 400
+    response.headers = {"content-type": "application/json"}
+    response.json.return_value = {"msg": "Cannot parse args"}
+    with patch("livy.httpx.post", return_value=response):
+        with pytest.raises(LivyError) as exc:
+            post_json(
+                "batches",
+                authorization="Bearer test-token",
+                payload={"file": "hdfs:///user/analyst/job.py"},
+            )
+    assert exc.value.status == 400
+    assert exc.value.details["livy_message"] == "Cannot parse args"
+    assert "Bearer" not in str(exc.value.details)

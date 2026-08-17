@@ -195,6 +195,24 @@ def _call_tool(rpc_id: Any, name: str, arguments: dict[str, Any], request: Reque
             status=exc.status,
         )
         return _tool_error(rpc_id, str(exc), {**exc.details, "status": exc.status})
+    except Exception as exc:  # noqa: BLE001
+        _log(
+            "tool_crash",
+            tool=name,
+            sub=knox_user,
+            knox_id=token_id,
+            request_id=request_id,
+            error=exc.__class__.__name__,
+        )
+        record(
+            sub=knox_user,
+            tool=name,
+            ok=False,
+            request_id=request_id,
+            token_id=token_id,
+            status=502,
+        )
+        return _tool_error(rpc_id, "hive request failed", {"status": 502})
     _log("tool_ok", tool=name, sub=knox_user, knox_id=token_id, request_id=request_id)
     record(sub=knox_user, tool=name, ok=True, request_id=request_id, token_id=token_id)
     return _rpc_result(

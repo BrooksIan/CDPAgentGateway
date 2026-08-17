@@ -87,3 +87,19 @@ def test_config_writes_apisix_yaml() -> None:
     assert 'methods: ["GET", "HEAD"]' in text
     assert 'methods: ["GET", "HEAD", "PUT"]' in text
     assert 'methods: ["GET", "HEAD", "POST", "PUT", "DELETE"]' not in text
+
+
+def test_tool_arguments_split_livy_args_list() -> None:
+    from agentgateway.probe import tool_arguments
+
+    parsed = tool_arguments(
+        [
+            "file=hdfs:///user/analyst/job.py",
+            "name=count-to-10",
+            "args=analyst,count_to_10",
+            "batch_id=3",
+        ]
+    )
+    assert parsed["args"] == ["analyst", "count_to_10"]
+    assert parsed["batch_id"] == 3
+    assert parsed["file"].startswith("hdfs://")

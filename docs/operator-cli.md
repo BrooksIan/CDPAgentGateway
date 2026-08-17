@@ -35,8 +35,9 @@ gateway webhdfs put examples/spark/count_to_10.py /user/you/examples/count_to_10
 gateway hive                      # SHOW DATABASES via Knox token/hive
 gateway mcp                       # list Spark MCP tools
 gateway mcp --tool spark_list_batches
-gateway mcp --adapter hive --tool hive_list_databases
-gateway mcp --tool spark_submit_batch --arg file=hdfs:///user/you/examples/count_to_10.py --arg args=you,count_to_10
+gateway mcp --tool spark_submit_batch --arg file=hdfs:///user/you/examples/count_to_10.py --arg name=count-to-10
+gateway mcp --adapter hive --tool hive_list_tables --arg database=you
+gateway mcp --adapter hive --tool hive_select --arg database=you --arg table=count_to_10 --arg columns=n --arg limit=10
 gateway test --live
 ```
 
@@ -47,6 +48,14 @@ Spark usage: [spark.md](spark.md). Stage `count_to_10.py` with WebHDFS, then sub
 ```bash
 gateway webhdfs put examples/spark/count_to_10.py /user/you/examples/count_to_10.py
 gateway mcp --tool spark_submit_batch --arg file=hdfs:///user/you/examples/count_to_10.py
+```
+
+Hive usage after Spark writes Iceberg `{user}.count_to_10`: [hive.md](hive.md), [examples/hive/README.md](../examples/hive/README.md).
+
+```bash
+gateway mcp --adapter hive --tool hive_list_tables --arg database=you
+gateway mcp --adapter hive --tool hive_describe_table --arg database=you --arg table=count_to_10
+gateway mcp --adapter hive --tool hive_select --arg database=you --arg table=count_to_10 --arg columns=n --arg limit=10
 ```
 
 Hive JDBC is a separate inventory command (`cdp-proxy-api` is not the Livy token topology):

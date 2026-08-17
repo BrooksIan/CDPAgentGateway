@@ -29,6 +29,8 @@ DENIED_CONF_MARKERS = (
     "proxyuser",
     "javax.jdo",
 )
+_SECRET_MESSAGE_MARKERS = ("bearer ", "authorization", "password", "token=")
+MAX_LIVY_MESSAGE = 400
 
 _BATCH_ID = re.compile(r"^[0-9]+$")
 
@@ -148,7 +150,7 @@ def get_json(
         raise LivyError(
             "livy request failed",
             status=response.status_code,
-            details={"livy_status": response.status_code, "livy_path": rel},
+            details=_livy_failure_details(response.status_code, rel, body),
         )
 
     if kind == "sessions":
@@ -165,6 +167,31 @@ def get_json(
     return shaped
 
 
+def public_livy_message(body: dict[str, Any], *, limit: int = MAX_LIVY_MESSAGE) -> str | None:
+    candidates: list[str] = []
+    for key in ("msg", "message", "error", "exception"):
+        value = body.get(key)
+        if isinstance(value, str) and value.strip():
+            candidates.append(value.strip())
+    nested = body.get("value")
+    if isinstance(nested, str) and nested.strip():
+        candidates.append(nested.strip())
+    for text in candidates:
+        lowered = text.lower()
+        if any(marker in lowered for marker in _SECRET_MESSAGE_MARKERS):
+            continue
+        return text[:limit]
+    return None
+
+
+def _livy_failure_details(status: int, rel: str, body: dict[str, Any]) -> dict[str, Any]:
+    details: dict[str, Any] = {"livy_status": status, "livy_path": rel}
+    message = public_livy_message(body)
+    if message:
+        details["livy_message"] = message
+    return details
+
+
 def _decode_body(response: httpx.Response) -> dict[str, Any]:
     ctype = (response.headers.get("content-type") or "").lower()
     if "json" in ctype:
@@ -173,10 +200,16 @@ def _decode_body(response: httpx.Response) -> dict[str, Any]:
         except json.JSONDecodeError as exc:
             raise LivyError("livy returned invalid JSON", status=502) from exc
         return data if isinstance(data, dict) else {"value": data}
+    status = response.status_code if response.status_code >= 400 else 502
+    text = (response.text or "").strip()
+    details: dict[str, Any] = {"livy_status": response.status_code}
+    message = public_livy_message({"message": text}) if text else None
+    if message:
+        details["livy_message"] = message
     raise LivyError(
         "livy returned a non-JSON body",
-        status=response.status_code if response.status_code >= 400 else 502,
-        details={"livy_status": response.status_code},
+        status=status,
+        details=details,
     )
 
 
@@ -318,7 +351,7 @@ def post_json(
         raise LivyError(
             "livy submit failed",
             status=response.status_code,
-            details={"livy_status": response.status_code, "livy_path": rel},
+            details=_livy_failure_details(response.status_code, rel, body),
         )
     shaped = public_batch(body) if isinstance(body, dict) else {"value": body}
     shaped["knox_user"] = knox_user

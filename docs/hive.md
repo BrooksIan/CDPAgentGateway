@@ -64,12 +64,36 @@ gateway mcp --adapter hive --tool hive_list_databases --mint
 gateway mcp --adapter hive --tool hive_select --arg database=default --arg table=dual --arg columns=dummy_col --arg limit=5 --mint
 ```
 
-After [`examples/spark/count_to_10.py`](../examples/spark/count_to_10.py) succeeds, the same Knox `sub` can read the Iceberg table Spark registered in HMS. Hive MCP still cannot run DDL.
+After [`examples/spark/count_to_10.py`](../examples/spark/count_to_10.py) succeeds, query that Iceberg table with the same Knox JWT. Hive still cannot CREATE or INSERT. Walkthrough: [examples/hive/README.md](../examples/hive/README.md).
+
+```mermaid
+sequenceDiagram
+  participant Ag as gateway mcp --adapter hive
+  participant GW as APISIX
+  participant MCP as mcp-hive
+  participant Knox as Knox token /hive
+  participant HS2 as HiveServer2
+
+  Note over HS2: Iceberg {user}.count_to_10 already in HMS
+  Ag->>GW: hive_list_tables database=$USER
+  GW->>MCP: POST /mcp Bearer X-Knox-User
+  MCP->>Knox: SHOW TABLES IN `user`
+  HS2-->>Ag: count_to_10
+  Ag->>GW: hive_describe_table table=count_to_10
+  HS2-->>Ag: n bigint
+  Ag->>GW: hive_select columns=n limit=10
+  HS2-->>Ag: rows 1..10
+```
 
 ```bash
+gateway mcp --adapter hive --tool hive_list_tables --arg database=$USER
+gateway mcp --adapter hive --tool hive_describe_table \
+  --arg database=$USER --arg table=count_to_10
 gateway mcp --adapter hive --tool hive_select \
   --arg database=$USER --arg table=count_to_10 --arg columns=n --arg limit=10
 ```
+
+A successful `hive_select` looks like `kind=select`, `columns=["n"]`, `returned=10`, `rows` `{"n":"1"}` … `{"n":"10"}`. Named columns are required; `SELECT *` is rejected. If Hive has not seen the table yet, the tool error names `count_to_10` (HTTP 200 JSON-RPC `isError`, not a raw 500).
 
 Must not:
 
@@ -154,4 +178,5 @@ sequenceDiagram
 4. `gateway hive` lists databases for the Knox `sub` (token topology)
 5. `gateway mcp --adapter hive --tool hive_list_databases` as the same `sub`
 6. Confirm Ranger policies for that `sub` on the Hive database
-7. Keep `/cdp/hive` unpublished
+7. `gateway mcp --adapter hive --tool hive_select` on `{user}.count_to_10` column `n` after Spark succeeds — [examples/hive/README.md](../examples/hive/README.md)
+8. Keep `/cdp/hive` unpublished

@@ -8,8 +8,7 @@ Submit from HDFS (or a CDE job resource), not a laptop path:
     gateway webhdfs put examples/spark/count_to_10.py /user/$USER/examples/count_to_10.py
     gateway mcp --tool spark_submit_batch \\
       --arg file=hdfs:///user/$USER/examples/count_to_10.py \\
-      --arg name=count-to-10 \\
-      --arg args=$USER,count_to_10
+      --arg name=count-to-10
 
 Optional args: <database> <table>. Defaults: Spark user database, table count_to_10.
 

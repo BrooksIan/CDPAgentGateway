@@ -1,0 +1,258 @@
+"""Cloudera AI / CML AMP runtime: Python Knox JWT in front of mcp-spark.
+
+Compose still uses APISIX + knox-jwt.lua. This profile is optional and live-Knox only.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import time
+import uuid
+from collections import defaultdict
+from pathlib import Path
+from typing import Any
+
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Route
+
+from agentgateway.knox import parse_knox_proxy_url
+from agentgateway.knox_jwt import (
+    DEFAULT_ALG,
+    DEFAULT_CLOCK_SKEW,
+    DEFAULT_ISSUER,
+    DEFAULT_REALM,
+    KnoxJWTError,
+    extract_bearer,
+    unauthorized_headers,
+    verify_knox_jwt,
+)
+from agentgateway.paths import repo_root
+
+
+def cml_port() -> int:
+    raw = os.environ.get("CDSW_APP_PORT") or os.environ.get("PORT") or "8080"
+    try:
+        return int(raw)
+    except ValueError:
+        return 8080
+
+
+def amp_public_key_path() -> Path:
+    configured = os.environ.get("KNOX_PUBLIC_KEY_FILE") or ""
+    if configured:
+        path = Path(configured)
+        return path if path.is_absolute() else repo_root() / path
+    return repo_root() / "conf" / "generated" / "knox-public.pem"
+
+
+def apply_live_upstream() -> dict[str, str]:
+    url = (os.environ.get("KNOX_PROXY_URL") or "").strip()
+    if not url:
+        raise ValueError("AMP requires KNOX_PROXY_URL (Knox Livy-for-Spark-3 HTTPS URL)")
+    parsed = parse_knox_proxy_url(url)
+    for key, value in parsed.items():
+        os.environ.setdefault(key, value)
+    os.environ.setdefault("ADMIN_BACKEND", "sqlite")
+    os.environ.setdefault("ADMIN_DB", str(repo_root() / "data" / "gateway.sqlite"))
+    os.environ.setdefault("GATEWAY_MODE", "live")
+    return parsed
+
+
+def _ensure_service_path(relative: str) -> None:
+    path = str(repo_root() / relative)
+    if path not in sys.path:
+        sys.path.append(path)
+
+
+def _load_module(module_name: str, directory: str, filename: str = "server.py"):
+    import importlib.util
+
+    _ensure_service_path(directory)
+    file_path = repo_root() / directory / filename
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load {file_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _int_env(name: str, default: int) -> int:
+    raw = os.environ.get(name) or str(default)
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value >= 0 else default
+
+
+class BurstLimiter:
+    def __init__(self, count: int, window: int):
+        self.count = max(int(count), 0)
+        self.window = max(int(window), 1)
+        self._hits: dict[str, list[float]] = defaultdict(list)
+
+    def allow(self, sub: str, *, now: float | None = None) -> bool:
+        if self.count <= 0:
+            return True
+        stamp = now if now is not None else time.time()
+        bucket = self._hits[sub]
+        cutoff = stamp - self.window
+        self._hits[sub] = [hit for hit in bucket if hit > cutoff]
+        if len(self._hits[sub]) >= self.count:
+            return False
+        self._hits[sub].append(stamp)
+        return True
+
+
+def _header_map(scope: dict[str, Any]) -> dict[bytes, bytes]:
+    return {key: value for key, value in scope.get("headers") or []}
+
+
+def _set_header(scope: dict[str, Any], name: str, value: str) -> None:
+    key = name.lower().encode("latin-1")
+    raw = value.encode("latin-1")
+    headers = [pair for pair in scope.get("headers") or [] if pair[0] != key]
+    headers.append((key, raw))
+    scope["headers"] = headers
+
+
+async def _send_json(
+    send,
+    *,
+    status: int,
+    body: dict[str, Any],
+    extra_headers: list[tuple[bytes, bytes]] | None = None,
+) -> None:
+    payload = json.dumps(body).encode("utf-8")
+    headers = list(extra_headers or [])
+    if not any(key == b"content-type" for key, _ in headers):
+        headers.append((b"content-type", b"application/json"))
+    headers.append((b"content-length", str(len(payload)).encode("ascii")))
+    await send({"type": "http.response.start", "status": status, "headers": headers})
+    await send({"type": "http.response.body", "body": payload})
+
+
+class KnoxJWTMiddleware:
+    """ASGI wrapper: skip public GETs, require Knox JWT on MCP POSTs."""
+
+    def __init__(self, app, *, public_key_file: Path, limiter: BurstLimiter | None = None):
+        self.app = app
+        self.public_key_file = public_key_file
+        self.limiter = limiter
+        self.issuer = os.environ.get("KNOX_ISSUER") or DEFAULT_ISSUER
+        self.expected_alg = os.environ.get("KNOX_EXPECTED_ALG") or DEFAULT_ALG
+        self.clock_skew = _int_env("KNOX_CLOCK_SKEW", DEFAULT_CLOCK_SKEW)
+        self.realm = os.environ.get("KNOX_REALM") or DEFAULT_REALM
+        self._pem: str | None = None
+
+    def _public_key(self) -> str:
+        if self._pem is None:
+            if not self.public_key_file.is_file():
+                raise KnoxJWTError("gateway_misconfigured", status=500)
+            pem = self.public_key_file.read_text()
+            if not pem.strip():
+                raise KnoxJWTError("gateway_misconfigured", status=500)
+            self._pem = pem
+        return self._pem
+
+    def _skip_jwt(self, method: str, path: str) -> bool:
+        if method != "GET":
+            return False
+        return path in {"/", "/health"} or path.rstrip("/") in {"", "/health"}
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        method = scope.get("method") or "GET"
+        path = scope.get("path") or "/"
+        if self._skip_jwt(method, path):
+            await self.app(scope, receive, send)
+            return
+        headers = _header_map(scope)
+        authorization = headers.get(b"authorization", b"").decode("latin-1")
+        try:
+            token = extract_bearer(authorization)
+            identity = verify_knox_jwt(
+                token,
+                public_key_pem=self._public_key(),
+                issuer=self.issuer,
+                expected_alg=self.expected_alg,
+                clock_skew=self.clock_skew,
+            )
+        except KnoxJWTError as extra:
+            headers = unauthorized_headers(realm=self.realm, reason=extra.reason) if extra.status == 401 else [
+                (b"x-agent-gateway-reason", extra.reason.encode("ascii")),
+                (b"content-type", b"application/json"),
+            ]
+            await _send_json(
+                send,
+                status=extra.status,
+                body={"error": "unauthorized" if extra.status == 401 else "gateway_misconfigured", "reason": extra.reason},
+                extra_headers=headers,
+            )
+            return
+        if self.limiter and method == "POST" and not self.limiter.allow(identity.sub):
+            await _send_json(
+                send,
+                status=429,
+                body={"error": "rate_limited", "reason": "rate_limited"},
+                extra_headers=[
+                    (b"x-agent-gateway-reason", b"rate_limited"),
+                    (b"content-type", b"application/json"),
+                ],
+            )
+            return
+        request_id = headers.get(b"x-request-id", b"").decode("latin-1").strip() or uuid.uuid4().hex
+        _set_header(scope, "X-Knox-User", identity.sub)
+        if identity.token_id:
+            _set_header(scope, "X-Knox-Token-Id", identity.token_id)
+        _set_header(scope, "X-Request-Id", request_id)
+        await self.app(scope, receive, send)
+
+
+def build_mcp_app() -> Starlette:
+    apply_live_upstream()
+    mcp = _load_module("amp_mcp_spark_server", "mcp-spark")
+
+    async def root(request: Request) -> Response:
+        if request.method == "GET":
+            return JSONResponse({"status": "ok", "service": "mcp-spark", "profile": "amp"})
+        return await mcp.mcp_endpoint(request)
+
+    app = Starlette(
+        routes=[
+            Route("/health", mcp.health, methods=["GET"]),
+            Route("/", root, methods=["GET", "POST"]),
+            Route("/mcp", mcp.mcp_endpoint, methods=["GET", "POST"]),
+            Route("/mcp/", mcp.mcp_endpoint, methods=["GET", "POST"]),
+            Route("/mcp/spark", mcp.mcp_endpoint, methods=["GET", "POST"]),
+            Route("/mcp/spark/", mcp.mcp_endpoint, methods=["GET", "POST"]),
+        ]
+    )
+    limiter = BurstLimiter(
+        _int_env("MCP_RATE_COUNT", 60),
+        _int_env("MCP_RATE_WINDOW", 60),
+    )
+    return KnoxJWTMiddleware(app, public_key_file=amp_public_key_path(), limiter=limiter)
+
+
+def build_admin_app():
+    os.environ.setdefault("ADMIN_DB", str(repo_root() / "data" / "gateway.sqlite"))
+    os.environ.setdefault("APISIX_HEALTH_URL", "")
+    os.environ.setdefault("MCP_SPARK_HEALTH_URL", os.environ.get("AMP_MCP_HEALTH_URL") or "")
+    return _load_module("amp_admin_server", "admin").app
+
+
+def serve_cml_app(app, *, service: str) -> None:
+    import uvicorn
+
+    port = cml_port()
+    print(json.dumps({"service": service, "event": "listen", "port": port, "profile": "amp"}), flush=True)
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")

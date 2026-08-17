@@ -53,6 +53,7 @@ Status: not started.
 | `src/agentgateway/` | Operator CLI | Phase 1 proxy |
 | `mcp-spark` | Livy / Spark tools over Knox | Phase 1 Spark proxy | [spark.md](spark.md) |
 | `admin/` | Operator UI + sqlite usage/quotas | Phase 2 Spark MCP | [admin.md](admin.md) |
+| AMP (`.project-metadata.yaml`) | Optional CML apps; Python JWT; live Knox | Phase 2 Spark MCP | [amp.md](amp.md) |
 | `mcp-hive` | Read-only SQL tool over Knox Hive | `mcp-spark` + JDBC inventory | [hive.md](hive.md) |
 | `mcp-catalog` | Atlas / schema discovery tools | `mcp-hive` |
 | `policy` | Tool allowlists, row caps | Identity model (admin quotas + request_id audit join) |
@@ -66,4 +67,5 @@ Status: not started.
 | HTTPS on localhost APISIX | HTTP `:9080` for the laptop lab | Add TLS before partner agents leave the VPN |
 | IdP in front of Knox | None in Phase 1 | Needed when MCP OAuth onboarding starts |
 | Streamable HTTP on `/mcp/spark` | POST JSON-RPC only | Hold until a real host fails `initialize`; do not add GET SSE now |
+| AMP `launchable: true` | false | Needs a workbench import against live Knox recorded in [testing.md](testing.md) |
 | Revocation check vs short TTL | Short TTL first | Knox token-state API coupling vs leak window |

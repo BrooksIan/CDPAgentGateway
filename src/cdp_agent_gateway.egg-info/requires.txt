@@ -4,5 +4,14 @@ cryptography
 python-dotenv
 PyYAML
 
+[amp]
+starlette
+uvicorn
+
 [dev]
 pytest
+starlette
+uvicorn
+
+[hive]
+impyla>=0.19

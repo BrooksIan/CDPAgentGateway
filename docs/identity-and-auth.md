@@ -6,7 +6,7 @@ A Cursor or Claude workspace key is not a CDP user. Every request must bind **bo
 
 | Principal | Credential | Enforced by | Purpose |
 | --- | --- | --- | --- |
-| End user | Knox JWT (`sub`, `knox.id`) | APISIX `knox-jwt`, then Knox | Who is acting on CDP data |
+| End user | Knox JWT (`sub`, `knox.id`) | APISIX `knox-jwt` or AMP Python `knox-jwt`, then Knox | Who is acting on CDP data |
 | Agent platform | mTLS or caller key | APISIX consumer (not yet) | Which third-party product is calling |
 | Tool / service | Knox topology + Ranger | Knox + Ranger | What that user may read or write |
 
@@ -33,7 +33,8 @@ The [APISIX authentication guide](https://apisix.apache.org/learning-center/api-
 
 | Method | Use here? | Why |
 | --- | --- | --- |
-| `plugins/knox-jwt.lua` | **Yes — primary** | RS256 + `iss` + `exp` + `sub` against a pinned PEM |
+| `plugins/knox-jwt.lua` | **Yes — primary on Compose** | RS256 + `iss` + `exp` + `sub` against a pinned PEM |
+| `agentgateway.knox_jwt` | **Yes — AMP profile only** | Same fail-closed reasons as the Lua plugin; does not follow `jku` |
 | `jwt-auth` | No | Issues APISIX consumer JWTs |
 | `openid-connect` `bearer_only` | No | Knox is not a full OIDC provider |
 | Key Auth | Phase 3 layer | Identify the agent product, never the CDP user |

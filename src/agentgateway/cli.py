@@ -308,6 +308,9 @@ def cmd_test(args: argparse.Namespace) -> int:
                 "tests/test_admin_store.py",
                 "tests/test_quota_client.py",
                 "tests/test_apisix_render.py",
+                "tests/test_knox_jwt.py",
+                "tests/test_amp_packaging.py",
+                "tests/test_amp_mcp.py",
             ]
         )
     else:
@@ -608,10 +611,14 @@ def _print_jdbc(env: dict[str, str]) -> None:
 
 
 def cmd_fetch_jwks(args: argparse.Namespace) -> int:
-    url = args.jwks_url or load_env().get("KNOX_JWKS_URL")
+    env = load_env()
+    url = args.jwks_url or env.get("KNOX_JWKS_URL")
     if not url:
         print("error: pass --jwks-url or set KNOX_JWKS_URL", file=sys.stderr)
         return 2
+    host = (env.get("UPSTREAM_HOST") or "").strip()
+    if host and host != "mock-cdp":
+        trusted_jku(url, host)
     out = fetch_knox_pubkey(url, Path(args.out), insecure=args.insecure)
     print(out)
     return 0

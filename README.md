@@ -17,6 +17,7 @@ This repo follows the [Cloudera Blueprints Standard](https://github.com/kevinbta
 - [Prerequisites](#prerequisites)
 - [Hardware Requirements](#hardware-requirements)
 - [Documentation](#documentation)
+- [License](#license)
 
 ## Overview
 
@@ -82,17 +83,20 @@ Enterprises want coding and analytics agents to submit Spark jobs on CDP, but th
 
    `gateway knox` writes host, port, `cdp-proxy-token` prefix, and JWKS URL into `.env`. Spark: [docs/spark.md](docs/spark.md). Hive: [docs/hive.md](docs/hive.md). Do not commit `.env`.
 
+6. Optional — Cloudera AI Workbench AMP (not Docker Compose). Live Knox only; `launchable` stays false until a workbench proof. How-to: [docs/amp.md](docs/amp.md).
+
 Do not commit Knox tokens, JDBC passwords, or private keys.
 
 ## Architecture / Software Components
 
-Agents terminate at APISIX. The `mcp-spark` adapter sits behind the gateway and forwards the caller's Knox bearer to Livy. Knox remains the only hop that presents cluster credentials. The admin UI is bound to localhost and is not an agent route.
+Agents terminate at APISIX (Compose) or at a Cloudera AI Application (optional AMP). The `mcp-spark` adapter sits behind that edge and forwards the caller's Knox bearer to Livy. Knox remains the only hop that presents cluster credentials. The admin UI is not an agent route (localhost `:9090` on Compose; CML login on AMP).
 
 ![CDP Agent Gateway traffic path](assets/architecture.svg)
 
 | Component | Role |
 | --- | --- |
-| Apache APISIX | Agent-facing HTTP edge: Knox JWT plugin, allowlisted routes, request IDs |
+| Apache APISIX | Agent-facing HTTP edge (Compose): Knox JWT plugin, allowlisted routes, request IDs |
+| Python `knox-jwt` | Same RS256 / `iss` / `exp` / `sub` checks for the optional CML AMP profile |
 | `knox-jwt` plugin | RS256, `iss=KNOXSSO`, expiry; pinned PEM; forwards `Authorization` |
 | `mcp-spark` | Livy MCP tools (list/get/log/submit); not an APISIX plugin |
 | Mock CDP (lab) | Stand-in Knox JWKS and Livy probes for `gateway test` |
@@ -106,22 +110,26 @@ Agents terminate at APISIX. The `mcp-spark` adapter sits behind the gateway and 
 | `/cdp/livy_for_spark3*` | GET, HEAD | Knox Livy (operators/tests) |
 | `/cdp/hive` | — | **404** (not published) |
 
-Extended design: [docs/architecture.md](docs/architecture.md), [docs/spark.md](docs/spark.md), [docs/hive.md](docs/hive.md), [docs/admin.md](docs/admin.md), [docs/identity-and-auth.md](docs/identity-and-auth.md).
+Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](docs/amp.md), [docs/spark.md](docs/spark.md), [docs/hive.md](docs/hive.md), [docs/admin.md](docs/admin.md), [docs/identity-and-auth.md](docs/identity-and-auth.md).
 
 ## Target Audience
 
 - Platform and security architects who must put agents on CDP without a second identity plane
 - Data engineers and SEs running a laptop lab against mock Knox or a VPN-connected cluster
 - Partner / ISV teams onboarding MCP hosts (Cursor, Claude) behind Knox
+- Cloudera AI Workbench operators who want an optional AMP profile against live Knox
 
 ## Repository Structure
 
 | Path | Description |
 | --- | --- |
-| `assets/` | Architecture diagram and catalog media |
+| `assets/` | Architecture diagram, admin UI screenshots, and catalog media |
 | `deploy/` | Docker Compose (APISIX, mock CDP, mcp-spark, admin) |
-| `docs/` | Architecture, Spark, Hive, admin, identity, phases, tests |
+| `docs/` | Architecture, Spark, Hive, admin, identity, AMP, phases, tests |
+| `LICENSE` | Apache License 2.0 |
 | `METADATA.yaml` | Catalog metadata for the Cloudera blueprint website |
+| `.project-metadata.yaml` | Optional CML AMP runbook (`launchable` is still false) |
+| `0_`–`4_` AMP dirs | CML jobs/apps; ignored by Compose |
 | `conf/` | APISIX standalone config templates |
 | `plugins/` | Custom `knox-jwt` APISIX plugin |
 | `inventory/` | Phase 0 CDP inventory consumed by tests |
@@ -140,21 +148,25 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 
 - Git, Docker Desktop (or Engine + Compose v2), Python 3.11+
 - `pip install -e ".[dev]"` installs the `gateway` CLI (`make` is optional)
+- `pip install -e ".[amp]"` only for the Cloudera AI Workbench profile
 - `pip install -e ".[hive]"` only if you run `gateway hive` (impyla)
 - Local demo: no CDP entitlement; mock Knox runs in Compose
 - Live cluster: CDP Private Cloud Base or Public Cloud, VPN or allowlisted laptop, Knox Token API / Token Generation, JWKS URL, Ranger-allowed test user
-- Secrets belong in `.env` (from `.env.example`), never in git or inventory markdown
+- Optional AMP: Cloudera AI Workbench that can reach Knox; not Docker-in-CML
+- Secrets belong in `.env` (from `.env.example`) or CML project env, never in git or inventory markdown
 
 ## Hardware Requirements
 
 | Deployment | Minimum |
 | --- | --- |
 | Launchable / demo (local Docker) | 2 CPU, 4 GB RAM, 10 GB disk |
+| Optional CML AMP (not catalog-launchable yet) | Workbench Python 3.11: install job 1 CPU / 4 GB; each app 1 CPU / 2 GB |
 | Production / enterprise (APISIX in front of Knox) | Size APISIX for agent QPS; CDP/Knox/Ranger sizing is unchanged. Plan extra RAM if MCP adapters and long Spark jobs share the same host |
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Optional Cloudera AI AMP](docs/amp.md)
 - [Working with Spark](docs/spark.md)
 - [Working with Hive](docs/hive.md)
 - [Operator admin UI](docs/admin.md)
@@ -168,3 +180,9 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 - [APISIX Learning Center](https://apisix.apache.org/learning-center/)
 - [API Gateway Authentication](https://apisix.apache.org/learning-center/api-gateway-authentication/)
 - [Cloudera Blueprints Standard](https://github.com/kevinbtalbert/Cloudera-Blueprints-Standard)
+
+## License
+
+Copyright 2026 Cloudera, Inc.
+
+Licensed under the Apache License, Version 2.0. See [`LICENSE`](LICENSE).

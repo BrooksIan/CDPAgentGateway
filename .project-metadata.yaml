@@ -1,0 +1,126 @@
+name: CDP Agent Gateway
+description: >-
+  Optional Cloudera AI Workbench profile of CDP Agent Gateway. Agents send Knox JWTs
+  to a Spark MCP application; the adapter forwards the same bearer to Knox Livy for
+  Spark 3. Ranger authorizes the token subject. This is not Docker Compose and does
+  not replace Apache Knox.
+author: Cloudera
+specification_version: "1.0"
+prototype_version: "0.1"
+date: "2026-08-17"
+
+environment_variables:
+  KNOX_PROXY_URL:
+    default: ""
+    description: >-
+      HTTPS Livy-for-Spark-3 URL on cdp-proxy-token
+      (example: https://knox.example/env/cdp-proxy-token/livy_for_spark3/). Required.
+    required: true
+  KNOX_JWKS_URL:
+    default: ""
+    description: >-
+      Knox homepage JWKS URL. Host must match KNOX_PROXY_URL. Leave empty to use the
+      URL derived from KNOX_PROXY_URL.
+    required: false
+  KNOX_ISSUER:
+    default: "KNOXSSO"
+    description: Expected JWT iss claim.
+    required: false
+  KNOX_EXPECTED_ALG:
+    default: "RS256"
+    description: Expected JWT alg. Anything else is rejected.
+    required: false
+  KNOX_CLOCK_SKEW:
+    default: "60"
+    description: Seconds of leeway for exp and nbf.
+    required: false
+  UPSTREAM_TLS_VERIFY:
+    default: "true"
+    description: Verify TLS when fetching JWKS and calling Knox. Set false only for lab CAs.
+    required: false
+  MCP_RATE_COUNT:
+    default: "60"
+    description: Burst cap on MCP POSTs per Knox sub.
+    required: false
+  MCP_RATE_WINDOW:
+    default: "60"
+    description: Burst window in seconds.
+    required: false
+  ADMIN_INTERNAL_TOKEN:
+    default: ""
+    description: Unused when both AMP apps share sqlite. Leave empty.
+    required: false
+
+runtimes:
+  - editor: Workbench
+    kernel: Python 3.11
+    edition: Standard
+
+tasks:
+  - type: create_job
+    name: Install dependencies
+    entity_label: install_deps
+    script: 0_session-install-dependencies/install_dependencies.py
+    arguments: None
+    cpu: 1
+    memory: 4
+    kernel: python3
+    short_summary: Install the AMP extra (Starlette, uvicorn) and the operator package.
+
+  - type: run_job
+    entity_label: install_deps
+    short_summary: Run dependency install.
+
+  - type: create_job
+    name: Fetch pinned Knox JWKS
+    entity_label: fetch_jwks
+    script: 1_job-fetch-jwks/fetch_jwks.py
+    arguments: None
+    cpu: 1
+    memory: 2
+    kernel: python3
+    short_summary: Download JWKS from the inventory Knox host and write a verifying PEM.
+
+  - type: run_job
+    entity_label: fetch_jwks
+    short_summary: Pin JWKS; refuse a foreign jku host.
+
+  - type: create_job
+    name: Smoke-check Knox
+    entity_label: smoke_knox
+    script: 2_job-smoke-knox/smoke_knox.py
+    arguments: None
+    cpu: 1
+    memory: 2
+    kernel: python3
+    short_summary: Confirm the PEM exists and JWKS is reachable. Optional Livy GET if KNOX_TOKEN is set in the job.
+
+  - type: run_job
+    entity_label: smoke_knox
+    short_summary: Reachability check; never prints the bearer.
+
+  - type: start_application
+    name: Spark MCP
+    subdomain: mcp-spark
+    static_subdomain: true
+    bypass_authentication: true
+    script: 3_app-mcp-spark/app.py
+    cpu: 1
+    memory: 2
+    kernel: python3
+    short_summary: MCP JSON-RPC for Livy Spark 3. Requires Knox JWT. CML session cookies are not the user credential.
+    long_summary: >-
+      Public to MCP hosts so Cursor can send Authorization Bearer. The application
+      validates Knox RS256 (iss, exp, sub) against the pinned PEM, then forwards
+      the same bearer to Knox. Do not paste tokens into git or project files.
+
+  - type: start_application
+    name: Operator admin
+    subdomain: gateway-admin
+    static_subdomain: true
+    bypass_authentication: false
+    script: 4_app-operator-admin/app.py
+    cpu: 1
+    memory: 2
+    kernel: python3
+    short_summary: Usage and quotas for operators. CML login required. Not an MCP route.

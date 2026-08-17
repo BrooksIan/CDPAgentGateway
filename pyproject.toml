@@ -7,7 +7,11 @@ name = "cdp-agent-gateway"
 version = "0.1.0"
 description = "Operator CLI for the CDP Agent Gateway blueprint"
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.11"
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+]
 dependencies = [
   "httpx",
   "PyJWT",
@@ -17,7 +21,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "starlette", "uvicorn"]
+amp = ["starlette", "uvicorn"]
 hive = ["impyla>=0.19"]
 
 [project.scripts]

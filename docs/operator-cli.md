@@ -79,6 +79,8 @@ This talks to Knox `{KNOX_PROXY_PREFIX}/hive` with `KNOX_TOKEN`. It is not an ag
 | `admin [--open]` | Operator usage/quota/audit UI at `http://127.0.0.1:9090` (not an agent route) |
 | `call [path]` | Call an arbitrary gateway path with a bearer |
 
+Optional Cloudera AI Workbench packaging is not a `gateway` subcommand. See [amp.md](amp.md).
+
 ## Docker credential hang
 
 If `docker compose pull` blocks on `docker-credential-desktop get`, see [deploy/README.md](../deploy/README.md) for an anonymous `DOCKER_CONFIG` workaround.

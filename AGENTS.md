@@ -13,6 +13,7 @@ Read [docs/architecture.md](docs/architecture.md) and [docs/identity-and-auth.md
 - Bind two identities on every request: agent consumer (mTLS or caller key) and Knox `sub`.
 - Ranger remains authorization. Never impersonate a different user than the token `sub`.
 - MCP adapters are upstream services, not APISIX plugins and not the experimental `mcp-bridge`.
+- Optional CML AMP packaging lives in `.project-metadata.yaml` and `docs/amp.md`. Do not flip `launchable: true` without a workbench proof. Do not run Compose inside CML.
 - Keep `/mcp/spark` as POST JSON-RPC. Do not add Streamable HTTP (GET SSE / session) unless a real host fails `initialize` and the operator asks for it.
 - Never commit `.env`, Knox tokens, passcodes, keytabs, or JWKS private material.
 
@@ -20,7 +21,7 @@ Read [docs/architecture.md](docs/architecture.md) and [docs/identity-and-auth.md
 
 1. Fill [docs/phase-0-inventory.md](docs/phase-0-inventory.md) and `inventory/cdp.yaml` for the external CDP under test.
 2. Put secrets only in `.env` (from `.env.example`).
-3. Change Compose and APISIX config under `deploy/`, `conf/`, and `plugins/`.
+3. Change Compose and APISIX config under `deploy/`, `conf/`, and `plugins/`. AMP jobs/apps stay in numbered `0_`–`4_` dirs plus `src/agentgateway/amp.py`.
 4. Use the operator CLI for local work: `gateway init`, `gateway knox <knox-proxy-url>`, `gateway jdbc add <jdbc:hive2://…>`, `gateway up`, `gateway test`. `python -m agentgateway` is the same entry point.
 5. Execute cases in [docs/testing.md](docs/testing.md); record results without tokens.
 6. Keep `README.md` catalog sections and `METADATA.yaml` in sync when the product story changes.
@@ -29,7 +30,7 @@ Current target: **Phase 2 Spark MCP** on the Phase 1 Livy allowlist (`spark_subm
 
 ## Runtime agents (Cursor, Claude)
 
-Call `http://127.0.0.1:9080/mcp/spark` with the **user's Knox JWT** as `Authorization: Bearer`. How-to: [docs/spark.md](docs/spark.md). Hive is inventory-only: [docs/hive.md](docs/hive.md). Do not call Knox, Hive, or raw Livy writes. `/cdp/livy_for_spark3*` is GET/HEAD only. Do not log or echo the bearer.
+Call `http://127.0.0.1:9080/mcp/spark` with the **user's Knox JWT** as `Authorization: Bearer`. How-to: [docs/spark.md](docs/spark.md). Optional AMP URL: [docs/amp.md](docs/amp.md). Hive is inventory-only: [docs/hive.md](docs/hive.md). Do not call Knox, Hive, or raw Livy writes. `/cdp/livy_for_spark3*` is GET/HEAD only. Do not log or echo the bearer.
 
 Tools: `spark_list_sessions`, `spark_list_batches`, `spark_get_batch`, `spark_get_log`, `spark_submit_batch`. Submit `examples/spark/count_to_10.py` after copying it to HDFS/Ozone. Poll with `spark_get_batch`. Do not run interactive Livy `code`.
 

@@ -9,7 +9,7 @@ Two surfaces share the same Knox JWT and the same Ranger subject:
 | Livy HTTP | `/cdp/livy_for_spark3*` | GET, HEAD | Operators (`gateway spark`), tests |
 | MCP | `/mcp/spark` | POST (JSON-RPC) | Cursor, Claude, `gateway mcp` |
 
-Both require `Authorization: Bearer <knox-jwt>`. APISIX `knox-jwt` validates the token, then either rewrites to Knox Livy or forwards to the `mcp-spark` adapter. Hive and other CDP paths stay **404**.
+Both require `Authorization: Bearer <knox-jwt>`. Compose: APISIX `knox-jwt` validates the token, then either rewrites to Knox Livy or forwards to the `mcp-spark` adapter. AMP: the CML `mcp-spark` application validates the same JWT in Python. Hive and other CDP paths stay **404**.
 
 ```mermaid
 flowchart LR
@@ -89,7 +89,7 @@ Prefer MCP for agents. Raw Livy on the agent listener is **GET/HEAD only**. `POS
 
 ## MCP tools
 
-`mcp-spark` is a Compose upstream. APISIX strips `/mcp/spark` to `/mcp` on that service. Tools forward the **caller** bearer; they hold no cluster secrets.
+`mcp-spark` is a Compose upstream (APISIX strips `/mcp/spark` to `/mcp`) and the same module behind the optional CML AMP application. Tools forward the **caller** bearer; they hold no cluster secrets.
 
 | Tool | Livy call | Notes |
 | --- | --- | --- |
@@ -170,11 +170,11 @@ Put the Knox JWT in the host secret store, never in git.
 }
 ```
 
-Agents should call `/mcp/spark` only, with **POST JSON-RPC**. Streamable HTTP (GET SSE, MCP session) is **not** implemented and is held. Do not teach them the Knox URL, `/cdp/hive`, or the operator admin UI (`:9090`).
+Agents should call `/mcp/spark` only, with **POST JSON-RPC**. Streamable HTTP (GET SSE, MCP session) is **not** implemented and is held. Do not teach them the Knox URL, `/cdp/hive`, or the operator admin UI (`:9090`). AMP hosts use `https://mcp-spark.<workspace>/mcp/spark` instead of localhost; see [amp.md](amp.md).
 
 Operators set per-user daily call/submit quotas in [admin.md](admin.md). A denied submit is an MCP tool error and does not reach Livy. Operators look up a call by APISIX `X-Request-Id` (`GET /api/audit`) to join tool, `sub`, and `knox.id`.
 
-APISIX also applies a per-`sub` burst cap on `/mcp/spark` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW` in `.env`, default 60 per 60s). Exceeding it is HTTP `429` (`mcp rate limit`). Livy GET is not capped this way.
+APISIX also applies a per-`sub` burst cap on `/mcp/spark` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW` in `.env`, default 60 per 60s). Exceeding it is HTTP `429` (`mcp rate limit`). Livy GET is not capped this way. The AMP profile enforces the same counters in Python.
 
 ## What Spark does not do
 

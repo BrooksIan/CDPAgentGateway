@@ -11,7 +11,7 @@ reprise_link: "" # Public reprise link — add when the demo recording is publis
 # --- Classification (website filters) ---
 catalog_classification:
   - Enterprise Blueprint # Options: Enterprise Blueprint | Research | Launchable (AMP) | Developer Example
-launchable: false # true | false — not a Cloudera AI AMP
+launchable: false # true | false — AMP packaging exists; wait for a workbench proof before flipping
 lifecycle_status: Active # e.g., Active | Deprecated
 
 # --- Industry & alignment ---
@@ -31,6 +31,7 @@ tags:
   - gateway
   - ranger
   - cdp
+  - amp
 
 # --- Relationships ---
 product_mapping: # Cloudera products used

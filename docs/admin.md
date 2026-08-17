@@ -11,6 +11,10 @@ gateway admin --open
 
 Default URL: `http://127.0.0.1:9090`.
 
+On the optional CML AMP profile the same UI is a workbench application (`gateway-admin`) with **CML login**. It shares `data/gateway.sqlite` with mcp-spark. It is still not an agent route. How-to: [amp.md](amp.md).
+
+![Operator console: path status, health, and UTC-day usage](../assets/admin-overview.png)
+
 ## What it shows
 
 - Path status: quotas enforcing, APISIX burst cap, `GATEWAY_MODE`, upstream host, health of admin / mcp-spark / APISIX
@@ -29,7 +33,7 @@ curl -s "http://127.0.0.1:9090/api/status"
 | Layer | Where | In this sqlite? |
 | --- | --- | --- |
 | Daily quota | `mcp-spark` calls admin **before** Livy | Yes (`kind=denied`) |
-| Burst cap | APISIX `limit-count` on `/mcp/spark` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW`) | No |
+| Burst cap | APISIX `limit-count` on `/mcp/spark` (`MCP_RATE_COUNT` / `MCP_RATE_WINDOW`); AMP uses the same env on the Python JWT middleware | No |
 
 If this admin service is down, `mcp-spark` **fails open** (allows the call). The UI badge is honest: quotas are enforcing only while you can load this page.
 
@@ -39,12 +43,22 @@ Livy GET on `/cdp/livy_for_spark3*` is not burst-capped. Ranger still authorizes
 
 Empty fields mean unlimited. Per-user rows override the default `*` quota.
 
+![Default `*` quota and a per-user override for `analyst`](../assets/admin-quotas.png)
+
 | Field | Applies to |
 | --- | --- |
 | Daily tool calls | Every `tools/call` (list, get, log, submit) |
 | Daily submits | `spark_submit_batch` only |
 
 A denied submit returns an MCP tool error (`status=429`) and does not reach Knox.
+
+## Usage and audit
+
+Usage is per UTC day, keyed by Knox `sub`. Click a request id in Activity (or paste it into Audit join) to see tool, `sub`, and `knox.id` for that call. Bearers are never stored.
+
+![UTC-day usage by Knox `sub`, plus audit lookup by `X-Request-Id`](../assets/admin-usage-audit.png)
+
+![Activity log: tool calls keyed by Knox user and request id](../assets/admin-activity.png)
 
 ## What it is not
 

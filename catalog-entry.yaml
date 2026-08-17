@@ -1,0 +1,29 @@
+name: Community
+
+entries:
+  - title: CDP Agent Gateway
+    label: cdp-agent-gateway
+    short_description: |
+      Front third-party agents with Knox JWTs so Spark on CDP stays behind Ranger.
+      Optional Cloudera AI Workbench application (not Docker Compose).
+    long_description: |
+      CDP Agent Gateway lets Cursor and other MCP hosts submit Spark jobs as the Knox
+      token subject. The AMP profile runs mcp-spark as a CML Application with in-process
+      Knox JWT validation. Apache Knox remains the CDP perimeter. Compose/APISIX remains
+      the laptop and production-shaped edge. This catalog entry is packaging only until
+      a workbench proof sets METADATA.yaml launchable to true.
+    long_description_html: |
+      <p>CDP Agent Gateway lets Cursor and other MCP hosts submit Spark jobs as the Knox
+      token subject. The AMP profile runs mcp-spark as a CML Application with in-process
+      Knox JWT validation. Apache Knox remains the CDP perimeter.</p>
+    image_path: assets/architecture.svg
+    tags:
+      - agents
+      - mcp
+      - spark
+      - knox
+      - gateway
+    git_url: ""
+    is_prototype: true
+    is_community: true
+    is_new: true

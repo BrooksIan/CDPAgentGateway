@@ -80,3 +80,21 @@ def fetch_knox_pubkey(jwks_url: str, out: Path, *, insecure: bool = False) -> Pa
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(jwk_to_pem(keys[0]))
     return out
+
+
+def fetch_pinned_knox_pubkey(
+    *,
+    knox_proxy_url: str,
+    jwks_url: str | None,
+    out: Path,
+    insecure: bool = False,
+) -> Path:
+    """Download JWKS only when the URL host matches the inventory Knox host."""
+    from agentgateway.knox import parse_knox_proxy_url, trusted_jku
+
+    parsed = parse_knox_proxy_url(knox_proxy_url)
+    url = (jwks_url or parsed.get("KNOX_JWKS_URL") or "").strip()
+    if not url:
+        raise ValueError("Need KNOX_JWKS_URL or a Knox proxy URL that implies one")
+    trusted_jku(url, parsed["UPSTREAM_HOST"])
+    return fetch_knox_pubkey(url, out, insecure=insecure)

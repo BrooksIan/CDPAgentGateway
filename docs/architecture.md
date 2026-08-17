@@ -4,7 +4,7 @@ Third-party agents must not discover Livy, Hive, Impala, Ozone, NiFi, or other C
 
 ![CDP Agent Gateway traffic path](../assets/architecture.svg)
 
-Phase 1 traffic is `agents → APISIX → Knox → Livy (Spark 3)`. Phase 2 adds `agents → APISIX → mcp-spark → Knox → Livy`.
+Phase 1 traffic is `agents → APISIX → Knox → Livy (Spark 3)`. Phase 2 adds `agents → APISIX → mcp-spark → Knox → Livy`. Optional AMP is `agents → CML Application → mcp-spark → Knox → Livy`.
 
 ## What each hop owns
 
@@ -13,6 +13,7 @@ Phase 1 traffic is `agents → APISIX → Knox → Livy (Spark 3)`. Phase 2 adds
 | Operator CLI (`gateway`) | `.env`, mock keys, JWKS fetch, Compose, probes (`gateway spark`) | Cluster credentials, Ranger decisions |
 | Operator admin (`:9090`) | Usage by Knox `sub`, tool quotas, `request_id` audit join | Agent traffic, Ranger decisions, cluster credentials |
 | Agent Gateway (APISIX) | TLS (later), Knox JWT validation, allowlisted routes, request IDs, MCP burst cap | Cluster credentials, Ranger decisions, MCP tool implementations |
+| AMP mcp-spark app (optional) | Same Knox JWT rules in Python; CML Application URL | Compose, APISIX, mock Knox, impersonation |
 | MCP adapters (`mcp-spark`) | Livy list/get/log/submit; forward the caller's Knox bearer | Impersonation, inline Spark code, long-lived Knox secrets |
 | Knox | Token issuance, `JWTProvider` on `cdp-proxy-token`, Trusted Proxy / doAs | Public internet exposure |
 | Ranger | Data authorization for the Knox subject on Spark | Agent-product identity |
@@ -51,11 +52,12 @@ Use Backend-for-Frontend routes per agent class rather than one catch-all proxy:
 
 Spark jobs are long-running. Upstream send/read timeouts in APISIX are 120s; traces should start at the agent request and continue through Knox.
 
-## Local and live shape
+## Local, live, and AMP shape
 
 A laptop runs APISIX in Docker.
 
 - **Local:** upstream is `mock-cdp`. `gateway init && gateway up && gateway test` is the lab path.
 - **Live:** `gateway knox <https-knox-url-with-livy_for_spark3>` writes host, `cdp-proxy-token` prefix, and JWKS URL into `.env`. `gateway token set` stores the Knox JWT. Agents and curl still hit `localhost:9080`; APISIX validates the JWT and proxies Livy only.
+- **Optional AMP:** Cloudera AI Workbench applications (`mcp-spark`, `gateway-admin`). Python Knox JWT in front of the same `mcp-spark` adapter. Live Knox only; no Compose, no mock CDP. `launchable` stays false until a workbench proof. How-to: [amp.md](amp.md).
 
 Direct Knox access from untrusted networks stays blocked at the CDP perimeter.

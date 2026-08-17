@@ -13,7 +13,7 @@ Assumptions:
 ## How to run
 
 ```bash
-gateway test --unit          # inventory, CLI, blueprint layout (no Docker)
+gateway test --unit          # inventory, CLI, blueprint, AMP packaging (no Docker)
 gateway test                 # start Compose, run pytest -m "not live"
 gateway test --live          # requires GATEWAY_MODE=live and KNOX_TOKEN
 ```
@@ -74,6 +74,18 @@ Against mock CDP unless noted. Spark URI is `/cdp/livy_for_spark3/sessions`.
 | P2-11 | Operator admin UI on `:9090` | `GET /health` 200; `GET /admin` on APISIX is 404 | `tests/test_admin_gateway.py` |
 | P2-12 | Per-user submit quota | `daily_submits=0` → admin admit `429`; MCP `isError` when mock PEM is in use | `tests/test_admin_gateway.py`, `tests/test_admin_store.py` |
 | P2-13 | MCP burst rate limit | Authenticated `/mcp/spark` returns `429` after `MCP_RATE_COUNT` per Knox `sub`; Livy GET is not capped | `tests/test_gateway_ratelimit.py`, `tests/test_apisix_render.py` |
+
+## Optional AMP (not catalog-launchable yet)
+
+Python Knox JWT and CML packaging. Compose tests above stay the source of truth for APISIX.
+
+| ID | Case | Expected | Automated |
+| --- | --- | --- | --- |
+| AMP-01 | AMP metadata present; `launchable` false | `.project-metadata.yaml` tasks; no `KNOX_TOKEN` project env; mcp-spark bypasses CML login; admin does not | `tests/test_amp_packaging.py` |
+| AMP-02 | Python knox-jwt fail-closed | `missing_token`, `invalid_alg`, `expired`, `invalid_issuer` | `tests/test_knox_jwt.py` |
+| AMP-03 | AMP MCP GET `/health` public; POST without JWT `401` | Valid token `tools/list`; no raw bearer in body | `tests/test_amp_mcp.py` |
+| AMP-04 | JWKS host pin on AMP fetch | Foreign `jku` host refused before download | `tests/test_knox_jwt.py` |
+| AMP-05 | Workbench import against live Knox | MCP `tools/list` through the CML app HTTPS URL | Manual; record below without tokens |
 
 ## Later phases (do not implement yet)
 

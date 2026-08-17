@@ -50,6 +50,7 @@ def test_readme_has_blueprint_standard_sections() -> None:
     assert "assets/" in text
     assert "deploy/" in text
     assert "METADATA.yaml" in text
+    assert "docs/amp.md" in text
     assert "docs/spark.md" in text
     assert "docs/hive.md" in text
     assert "/mcp/spark" in text
@@ -83,6 +84,9 @@ def test_blueprint_layout_dirs_exist() -> None:
         ROOT / "docs" / "operator-cli.md",
         ROOT / "docs" / "spark.md",
         ROOT / "docs" / "hive.md",
+        ROOT / "docs" / "amp.md",
+        ROOT / ".project-metadata.yaml",
+        ROOT / "catalog-entry.yaml",
         ROOT / "METADATA.yaml",
     ):
         assert path.exists(), f"missing blueprint path {path.relative_to(ROOT)}"

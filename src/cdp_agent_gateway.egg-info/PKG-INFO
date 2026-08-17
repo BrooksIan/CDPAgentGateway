@@ -2,8 +2,217 @@ Metadata-Version: 2.4
 Name: cdp-agent-gateway
 Version: 0.1.0
 Summary: Operator CLI for the CDP Agent Gateway blueprint
+License: 
+                                         Apache License
+                                   Version 2.0, January 2004
+                                http://www.apache.org/licenses/
+        
+           TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+        
+           1. Definitions.
+        
+              "License" shall mean the terms and conditions for use, reproduction,
+              and distribution as defined by Sections 1 through 9 of this document.
+        
+              "Licensor" shall mean the copyright owner or entity authorized by
+              the copyright owner that is granting the License.
+        
+              "Legal Entity" shall mean the union of the acting entity and all
+              other entities that control, are controlled by, or are under common
+              control with that entity. For the purposes of this definition,
+              "control" means (i) the power, direct or indirect, to cause the
+              direction or management of such entity, whether by contract or
+              otherwise, or (ii) ownership of fifty percent (50%) or more of the
+              outstanding shares, or (iii) beneficial ownership of such entity.
+        
+              "You" (or "Your") shall mean an individual or Legal Entity
+              exercising permissions granted by this License.
+        
+              "Source" form shall mean the preferred form for making modifications,
+              including but not limited to software source code, documentation
+              source, and configuration files.
+        
+              "Object" form shall mean any form resulting from mechanical
+              transformation or translation of a Source form, including but
+              not limited to compiled object code, generated documentation,
+              and conversions to other media types.
+        
+              "Work" shall mean the work of authorship, whether in Source or
+              Object form, made available under the License, as indicated by a
+              copyright notice that is included in or attached to the work
+              (an example is provided in the Appendix below).
+        
+              "Derivative Works" shall mean any work, whether in Source or Object
+              form, that is based on (or derived from) the Work and for which the
+              editorial revisions, annotations, elaborations, or other modifications
+              represent, as a whole, an original work of authorship. For the purposes
+              of this License, Derivative Works shall not include works that remain
+              separable from, or merely link (or bind by name) to the interfaces of,
+              the Work and Derivative Works thereof.
+        
+              "Contribution" shall mean any work of authorship, including
+              the original version of the Work and any modifications or additions
+              to that Work or Derivative Works thereof, that is intentionally
+              submitted to Licensor for inclusion in the Work by the copyright owner
+              or by an individual or Legal Entity authorized to submit on behalf of
+              the copyright owner. For the purposes of this definition, "submitted"
+              means any form of electronic, verbal, or written communication sent
+              to the Licensor or its representatives, including but not limited to
+              communication on electronic mailing lists, source code control systems,
+              and issue tracking systems that are managed by, or on behalf of, the
+              Licensor for the purpose of discussing and improving the Work, but
+              excluding communication that is conspicuously marked or otherwise
+              designated in writing by the copyright owner as "Not a Contribution."
+        
+              "Contributor" shall mean Licensor and any individual or Legal Entity
+              on behalf of whom a Contribution has been received by Licensor and
+              subsequently incorporated within the Work.
+        
+           2. Grant of Copyright License. Subject to the terms and conditions of
+              this License, each Contributor hereby grants to You a perpetual,
+              worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+              copyright license to reproduce, prepare Derivative Works of,
+              publicly display, publicly perform, sublicense, and distribute the
+              Work and such Derivative Works in Source or Object form.
+        
+           3. Grant of Patent License. Subject to the terms and conditions of
+              this License, each Contributor hereby grants to You a perpetual,
+              worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+              (except as stated in this section) patent license to make, have made,
+              use, offer to sell, sell, import, and otherwise transfer the Work,
+              where such license applies only to those patent claims licensable
+              by such Contributor that are necessarily infringed by their
+              Contribution(s) alone or by combination of their Contribution(s)
+              with the Work to which such Contribution(s) was submitted. If You
+              institute patent litigation against any entity (including a
+              cross-claim or counterclaim in a lawsuit) alleging that the Work
+              or a Contribution incorporated within the Work constitutes direct
+              or contributory patent infringement, then any patent licenses
+              granted to You under this License for that Work shall terminate
+              as of the date such litigation is filed.
+        
+           4. Redistribution. You may reproduce and distribute copies of the
+              Work or Derivative Works thereof in any medium, with or without
+              modifications, and in Source or Object form, provided that You
+              meet the following conditions:
+        
+              (a) You must give any other recipients of the Work or
+                  Derivative Works a copy of this License; and
+        
+              (b) You must cause any modified files to carry prominent notices
+                  stating that You changed the files; and
+        
+              (c) You must retain, in the Source form of any Derivative Works
+                  that You distribute, all copyright, patent, trademark, and
+                  attribution notices from the Source form of the Work,
+                  excluding those notices that do not pertain to any part of
+                  the Derivative Works; and
+        
+              (d) If the Work includes a "NOTICE" text file as part of its
+                  distribution, then any Derivative Works that You distribute must
+                  include a readable copy of the attribution notices contained
+                  within such NOTICE file, excluding those notices that do not
+                  pertain to any part of the Derivative Works, in at least one
+                  of the following places: within a NOTICE text file distributed
+                  as part of the Derivative Works; within the Source form or
+                  documentation, if provided along with the Derivative Works; or,
+                  within a display generated by the Derivative Works, if and
+                  wherever such third-party notices normally appear. The contents
+                  of the NOTICE file are for informational purposes only and
+                  do not modify the License. You may add Your own attribution
+                  notices within Derivative Works that You distribute, alongside
+                  or as an addendum to the NOTICE text from the Work, provided
+                  that such additional attribution notices cannot be construed
+                  as modifying the License.
+        
+              You may add Your own copyright statement to Your modifications and
+              may provide additional or different license terms and conditions
+              for use, reproduction, or distribution of Your modifications, or
+              for any such Derivative Works as a whole, provided Your use,
+              reproduction, and distribution of the Work otherwise complies with
+              the conditions stated in this License.
+        
+           5. Submission of Contributions. Unless You explicitly state otherwise,
+              any Contribution intentionally submitted for inclusion in the Work
+              by You to the Licensor shall be under the terms and conditions of
+              this License, without any additional terms or conditions.
+              Notwithstanding the above, nothing herein shall supersede or modify
+              the terms of any separate license agreement you may have executed
+              with Licensor regarding such Contributions.
+        
+           6. Trademarks. This License does not grant permission to use the trade
+              names, trademarks, service marks, or product names of the Licensor,
+              except as required for reasonable and customary use in describing the
+              origin of the Work and reproducing the content of the NOTICE file.
+        
+           7. Disclaimer of Warranty. Unless required by applicable law or
+              agreed to in writing, Licensor provides the Work (and each
+              Contributor provides its Contributions) on an "AS IS" BASIS,
+              WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+              implied, including, without limitation, any warranties or conditions
+              of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+              PARTICULAR PURPOSE. You are solely responsible for determining the
+              appropriateness of using or redistributing the Work and assume any
+              risks associated with Your exercise of permissions under this License.
+        
+           8. Limitation of Liability. In no event and under no legal theory,
+              whether in tort (including negligence), contract, or otherwise,
+              unless required by applicable law (such as deliberate and grossly
+              negligent acts) or agreed to in writing, shall any Contributor be
+              liable to You for damages, including any direct, indirect, special,
+              incidental, or consequential damages of any character arising as a
+              result of this License or out of the use or inability to use the
+              Work (including but not limited to damages for loss of goodwill,
+              work stoppage, computer failure or malfunction, or any and all
+              other commercial damages or losses), even if such Contributor
+              has been advised of the possibility of such damages.
+        
+           9. Accepting Warranty or Additional Liability. While redistributing
+              the Work or Derivative Works thereof, You may choose to offer,
+              and charge a fee for, acceptance of support, warranty, indemnity,
+              or other liability obligations and/or rights consistent with this
+              License. However, in accepting such obligations, You may act only
+              on Your own behalf and on Your sole responsibility, not on behalf
+              of any other Contributor, and only if You agree to indemnify,
+              defend, and hold each Contributor harmless for any liability
+              incurred by, or claims asserted against, such Contributor by reason
+              of your accepting any such warranty or additional liability.
+        
+           END OF TERMS AND CONDITIONS
+        
+           APPENDIX: How to apply the Apache License to your work.
+        
+              To apply the Apache License to your work, attach the following
+              boilerplate notice, with the fields enclosed by brackets "[]"
+              replaced with your own identifying information. (Don't include
+              the brackets!)  The text should be enclosed in the appropriate
+              comment syntax for the file format. We also recommend that a
+              file or class name and description of purpose be included on the
+              same "printed page" as the copyright notice for easier
+              identification within third-party archives.
+        
+           Copyright 2026 Cloudera, Inc.
+        
+           Licensed under the Apache License, Version 2.0 (the "License");
+           you may not use this file except in compliance with the License.
+           You may obtain a copy of the License at
+        
+               http://www.apache.org/licenses/LICENSE-2.0
+        
+           Unless required by applicable law or agreed to in writing, software
+           distributed under the License is distributed on an "AS IS" BASIS,
+           WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+           See the License for the specific language governing permissions and
+           limitations under the License.
+        
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: httpx
 Requires-Dist: PyJWT
 Requires-Dist: cryptography
@@ -18,6 +227,7 @@ Requires-Dist: starlette; extra == "amp"
 Requires-Dist: uvicorn; extra == "amp"
 Provides-Extra: hive
 Requires-Dist: impyla>=0.19; extra == "hive"
+Dynamic: license-file
 
 # Cloudera Blueprint: CDP Agent Gateway
 
@@ -30,6 +240,7 @@ This repo follows the [Cloudera Blueprints Standard](https://github.com/kevinbta
 - [Overview](#overview)
 - [Demo](#demo)
 - [Use Case](#use-case)
+- [How this compares to AI gateways](#how-this-compares-to-ai-gateways)
 - [Key Features](#key-features)
 - [Quickstart](#quickstart)
 - [Software Components](#software-components)
@@ -38,31 +249,65 @@ This repo follows the [Cloudera Blueprints Standard](https://github.com/kevinbta
 - [Prerequisites](#prerequisites)
 - [Hardware Requirements](#hardware-requirements)
 - [Documentation](#documentation)
+- [License](#license)
 
 ## Overview
 
-CDP Agent Gateway sits in front of Cloudera Data Platform so Cursor, Claude, and other MCP hosts can run Spark without learning cluster topology. Apache APISIX terminates agent HTTP, validates Knox-issued RS256 JWTs, and forwards the same bearer into Knox `cdp-proxy-token` **Livy for Spark 3**. Agents use MCP at `/mcp/spark`. Operators can `GET` Livy for tests. Knox Trusted Proxy and Apache Ranger remain the authorization source of truth.
+![CDP Agent Gateway catalog cover](assets/AMP_thumbnail.jpg)
 
-Hive is inventoried (`gateway jdbc add`) and operators can `SHOW DATABASES` with `gateway hive`. `/cdp/hive` is not an agent route. Impala, Ozone, and NiFi stay unpublished. Cloudera value is unchanged identity and data policy: agents do not get a parallel credential path into the lakehouse.
+CDP Agent Gateway sits in front of Cloudera Data Platform so Cursor, Claude, and other MCP hosts can run Spark without learning cluster topology. Apache APISIX terminates agent HTTP, validates Knox-issued RS256 JWTs, and forwards the same bearer into Knox `cdp-proxy-token` **Livy for Spark 3**. Agents use MCP at `/mcp/spark`. Operators can `GET` Livy for tests and stage job files with **WebHDFS** (`/cdp/webhdfs*`). Knox Trusted Proxy and Apache Ranger remain the authorization source of truth.
+
+Hive is inventoried (`gateway jdbc add`) and agents use read-only MCP at `/mcp/hive`. Impala uses read-only MCP at `/mcp/impala`. `/cdp/hive` and `/cdp/impala` are not agent routes. Ozone and NiFi stay unpublished. Cloudera value is unchanged identity and data policy: agents do not get a parallel credential path into the lakehouse.
 
 ## Demo
 
-A recorded Reprise walkthrough is not published yet. The current path is the local Docker stack in [Quickstart](#quickstart): mock Knox, APISIX on `localhost:9080`, Spark MCP at `/mcp/spark`, operator admin UI on `127.0.0.1:9090`. Pytest covers missing bearer, `alg=none`, expired tokens, subject forwarding, and MCP tool list.
+A recorded Reprise walkthrough is not published yet. The current path is the local Docker stack in [Quickstart](#quickstart): mock Knox, APISIX on `localhost:9080`, Spark MCP at `/mcp/spark`, read-only Hive MCP at `/mcp/hive`, read-only Impala MCP at `/mcp/impala`, operator admin UI on `127.0.0.1:9090`. Pytest covers missing bearer, `alg=none`, expired tokens, subject forwarding, and MCP tool list. `--mint` is the lab JWT only; live Knox uses `gateway token set`.
+
+![Operator console: path status, health, and UTC-day usage](assets/admin-overview.png)
+
+![Default quota and per-user override](assets/admin-quotas.png)
+
+![UTC-day usage by Knox sub and audit join](assets/admin-usage-audit.png)
+
+![Activity log keyed by Knox user and request id](assets/admin-activity.png)
+
+The admin console is for operators, not MCP hosts. Full walkthrough: [docs/admin.md](docs/admin.md).
 
 ## Use Case
 
-Enterprises want coding and analytics agents to submit Spark jobs on CDP, but they cannot publish Livy or HiveServer2 to those tools. This blueprint gives one agent-facing address that allowlists Livy for Spark 3, enforces Knox user identity, keeps Ranger in charge of data access, and inventories Hive JDBC for a later MCP adapter without replacing the CDP perimeter.
+Enterprises want coding and analytics agents to submit Spark jobs and query Hive or Impala on CDP, but they cannot publish Livy, HiveServer2, or Impala to those tools. This blueprint gives one agent-facing address that allowlists Spark MCP plus read-only Hive and Impala MCP, enforces Knox user identity, and keeps Ranger in charge of data access without replacing the CDP perimeter.
+
+## How this compares to AI gateways
+
+This is a **CDP agent gateway**, not an **AI gateway**. Products in the AI-gateway class — [Envoy AI Gateway](https://github.com/envoyproxy/ai-gateway), Kong AI Gateway, LiteLLM-style proxies, and similar — sit in front of **models**. They unify OpenAI-shaped APIs, inject provider keys, meter tokens, and fail over across OpenAI, Bedrock, Anthropic, and self-hosted inference. Some also **multiplex** other people's MCP servers.
+
+This blueprint sits in front of **Cloudera Data Platform**. Agents present a Knox JWT. MCP adapters **implement** Spark, Hive, and Impala tools and forward the same bearer. Knox stays the CDP perimeter. Ranger still authorizes the token `sub`. There is no LLM translation, no token spend cap, and no catch-all MCP multiplexer.
+
+They compose; they do not replace each other. A coding agent that reasons with an LLM and writes Iceberg via Livy wants an AI gateway on the model hop and this gateway on the lakehouse hop. Do not put Knox JWTs on the model path or provider API keys on Livy.
+
+| | This blueprint | AI gateways (e.g. Envoy AI Gateway) |
+| --- | --- | --- |
+| Job | Agents → CDP (Spark / Hive / Impala) | Apps → GenAI providers and self-hosted models |
+| Identity | Knox RS256 JWT (`sub`, `knox.id`); Compose `X-Agent-Key` names the agent product | OAuth/OIDC to clients; API keys injected toward providers |
+| Authorization | Apache Ranger on the Knox subject | Gateway policy (token quotas, tool filters, CEL) |
+| MCP | Three adapters that **are** the tools (`/mcp/spark`, `/mcp/hive`, `/mcp/impala`); POST JSON-RPC | Multiplex N upstream MCP servers; often Streamable HTTP |
+| Rate limit | HTTP burst per Knox `sub` plus operator daily quotas | LLM tokens (input / output / cached / reasoning) |
+| Must not | Replace Knox, proxy raw Hive/Impala, mint a second user JWT | Validate Knox, honor Ranger, submit Livy batches |
+
+Architecture constraints: [docs/architecture.md](docs/architecture.md). Identity: [docs/identity-and-auth.md](docs/identity-and-auth.md).
 
 ## Key Features
 
 - Knox JWT at the agent edge — no second token format, no APISIX-minted user credentials
-- Dual identity — registered agent (caller key or mTLS later) plus CDP user (`sub` / `knox.id`)
-- Fail-closed proxy — missing, expired, wrong-issuer, and algorithm-confused tokens never reach Knox
-- Spark allowlist — MCP `/mcp/spark` (list, get, log, submit); Livy HTTP is GET/HEAD only
-- Hive inventory — `gateway jdbc add` stores Knox JDBC; `gateway hive` lists databases; `/cdp/hive` stays 404
+- Dual identity — Compose MCP `X-Agent-Key` names the agent product; Knox JWT `sub` / `knox.id` is the CDP user. AMP is JWT-only (CML project is the agent).
+- RFC 9728 PRM — `GET /.well-known/oauth-protected-resource`; `401 WWW-Authenticate` includes `resource_metadata`
+- Spark allowlist — MCP `/mcp/spark` (list, get, log, submit); Livy HTTP is GET/HEAD only; WebHDFS GET/HEAD/PUT for operator file staging
+- Hive MCP — `/mcp/hive` list/describe/select (no `SELECT *`, limit 50); `/cdp/hive` stays 404
+- Impala MCP — `/mcp/impala` list/describe/select (no `SELECT *`, limit 50); `/cdp/impala` stays 404
+- JDBC inventory — `gateway jdbc add` stores Knox Hive JDBC and/or CDW Impala JDBC; `gateway hive` / `gateway impala` list databases
 - Local-to-live — `gateway knox <livy-url>` points the same Compose file at external Knox
 - Operator admin UI — UTC-day usage, quotas vs burst 429s, audit join on localhost `:9090`
-- MCP burst cap — `limit-count` on `/mcp/spark` keyed by Knox `sub` (default 60/minute)
+- MCP burst cap — `limit-count` on `/mcp/spark`, `/mcp/hive`, and `/mcp/impala` keyed by Knox `sub` (default 60/minute)
 - Ranger stays authoritative — the gateway does not impersonate a different user than the token subject
 
 ## Quickstart
@@ -86,22 +331,26 @@ Enterprises want coding and analytics agents to submit Spark jobs on CDP, but th
    gateway test
    ```
 
-   `gateway` is the operator CLI (`python -m agentgateway` also works). `gateway test` renders APISIX config, starts Compose, and runs pytest (excluding live CDP). Commands: [docs/operator-cli.md](docs/operator-cli.md).
+   `gateway` is the operator CLI (`python -m agentgateway` also works). `gateway test` overlays mock-cdp without rewriting a live `.env`, starts Compose, runs pytest (excluding live CDP), then restores APISIX yaml from `.env`. Commands: [docs/operator-cli.md](docs/operator-cli.md).
 
 5. Optional — point the same gateway at a live cluster:
 
    ```bash
    gateway knox https://knox.example.com/env/cdp-proxy-token/livy_for_spark3/
+   gateway jdbc add 'jdbc:impala://coordinator.example:443/default;AuthMech=12;transportMode=http;httpPath=cliservice;ssl=1;auth=browser'
    gateway fetch-jwks --insecure
    gateway token set
    gateway up
    gateway spark
+   gateway webhdfs ls /
    gateway mcp
    gateway hive              # SHOW DATABASES; needs pip install -e ".[hive]"
+   gateway mcp --adapter hive --tool hive_list_databases
+   gateway mcp --adapter impala --tool impala_list_databases
    gateway admin --open      # http://127.0.0.1:9090
    ```
 
-   `gateway knox` writes host, port, `cdp-proxy-token` prefix, and JWKS URL into `.env`. Spark: [docs/spark.md](docs/spark.md). Hive: [docs/hive.md](docs/hive.md). Do not commit `.env`.
+   `gateway knox` writes host, port, `cdp-proxy-token` prefix, and JWKS URL into `.env`. Spark: [docs/spark.md](docs/spark.md). Hive: [docs/hive.md](docs/hive.md). Impala: [docs/impala.md](docs/impala.md). Do not commit `.env`.
 
 6. Optional — Cloudera AI Workbench AMP (not Docker Compose). Live Knox only; `launchable` stays false until a workbench proof. How-to: [docs/amp.md](docs/amp.md).
 
@@ -109,28 +358,36 @@ Do not commit Knox tokens, JDBC passwords, or private keys.
 
 ## Architecture / Software Components
 
-Agents terminate at APISIX (Compose) or at a Cloudera AI Application (optional AMP). The `mcp-spark` adapter sits behind that edge and forwards the caller's Knox bearer to Livy. Knox remains the only hop that presents cluster credentials. The admin UI is not an agent route (localhost `:9090` on Compose; CML login on AMP).
+Agents terminate at APISIX (Compose) or at a Cloudera AI Application (optional AMP). The `mcp-spark`, `mcp-hive`, and `mcp-impala` adapters sit behind that edge and forward the caller's Knox bearer to Livy, Hive, or Impala. Knox remains the only hop that presents cluster credentials. The admin UI is not an agent route (localhost `:9090` on Compose; CML login on AMP).
 
 ![CDP Agent Gateway traffic path](assets/architecture.svg)
 
+Spark MCP is the published Spark path. Operators stage HDFS files at `/cdp/webhdfs*`. Hive MCP is read-only at `/mcp/hive`. Impala MCP is read-only at `/mcp/impala`. `/cdp/hive` and `/cdp/impala` stay **404**. JDBC inventory is `gateway jdbc add` / `gateway hive` / `gateway impala`.
+
 | Component | Role |
 | --- | --- |
-| Apache APISIX | Agent-facing HTTP edge (Compose): Knox JWT plugin, allowlisted routes, request IDs |
+| Apache APISIX | Agent-facing HTTP edge (Compose): Knox JWT plugin, RFC 9728 PRM, MCP caller keys, allowlisted routes, request IDs |
 | Python `knox-jwt` | Same RS256 / `iss` / `exp` / `sub` checks for the optional CML AMP profile |
 | `knox-jwt` plugin | RS256, `iss=KNOXSSO`, expiry; pinned PEM; forwards `Authorization` |
 | `mcp-spark` | Livy MCP tools (list/get/log/submit); not an APISIX plugin |
+| `mcp-hive` | Hive MCP tools (list/describe/select); not an APISIX plugin |
+| `mcp-impala` | Impala MCP tools (list/describe/select); not an APISIX plugin |
 | Mock CDP (lab) | Stand-in Knox JWKS and Livy probes for `gateway test` |
 | Operator admin | Local UI on `:9090`: UTC-day usage, quotas vs burst 429s, audit join |
 | Apache Knox | Token issuance, `cdp-proxy-token`, Trusted Proxy / doAs |
-| Apache Ranger | Authorization for the Knox subject on Spark (and Hive when probed) |
+| Apache Ranger | Authorization for the Knox subject on Spark, Hive, Impala, and HDFS |
 
 | Agent URI | Methods | Upstream |
 | --- | --- | --- |
 | `/mcp/spark` | POST JSON-RPC | `mcp-spark` → Knox Livy |
+| `/mcp/hive` | POST JSON-RPC | `mcp-hive` → Knox Hive (read-only) |
+| `/mcp/impala` | POST JSON-RPC | `mcp-impala` → CDW `cliservice` or Knox Impala (read-only) |
 | `/cdp/livy_for_spark3*` | GET, HEAD | Knox Livy (operators/tests) |
+| `/cdp/webhdfs*` | GET, HEAD, PUT | Knox WebHDFS (operator staging) |
 | `/cdp/hive` | — | **404** (not published) |
+| `/cdp/impala` | — | **404** (not published) |
 
-Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](docs/amp.md), [docs/spark.md](docs/spark.md), [docs/hive.md](docs/hive.md), [docs/admin.md](docs/admin.md), [docs/identity-and-auth.md](docs/identity-and-auth.md).
+Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](docs/amp.md), [docs/spark.md](docs/spark.md), [docs/hive.md](docs/hive.md), [docs/impala.md](docs/impala.md), [docs/admin.md](docs/admin.md), [docs/identity-and-auth.md](docs/identity-and-auth.md).
 
 ## Target Audience
 
@@ -143,19 +400,25 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 
 | Path | Description |
 | --- | --- |
-| `assets/` | Architecture diagram, admin UI screenshots, and catalog media |
-| `deploy/` | Docker Compose (APISIX, mock CDP, mcp-spark, admin) |
-| `docs/` | Architecture, Spark, Hive, admin, identity, AMP, phases, tests |
+| `assets/` | Architecture diagram, AMP catalog cover, admin UI screenshots |
+| `deploy/` | Docker Compose (APISIX, mock CDP, mcp-spark, mcp-hive, mcp-impala, admin) |
+| `docs/` | Architecture, Spark, Hive, Impala, admin, identity, AMP, phases, tests |
+| `LICENSE` | Apache License 2.0 |
 | `METADATA.yaml` | Catalog metadata for the Cloudera blueprint website |
 | `.project-metadata.yaml` | Optional CML AMP runbook (`launchable` is still false) |
-| `0_`–`4_` AMP dirs | CML jobs/apps; ignored by Compose |
+| `0_`–`6_` AMP dirs | CML jobs/apps; ignored by Compose |
 | `conf/` | APISIX standalone config templates |
 | `plugins/` | Custom `knox-jwt` APISIX plugin |
 | `inventory/` | Phase 0 CDP inventory consumed by tests |
 | `src/agentgateway/` | Operator CLI (`gateway` / `python -m agentgateway`) |
 | `mcp-spark/` | Livy Spark 3 MCP adapter |
+| `mcp-hive/` | Hive MCP adapter (read-only) |
+| `mcp-impala/` | Impala MCP adapter (read-only) |
 | `admin/` | Operator usage/quota UI (`127.0.0.1:9090`) |
-| `examples/spark/` | Sample Spark 3 batch (`count_to_10.py`) |
+| `examples/spark/` | Sample Spark 3 batch (`count_to_10.py`) that writes Iceberg for Hive |
+| `examples/hive/` | Query that table with Hive MCP (`hive_list_tables` / `hive_describe_table` / `hive_select`) |
+| `examples/impala/` | Same Iceberg table through Impala MCP when metadata is visible |
+| `examples/agent/` | Jupyter notebook + helper that simulate a third-party MCP host |
 | `tests/` | Inventory, CLI, gateway, and MCP pytest |
 | `AGENTS.md` | Instructions for coding agents |
 | `.cursor/rules/` | Cursor project rules |
@@ -179,7 +442,7 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 | Deployment | Minimum |
 | --- | --- |
 | Launchable / demo (local Docker) | 2 CPU, 4 GB RAM, 10 GB disk |
-| Optional CML AMP (not catalog-launchable yet) | Workbench Python 3.11: install job 1 CPU / 4 GB; each app 1 CPU / 2 GB |
+| Optional CML AMP (not catalog-launchable yet) | Workbench Python 3.11 or greater: install session 1 CPU / 2 GB; each app 1 CPU / 1 GB |
 | Production / enterprise (APISIX in front of Knox) | Size APISIX for agent QPS; CDP/Knox/Ranger sizing is unchanged. Plan extra RAM if MCP adapters and long Spark jobs share the same host |
 
 ## Documentation
@@ -188,6 +451,7 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 - [Optional Cloudera AI AMP](docs/amp.md)
 - [Working with Spark](docs/spark.md)
 - [Working with Hive](docs/hive.md)
+- [Working with Impala](docs/impala.md)
 - [Operator admin UI](docs/admin.md)
 - [Identity and authentication](docs/identity-and-auth.md)
 - [Operator CLI](docs/operator-cli.md)
@@ -199,3 +463,9 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 - [APISIX Learning Center](https://apisix.apache.org/learning-center/)
 - [API Gateway Authentication](https://apisix.apache.org/learning-center/api-gateway-authentication/)
 - [Cloudera Blueprints Standard](https://github.com/kevinbtalbert/Cloudera-Blueprints-Standard)
+
+## License
+
+Copyright 2026 Cloudera, Inc.
+
+Licensed under the Apache License, Version 2.0. See [`LICENSE`](LICENSE).

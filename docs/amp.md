@@ -121,6 +121,9 @@ AMP is JWT-only for the agent product. Compose MCP caller keys and Phase 3 mTLS 
 | `4_app-operator-admin/` | Admin application |
 | `5_app-mcp-hive/` | Hive MCP application |
 | `6_app-mcp-impala/` | Impala MCP application |
+| `examples/agent/third_party_agent.ipynb` | Workbench notebook: simulate a third-party MCP host against the AMP apps |
+
+Set `KNOX_TOKEN` in project environment before running the notebook. Do not add `KNOX_TOKEN` to `.project-metadata.yaml` (same rule as Compose). Override MCP URLs with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if your workspace hostname differs from `https://mcp-spark.<CDSW_DOMAIN>/mcp/spark`.
 
 ## Non-goals
 

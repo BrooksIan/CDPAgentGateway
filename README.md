@@ -187,6 +187,7 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 | `examples/spark/` | Sample Spark 3 batch (`count_to_10.py`) that writes Iceberg for Hive |
 | `examples/hive/` | Query that table with Hive MCP (`hive_list_tables` / `hive_describe_table` / `hive_select`) |
 | `examples/impala/` | Same Iceberg table through Impala MCP when metadata is visible |
+| `examples/agent/` | Jupyter notebook + helper that simulate a third-party MCP host |
 | `tests/` | Inventory, CLI, gateway, and MCP pytest |
 | `AGENTS.md` | Instructions for coding agents |
 | `.cursor/rules/` | Cursor project rules |

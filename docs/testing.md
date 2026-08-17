@@ -95,7 +95,7 @@ Python Knox JWT and CML packaging. Compose tests above stay the source of truth 
 | AMP-02 | Python knox-jwt fail-closed | `missing_token`, `invalid_alg`, `expired`, `invalid_issuer` | `tests/test_knox_jwt.py` |
 | AMP-03 | AMP MCP GET `/health` public; POST without JWT `401` | Valid token `tools/list`; no raw bearer in body | `tests/test_amp_mcp.py` |
 | AMP-04 | JWKS host pin on AMP fetch | Foreign `jku` host refused before download | `tests/test_knox_jwt.py` |
-| AMP-05 | Workbench import against live Knox | MCP `tools/list` through the CML app HTTPS URL | Manual; record below without tokens |
+| AMP-05 | Workbench import against live Knox | MCP `tools/list` through the CML app HTTPS URL; optional [`examples/agent/third_party_agent.ipynb`](../examples/agent/third_party_agent.ipynb) with `KNOX_TOKEN` in project env | Manual; record below without tokens |
 
 ## Phase 3 — Third-party ready
 

@@ -43,7 +43,14 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert "4_app-operator-admin/app.py" in scripts
 
     kernels = {runtime["kernel"] for runtime in amp["runtimes"]}
+    editors = {runtime["editor"] for runtime in amp["runtimes"]}
     assert "Python 3.11" in kernels
+    assert "JupyterLab" in editors
+    assert {
+        "editor": "JupyterLab",
+        "kernel": "Python 3.11",
+        "edition": "Standard",
+    } in amp["runtimes"]
     for runtime in amp["runtimes"]:
         major, minor = runtime["kernel"].removeprefix("Python ").split(".")
         assert (int(major), int(minor)) >= (3, 11)
@@ -51,8 +58,10 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
         if task.get("kernel") != "python3":
             continue
         task_kernels = {runtime["kernel"] for runtime in task["runtimes"]}
+        task_editors = {runtime["editor"] for runtime in task["runtimes"]}
         assert "Python 3.11" in task_kernels
         assert "Python 3.12" in task_kernels
+        assert "JupyterLab" in task_editors
     install = next(task for task in amp["tasks"] if task.get("script") == "0_session-install-dependencies/install_dependencies.py")
     assert install["type"] == "run_session"
     assert install["entity_label"] == "install_deps"

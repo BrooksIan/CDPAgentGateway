@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentgateway.impyla_compat import connect_impyla
 from agentgateway.knox import IMPALA_SERVICE, TOKEN_TOPOLOGY, impala_warehouse_host
 
 REQUEST_TIMEOUT = 60.0
@@ -97,7 +98,7 @@ def show_databases(env: dict[str, str], token: str) -> list[str]:
     except ImportError as exc:
         raise ImpalaError("Impala client missing; pip install 'impyla>=0.19'") from exc
     try:
-        conn = connect(**impala_connect_kwargs(env, token))
+        conn = connect_impyla(connect, impala_connect_kwargs(env, token))
     except Exception as exc:  # noqa: BLE001 — HS2/thrift errors become probe errors
         raise ImpalaError(_public_message(exc)) from exc
     try:

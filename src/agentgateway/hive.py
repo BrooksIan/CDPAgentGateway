@@ -51,7 +51,12 @@ def show_databases(env: dict[str, str], token: str) -> list[str]:
         from impala.dbapi import connect
     except ImportError as exc:
         raise HiveError("Hive client missing; pip install 'impyla>=0.19'") from exc
-    conn = connect(**hive_connect_kwargs(env, token))
+    from agentgateway.impyla_compat import connect_impyla
+
+    try:
+        conn = connect_impyla(connect, hive_connect_kwargs(env, token))
+    except TypeError as extra:
+        raise HiveError(str(extra)) from extra
     try:
         cursor = conn.cursor()
         try:

@@ -75,6 +75,9 @@ runtimes:
   - editor: Workbench
     kernel: Python 3.11
     edition: Standard
+  - editor: JupyterLab
+    kernel: Python 3.11
+    edition: Standard
   - editor: Workbench
     kernel: Python 3.12
     edition: Standard
@@ -93,6 +96,9 @@ tasks:
     kernel: python3
     runtimes:
       - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: JupyterLab
         kernel: Python 3.11
         edition: Standard
       - editor: Workbench
@@ -117,6 +123,9 @@ tasks:
     kernel: python3
     runtimes:
       - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: JupyterLab
         kernel: Python 3.11
         edition: Standard
       - editor: Workbench
@@ -151,6 +160,9 @@ tasks:
       - editor: Workbench
         kernel: Python 3.11
         edition: Standard
+      - editor: JupyterLab
+        kernel: Python 3.11
+        edition: Standard
       - editor: Workbench
         kernel: Python 3.12
         edition: Standard
@@ -181,6 +193,9 @@ tasks:
     kernel: python3
     runtimes:
       - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: JupyterLab
         kernel: Python 3.11
         edition: Standard
       - editor: Workbench
@@ -214,6 +229,9 @@ tasks:
       - editor: Workbench
         kernel: Python 3.11
         edition: Standard
+      - editor: JupyterLab
+        kernel: Python 3.11
+        edition: Standard
       - editor: Workbench
         kernel: Python 3.12
         edition: Standard
@@ -243,6 +261,9 @@ tasks:
     kernel: python3
     runtimes:
       - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: JupyterLab
         kernel: Python 3.11
         edition: Standard
       - editor: Workbench
@@ -276,6 +297,9 @@ tasks:
       - editor: Workbench
         kernel: Python 3.11
         edition: Standard
+      - editor: JupyterLab
+        kernel: Python 3.11
+        edition: Standard
       - editor: Workbench
         kernel: Python 3.12
         edition: Standard
@@ -301,6 +325,9 @@ tasks:
     kernel: python3
     runtimes:
       - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: JupyterLab
         kernel: Python 3.11
         edition: Standard
       - editor: Workbench

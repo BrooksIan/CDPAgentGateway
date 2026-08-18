@@ -9,7 +9,7 @@ Two notebooks call CDP Agent Gateway as an external MCP host. Both use POST JSON
 
 ## Prerequisites
 
-- **Knox JWT** pasted in the notebook token cell (`getpass`, session only). Optional: `KNOX_TOKEN` for this engine, or `KNOX_TOKEN_FILE`. Never commit tokens, never add them to AMP project env, never print them.
+- **Knox JWT** pasted in the notebook token cell (`getpass`, session only). It must be a Token API **JWT** (`eyJ…`, three segments, `alg=RS256`, `iss=KNOXSSO`). A Knox passcode, cookie, or `Bearer eyJ…` paste becomes `401 invalid_token`. Optional: `KNOX_TOKEN` for this engine, or `KNOX_TOKEN_FILE`. Never commit tokens, never add them to AMP project env, never print them.
 - **Compose:** `gateway up` on `http://127.0.0.1:9080`. MCP routes need `X-Agent-Key` (default `lab-agent`).
 - **AMP:** `agent-gateway` plus Spark/Hive/Impala MCP applications. Knox JWT as `Authorization: Bearer`.
 - **LangGraph notebook only:** `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for this engine. Optional `LANGGRAPH_MODEL`. The notebook pins LangGraph / `langchain-core` **0.3.x** (`<0.4`) so it can share a Cloudera AI Workbench engine with CML's `langchain` 0.3. Do not install langchain-core 1.x on AMP. Do not commit model keys.

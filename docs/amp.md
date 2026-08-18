@@ -38,7 +38,7 @@ Fix clone access **before** launching the AMP:
 3. Add `catalog-entry.yaml` as a custom AMP source (**Site Administration → AMPs**), or use **New Project → ML Prototype** with this git URL.
 4. Open the **CDP Agent Gateway** tile → **Configure Project**. `KNOX_PROXY_URL` must have a **non-empty YAML default** (CML shows `Missing required environment variables` if the default is `null` or blank, even after you type a value). The form is pre-filled from `inventory/cdp.yaml`. Override it for another cluster. Do not add `KNOX_TOKEN` here.
 5. Click **Launch Project**. CML then runs tasks in order: install extras, **create and run** Fetch JWKS, **create and run** Smoke-check Knox, start MCP + admin apps, start **agent-gateway** (APISIX).
-6. Runtime: Workbench or PBJ Workbench, **Python 3.11 or greater** (3.12 is listed), Standard. No GPU. Do not pick Python 3.10 or older — `requires-python` is `>=3.11`.
+6. Runtime: Workbench, **JupyterLab (Python 3.11 Standard)**, or PBJ Workbench, **Python 3.11 or greater** (3.12 is listed for Workbench/PBJ). No GPU. Do not pick Python 3.10 or older — `requires-python` is `>=3.11`. Open the agent notebooks in JupyterLab Python 3.11 Standard.
 
 A public clone does not need a PAT. Do not encode a token in `git_url`.
 

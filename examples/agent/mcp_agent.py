@@ -30,6 +30,77 @@ _AMP_SUBDOMAINS = {
 }
 
 
+def normalize_knox_token(raw: str) -> str:
+    """Strip quotes, a duplicated Bearer prefix, and paste wrapping. Never log the value."""
+    token = (raw or "").strip()
+    if len(token) >= 2 and token[0] == token[-1] and token[0] in {'"', "'"}:
+        token = token[1:-1].strip()
+    if token[:7].lower() == "bearer ":
+        token = token[7:].strip()
+    return "".join(token.split())
+
+
+def jwt_shaped(token: str) -> bool:
+    parts = (token or "").split(".")
+    return len(parts) == 3 and all(parts[:2])
+
+
+def knox_token_status(token: str | None = None) -> dict[str, Any]:
+    """Unverified JWT facts for the notebook. Never includes the bearer."""
+    raw = normalize_knox_token(token if token is not None else (os.environ.get("KNOX_TOKEN") or ""))
+    status: dict[str, Any] = {
+        "set": bool(raw),
+        "jwt_shaped": jwt_shaped(raw),
+        "alg": "",
+        "iss": "",
+        "sub": "",
+        "exp_in_s": None,
+        "hint": "",
+    }
+    if not raw:
+        status["hint"] = "missing"
+        return status
+    if not status["jwt_shaped"]:
+        status["hint"] = (
+            "not a JWT (need three segments, usually starting with eyJ). "
+            "Paste a Knox Token API access token, not a passcode, cookie, or 'Bearer ' prefix. "
+            "Gateway reason invalid_token means the bearer did not parse as a JWT."
+        )
+        return status
+    try:
+        import jwt as pyjwt
+
+        header = pyjwt.get_unverified_header(raw)
+        payload = pyjwt.decode(raw, options={"verify_signature": False})
+    except Exception:  # noqa: BLE001
+        status["jwt_shaped"] = False
+        status["hint"] = (
+            "not a parseable JWT. Gateway returns 401 invalid_token for this shape. "
+            "Get a fresh token from Knox Token Generation / Token API."
+        )
+        return status
+    status["alg"] = str(header.get("alg") or "")
+    status["iss"] = str(payload.get("iss") or "")
+    status["sub"] = str(payload.get("sub") or "")
+    exp = payload.get("exp")
+    if exp is not None:
+        try:
+            status["exp_in_s"] = int(exp) - int(time.time())
+        except (TypeError, ValueError):
+            status["exp_in_s"] = None
+    if status["alg"] and status["alg"] != "RS256":
+        status["hint"] = f"alg={status['alg']} (gateway expects RS256)"
+    elif status["iss"] and status["iss"] != "KNOXSSO":
+        status["hint"] = f"iss={status['iss']!r} (gateway expects KNOXSSO)"
+    elif not status["sub"]:
+        status["hint"] = "missing sub"
+    elif status["exp_in_s"] is not None and status["exp_in_s"] < 0:
+        status["hint"] = "expired; mint a new Knox Token API JWT"
+    else:
+        status["hint"] = "ok"
+    return status
+
+
 def _repo_src() -> Path:
     root = Path(os.environ.get("AGENTGATEWAY_ROOT") or Path.cwd()).resolve()
     if not (root / "pyproject.toml").is_file():
@@ -39,24 +110,28 @@ def _repo_src() -> Path:
     return root / "src"
 
 
-def load_knox_token(*, prompt: bool = True) -> str:
-    """Load a Knox JWT for this process only. Never print or persist it to git."""
-    token = (os.environ.get("KNOX_TOKEN") or "").strip()
+def load_knox_token(*, prompt: bool = True, ignore_non_jwt_env: bool = False) -> str:
+    """Load a Knox JWT for this process only. Never print or persist it to git.
+
+    ignore_non_jwt_env: notebook token cell should pass True so a Knox passcode in
+    KNOX_TOKEN does not skip getpass (that paste becomes gateway 401 invalid_token).
+    """
+    token = normalize_knox_token(os.environ.get("KNOX_TOKEN") or "")
+    if token and ignore_non_jwt_env and not jwt_shaped(token):
+        token = ""
+    if not token:
+        path = (os.environ.get("KNOX_TOKEN_FILE") or "").strip()
+        if path:
+            file = Path(path).expanduser()
+            if file.is_file():
+                token = normalize_knox_token(file.read_text())
+    if token and ignore_non_jwt_env and not jwt_shaped(token):
+        token = ""
+    if not token and prompt:
+        token = normalize_knox_token(getpass("Knox JWT (not echoed; session only): "))
     if token:
+        os.environ["KNOX_TOKEN"] = token
         return token
-    path = (os.environ.get("KNOX_TOKEN_FILE") or "").strip()
-    if path:
-        file = Path(path).expanduser()
-        if file.is_file():
-            token = file.read_text().strip()
-            if token:
-                os.environ["KNOX_TOKEN"] = token
-                return token
-    if prompt:
-        token = getpass("Knox JWT (not echoed; session only): ").strip()
-        if token:
-            os.environ["KNOX_TOKEN"] = token
-            return token
     raise RuntimeError(
         "No Knox JWT in this session. Run the notebook token cell (getpass) or export "
         "KNOX_TOKEN for this engine only. Do not put the bearer in AMP project env or git."
@@ -108,6 +183,32 @@ def agent_headers(*, adapter: str = "spark") -> dict[str, str]:
     return headers
 
 
+def _mcp_http_error(url: str, response: httpx.Response) -> str:
+    snippet = (response.text or "").replace("\n", " ").strip()[:400]
+    reason = ""
+    try:
+        body = json.loads(response.text or "")
+        if isinstance(body, dict):
+            reason = str(body.get("reason") or body.get("error") or "")
+    except Exception:  # noqa: BLE001
+        reason = ""
+    extra = ""
+    if response.status_code == 401 and reason == "invalid_token":
+        extra = (
+            " The bearer did not parse as a JWT. Re-run the token cell with a Knox Token API "
+            "JWT (three segments, usually starts with eyJ). Do not paste a passcode, cookie, "
+            "or a second 'Bearer ' prefix."
+        )
+    elif response.status_code == 401 and reason == "expired":
+        extra = " The Knox JWT is expired. Mint a new Token API JWT and re-run the token cell."
+    elif response.status_code == 401 and reason == "invalid_signature":
+        extra = (
+            " Signature does not match the pinned Knox JWKS. Use a live Knox Token API JWT, "
+            "not a lab --mint token. Confirm the Fetch JWKS AMP job succeeded."
+        )
+    return f"MCP HTTP {response.status_code} from {url}: {snippet}{extra}"
+
+
 def mcp_request(
     method: str,
     *,
@@ -123,8 +224,7 @@ def mcp_request(
     with httpx.Client(timeout=timeout, verify=_tls_verify()) as client:
         response = client.post(url, json=payload, headers=agent_headers(adapter=adapter))
     if response.status_code >= 400:
-        snippet = (response.text or "").replace("\n", " ").strip()[:400]
-        raise RuntimeError(f"MCP HTTP {response.status_code} from {url}: {snippet}")
+        raise RuntimeError(_mcp_http_error(url, response))
     body = response.json()
     if "error" in body:
         raise RuntimeError(json.dumps(body["error"], indent=2))

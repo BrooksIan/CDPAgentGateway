@@ -17,6 +17,24 @@ from sql import (
     show_tables_sql,
 )
 
+try:
+    from agentgateway.impyla_compat import connect_impyla as _impyla_connect
+except ImportError:  # Compose mcp-hive image has no agentgateway package
+    import inspect
+
+    def _impyla_connect(connect, kwargs: dict[str, Any]):
+        try:
+            params = inspect.signature(connect).parameters
+        except (TypeError, ValueError):
+            return connect(**kwargs)
+        if any(item.kind == inspect.Parameter.VAR_KEYWORD for item in params.values()):
+            return connect(**kwargs)
+        allowed = set(params)
+        filtered = {key: value for key, value in kwargs.items() if key in allowed}
+        if kwargs.get("jwt") and "jwt" not in filtered:
+            raise HiveError("Hive client is too old for JWT; pip install 'impyla>=0.19'", status=500)
+        return connect(**filtered)
+
 HIVE_SERVICE = "hive"
 TOKEN_TOPOLOGY = "cdp-proxy-token"
 REQUEST_TIMEOUT = 60.0
@@ -109,7 +127,7 @@ def _fetch(sql: str, *, authorization: str) -> tuple[list[str], list[tuple[Any, 
     except ImportError as exc:
         raise HiveError("Hive client missing; install impyla", status=500) from exc
     try:
-        conn = connect(**_connect_kwargs(_bearer(authorization)))
+        conn = _impyla_connect(connect, _connect_kwargs(_bearer(authorization)))
         try:
             cursor = conn.cursor()
             try:

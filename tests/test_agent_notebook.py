@@ -137,9 +137,75 @@ def test_mcp_request_includes_http_error_body(monkeypatch: pytest.MonkeyPatch) -
         mcp_agent.tools_list("spark")
 
 
+def test_mcp_request_explains_invalid_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CDSW_DOMAIN", raising=False)
+    monkeypatch.setenv("KNOX_TOKEN", "test-token")
+
+    class FakeResponse:
+        status_code = 401
+        text = '{"error": "unauthorized", "reason": "invalid_token"}'
+
+        def json(self) -> dict:
+            raise AssertionError("json() should not run")
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+        def post(self, url, json=None, headers=None):
+            return FakeResponse()
+
+    monkeypatch.setattr(httpx, "Client", FakeClient)
+    with pytest.raises(RuntimeError, match="not parse as a JWT"):
+        mcp_agent.tools_list("spark")
+
+
 def test_load_knox_token_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KNOX_TOKEN", "session-jwt")
     assert mcp_agent.load_knox_token(prompt=False) == "session-jwt"
+
+
+def test_normalize_knox_token_strips_bearer_quotes_and_wrap() -> None:
+    raw = '  "Bearer eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhIn0.sig"  \n'
+    assert mcp_agent.normalize_knox_token(raw) == "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhIn0.sig"
+
+
+def test_knox_token_status_rejects_passcode() -> None:
+    status = mcp_agent.knox_token_status("knox-passcode")
+    assert status["set"] is True
+    assert status["jwt_shaped"] is False
+    assert "invalid_token" in status["hint"]
+    assert "knox-passcode" not in json.dumps(status)
+
+
+def test_knox_token_status_reads_unverified_claims() -> None:
+    token = (
+        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
+        "eyJzdWIiOiJhbmFseXN0IiwiaXNzIjoiS05PWFNTT19URVNUIiwiZXhwIjoyMTQ3NDgzNjQ3fQ."
+        "c2ln"
+    )
+    status = mcp_agent.knox_token_status(token)
+    assert status["jwt_shaped"] is True
+    assert status["alg"] == "RS256"
+    assert status["sub"] == "analyst"
+    assert "token" not in status
+    dumped = json.dumps(status)
+    assert token not in dumped
+
+
+def test_load_knox_token_reprompts_when_env_is_not_jwt(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KNOX_TOKEN", "passcode")
+    monkeypatch.delenv("KNOX_TOKEN_FILE", raising=False)
+    monkeypatch.setattr(mcp_agent, "getpass", lambda _prompt: "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhIn0.sig")
+    token = mcp_agent.load_knox_token(prompt=True, ignore_non_jwt_env=True)
+    assert mcp_agent.jwt_shaped(token)
+    assert os.environ["KNOX_TOKEN"] == token
 
 
 def test_load_knox_token_prompts_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -187,6 +253,7 @@ def test_notebook_runs_spark_to_hive_example() -> None:
     assert "hive_select" in source
     assert "poll_spark_batch" in source
     assert "load_knox_token" in source
+    assert "knox_token_status" in source
     assert "getpass" in source or "Knox JWT" in source
     assert "langgraph_agent.ipynb" in source
     assert "print(token)" not in source
@@ -265,6 +332,7 @@ def test_langgraph_notebook_present() -> None:
     assert "make_agent" in source
     assert "invoke_agent" in source
     assert "load_knox_token" in source
+    assert "knox_token_status" in source
     assert "getpass" in source or "Knox JWT" in source
     assert "install_langgraph_deps" in source
     assert "LANGGRAPH_RUN_SUBMIT" in source

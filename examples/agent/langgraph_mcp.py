@@ -26,8 +26,9 @@ from mcp_agent import (
     load_knox_token,
 )
 
-# CML workbench ships langchain 0.3 / langchain-aws (langchain-core<0.4). LangGraph 1.x
-# pulls langchain-core 1.x and breaks that runtime. Keep the 0.3 line.
+# LangGraph 0.3 needs langchain-core 0.3.x. CML workbenches may already have langchain 0.2
+# or 0.3 plus langchain-aws/community. Do not install langchain-core 1.x. Pip will warn
+# about CML's older langchain pins; this notebook does not import those packages.
 LANGGRAPH_PIP_PACKAGES = (
     "langgraph>=0.3.5,<0.4",
     "langchain-core>=0.3.85,<0.4",
@@ -62,10 +63,11 @@ def _amp_runtime() -> bool:
 
 
 def langgraph_pip_packages(*, amp: bool | None = None) -> list[str]:
-    """Package specs that coexist with CML langchain 0.3 (langchain-core<0.4).
+    """Package specs for LangGraph 0.3 (langchain-core 0.3.x, <0.4).
 
     AMP does not install or pin protobuf (CML plugins disagree: mlflow 4.25.3 vs raz-client 7.34.0).
     AMP skips Anthropic unless ANTHROPIC_API_KEY or LANGGRAPH_INSTALL_ANTHROPIC is set.
+    CML langchain 0.2.x / langchain-community / langchain-aws pin warnings are expected.
     """
     packages = list(LANGGRAPH_PIP_PACKAGES)
     if amp is None:
@@ -86,16 +88,23 @@ def langgraph_pip_packages(*, amp: bool | None = None) -> list[str]:
 
 
 def require_langchain_core_03() -> str:
-    """Fail closed if this engine has langchain-core 1.x (breaks CML langchain 0.3)."""
+    """Fail closed unless langchain-core is 0.3.x (LangGraph 0.3; never 1.x on AMP)."""
     core = _dist_version("langchain-core")
     if not core:
         raise RuntimeError("langchain-core is not installed")
-    major = int(core.split(".", 1)[0])
+    parts = core.split(".")
+    major = int(parts[0])
+    minor = int(parts[1]) if len(parts) > 1 else 0
     if major >= 1:
         raise RuntimeError(
-            f"langchain-core {core} is 1.x; Cloudera AI Workbench langchain 0.3 needs <0.4. "
+            f"langchain-core {core} is 1.x; this notebook needs 0.3.x (<0.4). "
             "Restart this session, then re-run the install cell "
             "(it pins langchain-core>=0.3.85,<0.4). Do not pip install langchain-core 1.x on AMP."
+        )
+    if major != 0 or minor != 3:
+        raise RuntimeError(
+            f"langchain-core {core} is not 0.3.x. Re-run the install cell "
+            "(it pins langchain-core>=0.3.85,<0.4)."
         )
     loaded = sys.modules.get("langchain_core")
     loaded_ver = getattr(loaded, "__version__", "") if loaded is not None else ""
@@ -128,8 +137,9 @@ def install_langgraph_deps(*, root: Path | None = None) -> list[str]:
     print("langchain-core:", require_langchain_core_03())
     if amp:
         print(
-            "note: ignore CML pip pin warnings (protobuf / typing-extensions). "
-            "This install does not change protobuf. langchain-core must stay 0.3.x."
+            "note: ignore CML pip conflicts (langchain 0.2.x / langchain-community / "
+            "langchain-aws want core<0.3; protobuf / typing-extensions). This notebook "
+            "uses langchain-core 0.3 + LangGraph 0.3 only. It does not change protobuf."
         )
     return packages
 
@@ -204,7 +214,10 @@ def langchain_tools(
     """LangChain StructuredTools bound to gateway MCP. Discovers the live catalog by default."""
     from langchain_core.tools import StructuredTool
 
-    specs = catalog if catalog is not None else list_gateway_tools(adapters)
+    skipped: list[str] = []
+    specs = catalog if catalog is not None else list_gateway_tools(adapters, skipped=skipped)
+    if skipped:
+        print("skipped disabled adapters:", ", ".join(skipped))
     tools: list[Any] = []
     for spec in specs:
         name = str(spec.get("name") or "").strip()

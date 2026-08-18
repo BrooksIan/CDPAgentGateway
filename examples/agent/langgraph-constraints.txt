@@ -1,5 +1,5 @@
-# Cloudera AI Workbench ships langchain 0.3. Do not install langchain-core 1.x.
-# Do not pin protobuf: CML plugins disagree (mlflow 4.25.3 vs raz-client 7.34.0).
+# LangGraph 0.3 needs langchain-core 0.3.x. CML may ship langchain 0.2 or 0.3.
+# Do not install langchain-core 1.x. Do not pin protobuf (mlflow vs raz-client).
 langchain-core>=0.3.85,<0.4
 langgraph>=0.3.5,<0.4
 langchain-openai>=0.3,<0.4

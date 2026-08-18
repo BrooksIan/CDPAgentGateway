@@ -312,6 +312,57 @@ def test_list_gateway_tools_tags_adapter(monkeypatch: pytest.MonkeyPatch) -> Non
     assert catalog[0]["name"] == "hive_list_databases"
 
 
+def test_list_gateway_tools_skips_disabled_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_tools_list(adapter: str):
+        if adapter == "impala":
+            raise mcp_agent.AdapterDisabled("impala", "https://gw.example/mcp/impala")
+        return [{"name": f"{adapter}_list_databases", "description": adapter}]
+
+    monkeypatch.setattr(mcp_agent, "tools_list", fake_tools_list)
+    skipped: list[str] = []
+    catalog = mcp_agent.list_gateway_tools(("spark", "hive", "impala"), skipped=skipped)
+    assert skipped == ["impala"]
+    assert [item["adapter"] for item in catalog] == ["spark", "hive"]
+
+
+def test_list_gateway_tools_fails_when_all_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_tools_list(adapter: str):
+        raise mcp_agent.AdapterDisabled(adapter, f"https://gw.example/mcp/{adapter}")
+
+    monkeypatch.setattr(mcp_agent, "tools_list", fake_tools_list)
+    with pytest.raises(RuntimeError, match="Disabled adapters: spark, hive, impala"):
+        mcp_agent.list_gateway_tools()
+
+
+def test_mcp_request_raises_adapter_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CDSW_DOMAIN", raising=False)
+    monkeypatch.setenv("KNOX_TOKEN", "test-token")
+
+    class FakeResponse:
+        status_code = 404
+        text = '{"error":"adapter_disabled","reason":"impala"}'
+
+        def json(self) -> dict:
+            raise AssertionError("json() should not run on HTTP 404 adapter_disabled")
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+        def post(self, url, json=None, headers=None):
+            return FakeResponse()
+
+    monkeypatch.setattr(httpx, "Client", FakeClient)
+    with pytest.raises(mcp_agent.AdapterDisabled, match="impala"):
+        mcp_agent.tools_list("impala")
+
+
 def _load_langgraph_mcp():
     path = ROOT / "examples" / "agent" / "langgraph_mcp.py"
     spec = importlib.util.spec_from_file_location("langgraph_mcp", path)
@@ -471,6 +522,13 @@ def test_require_langchain_core_03_rejects_1x(monkeypatch: pytest.MonkeyPatch) -
     lg = _load_langgraph_mcp()
     monkeypatch.setattr(lg, "_dist_version", lambda _name: "1.5.6")
     with pytest.raises(RuntimeError, match="1.x"):
+        lg.require_langchain_core_03()
+
+
+def test_require_langchain_core_03_rejects_02(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+    monkeypatch.setattr(lg, "_dist_version", lambda _name: "0.2.43")
+    with pytest.raises(RuntimeError, match="not 0.3.x"):
         lg.require_langchain_core_03()
 
 

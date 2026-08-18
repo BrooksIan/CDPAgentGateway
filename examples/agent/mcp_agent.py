@@ -30,6 +30,30 @@ _AMP_SUBDOMAINS = {
 }
 
 
+class AdapterDisabled(RuntimeError):
+    """AMP returned HTTP 404 adapter_disabled (that MCP application is off)."""
+
+    def __init__(self, adapter: str, url: str) -> None:
+        self.adapter = adapter
+        self.url = url
+        super().__init__(f"MCP adapter {adapter!r} is disabled at {url}")
+
+
+def _adapter_disabled_name(response: httpx.Response, adapter: str) -> str | None:
+    if response.status_code != 404:
+        return None
+    try:
+        body = json.loads(response.text or "")
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(body, dict) or body.get("error") != "adapter_disabled":
+        return None
+    reason = str(body.get("reason") or body.get("service") or adapter).strip()
+    if reason.startswith("mcp-"):
+        reason = reason[4:]
+    return reason or adapter
+
+
 def normalize_knox_token(raw: str) -> str:
     """Strip quotes, a duplicated Bearer prefix, and paste wrapping. Never log the value."""
     token = (raw or "").strip()
@@ -224,6 +248,9 @@ def mcp_request(
     with httpx.Client(timeout=timeout, verify=_tls_verify()) as client:
         response = client.post(url, json=payload, headers=agent_headers(adapter=adapter))
     if response.status_code >= 400:
+        disabled = _adapter_disabled_name(response, adapter)
+        if disabled:
+            raise AdapterDisabled(disabled, url)
         raise RuntimeError(_mcp_http_error(url, response))
     body = response.json()
     if "error" in body:
@@ -286,14 +313,28 @@ def adapter_for_tool(name: str) -> str:
 
 def list_gateway_tools(
     adapters: tuple[str, ...] | list[str] = ("spark", "hive", "impala"),
+    *,
+    skipped: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """tools/list across adapters. Each spec includes adapter. Never logs the bearer."""
+    """tools/list across adapters. Skips AMP adapter_disabled (404). Never logs the bearer."""
     catalog: list[dict[str, Any]] = []
+    disabled: list[str] = skipped if skipped is not None else []
     for adapter in adapters:
-        for spec in tools_list(adapter):
+        try:
+            specs = tools_list(adapter)
+        except AdapterDisabled:
+            disabled.append(adapter)
+            continue
+        for spec in specs:
             item = dict(spec)
             item["adapter"] = adapter
             catalog.append(item)
+    if not catalog:
+        names = ", ".join(disabled) or "none"
+        raise RuntimeError(
+            f"No MCP tools listed. Disabled adapters: {names}. "
+            "Enable Spark/Hive on agent-gateway (Impala is optional)."
+        )
     return catalog
 
 

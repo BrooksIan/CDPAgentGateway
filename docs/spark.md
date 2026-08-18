@@ -242,7 +242,7 @@ Put the Knox JWT in the host secret store, never in git.
 
 Third-party agents are demonstrated with notebooks in [`examples/agent/`](../examples/agent/README.md). [`third_party_agent.ipynb`](../examples/agent/third_party_agent.ipynb) is a scripted MCP host. [`langgraph_agent.ipynb`](../examples/agent/langgraph_agent.ipynb) shows **LangGraph** ReAct over the same POST JSON-RPC tools. Neither adds Streamable HTTP.
 
-Agents should call `/mcp/spark`, `/mcp/hive`, or `/mcp/impala` only, with **POST JSON-RPC**. Streamable HTTP (GET SSE, MCP session) is **not** implemented and is held. Do not teach them the Knox URL, `/cdp/webhdfs`, `/cdp/hive`, `/cdp/impala`, or the operator admin UI (`:9090`). AMP hosts use `https://mcp-spark.<workspace>/mcp/spark`, `https://mcp-hive.<workspace>/mcp/hive`, or `https://mcp-impala.<workspace>/mcp/impala` instead of localhost; see [amp.md](amp.md).
+Agents should call `/mcp/spark`, `/mcp/hive`, or `/mcp/impala` only, with **POST JSON-RPC**. Streamable HTTP (GET SSE, MCP session) is **not** implemented and is held. Do not teach them the Knox URL, `/cdp/webhdfs`, `/cdp/hive`, `/cdp/impala`, or the operator admin UI (`:9090`). AMP hosts use `https://cdp-ag.<workspace>/mcp/spark`, `https://cdp-ag.<workspace>/mcp/hive`, or `https://cdp-ag.<workspace>/mcp/impala` instead of localhost; see [amp.md](amp.md).
 
 Operators set per-user daily call/submit quotas in [admin.md](admin.md). A denied submit is an MCP tool error and does not reach Livy. Operators look up a call by APISIX `X-Request-Id` (`GET /api/audit`) to join tool, `sub`, and `knox.id`.
 

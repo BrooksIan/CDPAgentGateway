@@ -80,24 +80,24 @@ environment_variables:
     required: false
   GATEWAY_PUBLIC_URL:
     default: ""
-    description: "Optional public agent URL for RFC 9728. Leave empty to use https://agent-gateway.<CDSW_DOMAIN>."
+    description: "Optional public agent URL for RFC 9728. Leave empty to use https://cdp-ag.<CDSW_DOMAIN>."
     required: false
 
 runtimes:
+  - editor: Workbench
+    kernel: Python 3.12
+    edition: Standard
+  - editor: PBJ Workbench
+    kernel: Python 3.12
+    edition: Standard
   - editor: Workbench
     kernel: Python 3.11
     edition: Standard
   - editor: JupyterLab
     kernel: Python 3.11
     edition: Standard
-  - editor: Workbench
-    kernel: Python 3.12
-    edition: Standard
   - editor: PBJ Workbench
     kernel: Python 3.11
-    edition: Standard
-  - editor: PBJ Workbench
-    kernel: Python 3.12
     edition: Standard
 
 tasks:
@@ -106,22 +106,6 @@ tasks:
     entity_label: install_deps
     script: 0_session-install-dependencies/install_dependencies.py
     kernel: python3
-    runtimes:
-      - editor: Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: JupyterLab
-        kernel: Python 3.11
-        edition: Standard
-      - editor: Workbench
-        kernel: Python 3.12
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.12
-        edition: Standard
     cpu: 1.0
     memory: 2.0
     gpu: 0
@@ -133,22 +117,6 @@ tasks:
     script: 1_job-fetch-jwks/fetch_jwks.py
     arguments: None
     kernel: python3
-    runtimes:
-      - editor: Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: JupyterLab
-        kernel: Python 3.11
-        edition: Standard
-      - editor: Workbench
-        kernel: Python 3.12
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.12
-        edition: Standard
     cpu: 1.0
     memory: 1.0
     gpu: 0
@@ -168,22 +136,6 @@ tasks:
     script: 2_job-smoke-knox/smoke_knox.py
     arguments: None
     kernel: python3
-    runtimes:
-      - editor: Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: JupyterLab
-        kernel: Python 3.11
-        edition: Standard
-      - editor: Workbench
-        kernel: Python 3.12
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.12
-        edition: Standard
     cpu: 1.0
     memory: 1.0
     gpu: 0
@@ -200,25 +152,9 @@ tasks:
   - type: start_application
     name: Spark MCP
     entity_label: spark-mcp
-    subdomain: mcp-spark
+    subdomain: cdp-ag-spark
     script: 3_app-mcp-spark/app.py
     kernel: python3
-    runtimes:
-      - editor: Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: JupyterLab
-        kernel: Python 3.11
-        edition: Standard
-      - editor: Workbench
-        kernel: Python 3.12
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.12
-        edition: Standard
     cpu: 1.0
     memory: 1.0
     gpu: 0
@@ -234,25 +170,9 @@ tasks:
   - type: start_application
     name: Hive MCP
     entity_label: hive-mcp
-    subdomain: mcp-hive
+    subdomain: cdp-ag-hive
     script: 5_app-mcp-hive/app.py
     kernel: python3
-    runtimes:
-      - editor: Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: JupyterLab
-        kernel: Python 3.11
-        edition: Standard
-      - editor: Workbench
-        kernel: Python 3.12
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.12
-        edition: Standard
     cpu: 1.0
     memory: 1.0
     gpu: 0
@@ -268,25 +188,9 @@ tasks:
   - type: start_application
     name: Impala MCP
     entity_label: impala-mcp
-    subdomain: mcp-impala
+    subdomain: cdp-ag-impala
     script: 6_app-mcp-impala/app.py
     kernel: python3
-    runtimes:
-      - editor: Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: JupyterLab
-        kernel: Python 3.11
-        edition: Standard
-      - editor: Workbench
-        kernel: Python 3.12
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.12
-        edition: Standard
     cpu: 1.0
     memory: 1.0
     gpu: 0
@@ -302,25 +206,9 @@ tasks:
   - type: start_application
     name: Operator admin
     entity_label: gateway-admin
-    subdomain: gateway-admin
+    subdomain: cdp-ag-admin
     script: 4_app-operator-admin/app.py
     kernel: python3
-    runtimes:
-      - editor: Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: JupyterLab
-        kernel: Python 3.11
-        edition: Standard
-      - editor: Workbench
-        kernel: Python 3.12
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.12
-        edition: Standard
     cpu: 1.0
     memory: 1.0
     gpu: 0
@@ -332,25 +220,9 @@ tasks:
   - type: start_application
     name: Agent gateway (APISIX)
     entity_label: agent-gateway
-    subdomain: agent-gateway
+    subdomain: cdp-ag
     script: 7_app-agent-gateway/app.py
     kernel: python3
-    runtimes:
-      - editor: Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: JupyterLab
-        kernel: Python 3.11
-        edition: Standard
-      - editor: Workbench
-        kernel: Python 3.12
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.12
-        edition: Standard
     cpu: 1.0
     memory: 1.5
     gpu: 0

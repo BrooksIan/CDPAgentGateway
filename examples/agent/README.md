@@ -19,7 +19,7 @@ These notebooks **demonstrate third-party agents** against CDP Agent Gateway. Th
 | Profile | Spark MCP |
 | --- | --- |
 | Compose | `http://127.0.0.1:9080/mcp/spark` |
-| AMP | `https://agent-gateway.<CDSW_DOMAIN>/mcp/spark` (APISIX; preferred) |
+| AMP | `https://cdp-ag.<CDSW_DOMAIN>/mcp/spark` (APISIX; preferred) |
 
 Override with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if your workspace uses a different hostname pattern.
 

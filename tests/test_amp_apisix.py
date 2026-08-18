@@ -19,9 +19,9 @@ def test_amp_apisix_env_points_at_sibling_mcp_apps(monkeypatch: pytest.MonkeyPat
     )
     monkeypatch.delenv("AGENT_CALLER_KEY", raising=False)
     values = build_amp_apisix_env()
-    assert values["GATEWAY_PUBLIC_URL"] == "https://agent-gateway.ml.example.com"
+    assert values["GATEWAY_PUBLIC_URL"] == "https://cdp-ag.ml.example.com"
     assert values["MCP_SPARK_UPSTREAM_SCHEME"] == "https"
-    assert values["MCP_SPARK_UPSTREAM_HOST"] == "mcp-spark.ml.example.com"
+    assert values["MCP_SPARK_UPSTREAM_HOST"] == "cdp-ag-spark.ml.example.com"
     assert values["MCP_SPARK_UPSTREAM_PORT"] == "443"
     assert values["MCP_SPARK_PASS_HOST"] == "rewrite"
     assert values.get("AGENT_CALLER_KEY") == ""
@@ -36,8 +36,8 @@ def test_amp_apisix_render_uses_https_upstreams(monkeypatch: pytest.MonkeyPatch)
     values = build_amp_apisix_env()
     rendered = render_apisix_yaml(TEMPLATE, values)
     assert 'scheme: https' in rendered
-    assert 'upstream_host: mcp-spark.ml.example.com' in rendered
-    assert '"mcp-spark.ml.example.com:443": 1' in rendered
+    assert 'upstream_host: cdp-ag-spark.ml.example.com' in rendered
+    assert '"cdp-ag-spark.ml.example.com:443": 1' in rendered
     assert "uri: /cdp/webhdfs*" in rendered
 
 

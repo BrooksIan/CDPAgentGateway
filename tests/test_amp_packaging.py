@@ -72,19 +72,26 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert install["type"] == "run_session"
     assert install["entity_label"] == "install_deps"
     assert "cpu" in install and "memory" in install
-    mcp = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-spark")
-    hive = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-hive")
-    impala = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-impala")
-    apisix = next(task for task in amp["tasks"] if task.get("subdomain") == "agent-gateway")
-    admin = next(task for task in amp["tasks"] if task.get("subdomain") == "gateway-admin")
+    mcp = next(task for task in amp["tasks"] if task.get("subdomain") == "cdp-ag-spark")
+    hive = next(task for task in amp["tasks"] if task.get("subdomain") == "cdp-ag-hive")
+    impala = next(task for task in amp["tasks"] if task.get("subdomain") == "cdp-ag-impala")
+    apisix = next(task for task in amp["tasks"] if task.get("subdomain") == "cdp-ag")
+    admin = next(task for task in amp["tasks"] if task.get("subdomain") == "cdp-ag-admin")
     assert mcp["type"] == "start_application"
     assert mcp["kernel"] == "python3"
     assert mcp["bypass_authentication"] is True
+    assert mcp["static_subdomain"] is True
     assert hive["bypass_authentication"] is True
+    assert hive["static_subdomain"] is True
     assert impala["bypass_authentication"] is True
+    assert impala["static_subdomain"] is True
     assert apisix["type"] == "start_application"
     assert apisix["bypass_authentication"] is True
+    assert apisix["static_subdomain"] is True
     assert admin["bypass_authentication"] is False
+    assert admin["static_subdomain"] is True
+    subdomains = [task["subdomain"] for task in amp["tasks"] if "subdomain" in task]
+    assert len(subdomains) == len(set(subdomains))
     labels = [task.get("entity_label") for task in amp["tasks"] if task.get("entity_label")]
     assert labels.index("install_deps") < labels.index("fetch_jwks")
     assert labels.index("fetch_jwks") < labels.index("spark-mcp")

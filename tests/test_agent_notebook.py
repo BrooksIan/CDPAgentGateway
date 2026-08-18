@@ -45,7 +45,7 @@ def test_mcp_base_url_compose(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_mcp_base_url_amp(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CDSW_DOMAIN", "ml.example.com")
     monkeypatch.delenv("MCP_HIVE_URL", raising=False)
-    assert mcp_agent.mcp_base_url("hive") == "https://agent-gateway.ml.example.com/mcp/hive"
+    assert mcp_agent.mcp_base_url("hive") == "https://cdp-ag.ml.example.com/mcp/hive"
 
 
 def test_agent_headers_compose_includes_caller_key(monkeypatch: pytest.MonkeyPatch) -> None:

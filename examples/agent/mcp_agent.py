@@ -24,9 +24,9 @@ _ADAPTERS = {
     "impala": "/mcp/impala",
 }
 _AMP_SUBDOMAINS = {
-    "spark": "mcp-spark",
-    "hive": "mcp-hive",
-    "impala": "mcp-impala",
+    "spark": "cdp-ag-spark",
+    "hive": "cdp-ag-hive",
+    "impala": "cdp-ag-impala",
 }
 
 
@@ -184,7 +184,7 @@ def mcp_base_url(adapter: str = "spark") -> str:
     if domain:
         public = (os.environ.get("GATEWAY_PUBLIC_URL") or "").strip().rstrip("/")
         if not public:
-            public = f"https://agent-gateway.{domain.rstrip('/')}"
+            public = f"https://cdp-ag.{domain.rstrip('/')}"
         return f"{public}{_ADAPTERS[key]}"
     gateway = (os.environ.get("GATEWAY_URL") or "http://127.0.0.1:9080").rstrip("/")
     return f"{gateway}{_ADAPTERS[key]}"

@@ -11,9 +11,9 @@ Template: [CML Community AMP Template](https://github.com/cloudera/CML_Community
 | Profile | Public agent address | JWT check | Upstream |
 | --- | --- | --- | --- |
 | Compose (default) | APISIX `:9080` | `plugins/knox-jwt.lua` | `mcp-spark` / `mcp-hive` / `mcp-impala` → Knox |
-| AMP (optional) | **`agent-gateway` CML app (APISIX)** | same `knox-jwt.lua` in Docker | sibling MCP apps → Knox |
+| AMP (optional) | **`cdp-ag` CML app (APISIX)** | same `knox-jwt.lua` in Docker | sibling MCP apps → Knox |
 
-AMP also publishes direct MCP application URLs (`mcp-spark`, `mcp-hive`, `mcp-impala`) with Python Knox JWT for debugging. **Agents should use `https://agent-gateway.<workspace>/mcp/spark`** (and hive/impala) so they get the same APISIX routes as Compose: `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`, optional `X-Agent-Key`, and APISIX burst caps.
+AMP also publishes direct MCP application URLs (`cdp-ag-spark`, `cdp-ag-hive`, `cdp-ag-impala`) with Python Knox JWT for debugging. **Agents should use `https://cdp-ag.<workspace>/mcp/spark`** (and hive/impala) so they get the same APISIX routes as Compose: `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`, optional `X-Agent-Key`, and APISIX burst caps.
 
 AMP prefers the same `apache/apisix:3.16.0-debian` image as Compose when `docker` is on the engine. CML application engines usually have no Docker; then `agent-gateway` pins Knox JWKS and runs Spark/Hive/Impala MCP **in-process** (`engine: python`, `mcp: inprocess` on `GET /health`). That avoids CML hairpin HTTPS to sibling app hostnames, which otherwise surfaces as a generic `Internal Server Error`. Sibling MCP apps remain for direct debug URLs. `/cdp/livy_for_spark3*` and `/cdp/webhdfs*` still proxy to Knox.
 
@@ -48,14 +48,14 @@ If a Knox job fails (bad `KNOX_PROXY_URL`), later tasks including applications d
 
 If applications exist but stay Starting or Failed, open Application logs. Typical causes:
 
+- `duplicate key value violates unique constraint "applications_subdomain_idx"` on **Step 6** (first `start_application`): a workspace app already owns that subdomain. CML subdomains are unique across the workbench, not per project. Stop leftover Applications named Spark MCP / `mcp-spark` / `agent-gateway` / `gateway-admin` (or delete the old AMP project), then **Redeploy** (not Resume). This AMP uses `cdp-ag`, `cdp-ag-spark`, `cdp-ag-hive`, `cdp-ag-impala`, and `cdp-ag-admin` so a leftover `mcp-spark` does not collide after you push and Redeploy.
 - Install wrote packages into the session engine instead of `/home/cdsw/.local` (`pip install --user` is required).
 - CML applications run in IPython, which already has an asyncio loop. AMP starts uvicorn in a background thread instead of `asyncio.run`.
 - `KNOX_PROXY_URL` must be set in **Project Settings → Environment**. An empty value skips JWKS pin; MCP POSTs then fail closed until you set it and rerun Fetch pinned Knox JWKS.
 - `GET /health` with `"error": "JSONDecodeError"` means Knox JWKS returned HTML or an empty body (common when the derived URL is `api/v1` and the cluster only serves `api/v2`). Set `KNOX_JWKS_URL` to the inventoried `.../homepage/knoxtoken/api/v2/jwks.json`, keep `UPSTREAM_TLS_VERIFY=false` for lab CAs, push this repo, then **Restart** Agent gateway. A healthy Python edge returns `"engine": "python"`.
-- Notebook `MCP HTTP 500` from `agent-gateway` after a valid JWT: check `GET /health` includes `"mcp": "inprocess"`. A body of plain `Internal Server Error` is CML's proxy wrapping an unhandled crash or a hairpin to `mcp-spark.<domain>`; restart Agent gateway after this in-process dispatch change. `gateway_misconfigured` means no Knox PEM.
+- Notebook `MCP HTTP 500` from `cdp-ag` after a valid JWT: check `GET /health` includes `"mcp": "inprocess"`. A body of plain `Internal Server Error` is CML's proxy wrapping an unhandled crash or a hairpin to `cdp-ag-spark.<domain>`; restart Agent gateway after this in-process dispatch change. `gateway_misconfigured` means no Knox PEM.
 - The process exited before listening on `127.0.0.1:$CDSW_APP_PORT` (CML probes loopback, not `0.0.0.0`).
 - User CPU/memory quota cannot schedule four apps (each 1 CPU / 1 GB). Drop other workloads or raise the quota.
-- Static subdomains `mcp-spark`, `mcp-hive`, `mcp-impala`, or `gateway-admin` already exist from a previous AMP attempt.
 
 Push this repo to GitHub, then **Redeploy** the AMP so the workbench re-imports `.project-metadata.yaml`.
 
@@ -63,15 +63,15 @@ Push this repo to GitHub, then **Redeploy** the AMP so the workbench re-imports 
 
 | Subdomain | CML login | Role |
 | --- | --- | --- |
-| **`agent-gateway`** | Bypassed | **Agent edge.** Docker APISIX when `docker` exists; otherwise Python (`engine: python`). `/mcp/spark`, `/mcp/hive`, `/mcp/impala`, `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`. Knox JWT + optional `X-Agent-Key`. |
-| `mcp-spark` | Bypassed (MCP hosts cannot send CML cookies) | MCP adapter upstream. Direct URL still works (Python JWT). Prefer `agent-gateway`. |
-| `mcp-hive` | Bypassed | POST JSON-RPC Hive (read-only). Knox JWT required. `/cdp/hive` is not this app. |
-| `mcp-impala` | Bypassed | POST JSON-RPC Impala (read-only). Off unless `ENABLE_MCP_IMPALA=true`. Knox JWT required. `/cdp/impala` is not this app. CDW `HTTP code 401` after a valid JWT is warehouse trust, not APISIX. |
-| `gateway-admin` | Required | Operator usage/quotas. Shares `data/gateway.sqlite`. Not an agent route. |
+| **`cdp-ag`** | Bypassed | **Agent edge.** Docker APISIX when `docker` exists; otherwise Python (`engine: python`). `/mcp/spark`, `/mcp/hive`, `/mcp/impala`, `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`. Knox JWT + optional `X-Agent-Key`. |
+| `cdp-ag-spark` | Bypassed (MCP hosts cannot send CML cookies) | MCP adapter upstream. Direct URL still works (Python JWT). Prefer `cdp-ag`. |
+| `cdp-ag-hive` | Bypassed | POST JSON-RPC Hive (read-only). Knox JWT required. `/cdp/hive` is not this app. |
+| `cdp-ag-impala` | Bypassed | POST JSON-RPC Impala (read-only). Off unless `ENABLE_MCP_IMPALA=true`. Knox JWT required. `/cdp/impala` is not this app. CDW `HTTP code 401` after a valid JWT is warehouse trust, not APISIX. |
+| `cdp-ag-admin` | Required | Operator usage/quotas. Shares `data/gateway.sqlite`. Not an agent route. |
 
 Quotas use sqlite on the project filesystem (`ADMIN_BACKEND=sqlite`). Compose still uses HTTP to the admin container and fails open if that container is down.
 
-Burst cap `MCP_RATE_COUNT` / `MCP_RATE_WINDOW` is enforced in APISIX on `agent-gateway` (same as Compose). Direct MCP app URLs still enforce Python burst limits if used without APISIX.
+Burst cap `MCP_RATE_COUNT` / `MCP_RATE_WINDOW` is enforced in APISIX on `cdp-ag` (same as Compose). Direct MCP app URLs still enforce Python burst limits if used without APISIX.
 
 ## MCP host config
 
@@ -81,21 +81,21 @@ The **agent** URL is the APISIX application (POST JSON-RPC, no Streamable HTTP):
 {
   "mcpServers": {
     "cdp-spark": {
-      "url": "https://agent-gateway.<workspace>/mcp/spark",
+      "url": "https://cdp-ag.<workspace>/mcp/spark",
       "headers": {
         "Authorization": "Bearer <knox-jwt>",
         "X-Agent-Key": "<partner-key-when-configured>"
       }
     },
     "cdp-hive": {
-      "url": "https://agent-gateway.<workspace>/mcp/hive",
+      "url": "https://cdp-ag.<workspace>/mcp/hive",
       "headers": {
         "Authorization": "Bearer <knox-jwt>",
         "X-Agent-Key": "<partner-key-when-configured>"
       }
     },
     "cdp-impala": {
-      "url": "https://agent-gateway.<workspace>/mcp/impala",
+      "url": "https://cdp-ag.<workspace>/mcp/impala",
       "headers": {
         "Authorization": "Bearer <knox-jwt>",
         "X-Agent-Key": "<partner-key-when-configured>"
@@ -105,7 +105,7 @@ The **agent** URL is the APISIX application (POST JSON-RPC, no Streamable HTTP):
 }
 ```
 
-Direct MCP subdomains (`mcp-spark`, etc.) remain for adapter debugging; JWT-only, no caller key unless you also set `AGENT_CALLER_KEY` and route through APISIX.
+Direct MCP subdomains (`cdp-ag-spark`, etc.) remain for adapter debugging; JWT-only, no caller key unless you also set `AGENT_CALLER_KEY` and route through APISIX.
 
 Previous direct-only config (still valid for debugging):
 
@@ -113,19 +113,19 @@ Previous direct-only config (still valid for debugging):
 {
   "mcpServers": {
     "cdp-spark": {
-      "url": "https://mcp-spark.<workspace>/mcp/spark",
+      "url": "https://cdp-ag-spark.<workspace>/mcp/spark",
       "headers": {
         "Authorization": "Bearer <knox-jwt>"
       }
     },
     "cdp-hive": {
-      "url": "https://mcp-hive.<workspace>/mcp/hive",
+      "url": "https://cdp-ag-hive.<workspace>/mcp/hive",
       "headers": {
         "Authorization": "Bearer <knox-jwt>"
       }
     },
     "cdp-impala": {
-      "url": "https://mcp-impala.<workspace>/mcp/impala",
+      "url": "https://cdp-ag-impala.<workspace>/mcp/impala",
       "headers": {
         "Authorization": "Bearer <knox-jwt>"
       }
@@ -141,7 +141,7 @@ Previous direct-only config (still valid for debugging):
 | Principal | AMP |
 | --- | --- |
 | End user | Knox JWT (`sub`, `knox.id`) — same as Compose |
-| Agent platform | CML **`agent-gateway`** APISIX app + MCP upstreams (`X-Agent-Key` when `AGENT_CALLER_KEY` is set) |
+| Agent platform | CML **`cdp-ag`** APISIX app + MCP upstreams (`X-Agent-Key` when `AGENT_CALLER_KEY` is set) |
 | Authorization | Ranger via Knox; no impersonation |
 
 AMP is JWT-only for the agent product. Compose MCP caller keys and Phase 3 mTLS do not map onto CML application URLs. AMP still publishes `/.well-known/oauth-protected-resource` and `resource_metadata` on `401`.
@@ -164,7 +164,7 @@ AMP is JWT-only for the agent product. Compose MCP caller keys and Phase 3 mTLS 
 | `examples/agent/third_party_agent.ipynb` | Third-party agent demo: scripted MCP host against the AMP apps |
 | `examples/agent/langgraph_agent.ipynb` | Third-party agent demo: **LangGraph** ReAct over the same MCP tools (LangGraph 0.2 or 0.3 to match CML langchain; model API key in the engine, not project env) |
 
-Paste a Knox JWT in the notebook token cell (`getpass`), or set `KNOX_TOKEN` for that engine only. Do not add `KNOX_TOKEN` or model API keys to project environment or `.project-metadata.yaml`. Override MCP URLs with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if needed. Default is `https://agent-gateway.<CDSW_DOMAIN>/mcp/*`.
+Paste a Knox JWT in the notebook token cell (`getpass`), or set `KNOX_TOKEN` for that engine only. Do not add `KNOX_TOKEN` or model API keys to project environment or `.project-metadata.yaml`. Override MCP URLs with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if needed. Default is `https://cdp-ag.<CDSW_DOMAIN>/mcp/*`.
 
 ## Non-goals
 

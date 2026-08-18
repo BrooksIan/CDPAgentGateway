@@ -46,11 +46,11 @@ def build_amp_apisix_env() -> dict[str, str]:
     if not domain:
         raise ValueError("AMP APISIX requires CDSW_DOMAIN (Cloudera AI Workbench application host)")
     merged["GATEWAY_MODE"] = "live"
-    merged.setdefault("GATEWAY_PUBLIC_URL", f"https://agent-gateway.{domain.rstrip('/')}")
+    merged.setdefault("GATEWAY_PUBLIC_URL", f"https://cdp-ag.{domain.rstrip('/')}")
     if not (os.environ.get("AGENT_CALLER_KEY") or "").strip():
         merged["AGENT_CALLER_KEY"] = ""
     for svc in _MCP_SERVICES:
-        sub = f"mcp-{svc.lower()}"
+        sub = f"cdp-ag-{svc.lower()}"
         merged.setdefault(f"MCP_{svc}_UPSTREAM_SCHEME", "https")
         merged.setdefault(f"MCP_{svc}_UPSTREAM_HOST", f"{sub}.{domain.rstrip('/')}")
         merged.setdefault(f"MCP_{svc}_UPSTREAM_PORT", "443")

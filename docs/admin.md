@@ -11,7 +11,7 @@ gateway admin --open
 
 Default URL: `http://127.0.0.1:9090`.
 
-On the optional CML AMP profile the same UI is a workbench application (`gateway-admin`) with **CML login**. It shares `data/gateway.sqlite` with mcp-spark. It is still not an agent route. How-to: [amp.md](amp.md).
+On the optional CML AMP profile the same UI is a workbench application (`cdp-ag-admin`) with **CML login**. It shares `data/gateway.sqlite` with mcp-spark. It is still not an agent route. How-to: [amp.md](amp.md).
 
 ![Operator console: path status, health, and UTC-day usage](../assets/admin-overview.png)
 

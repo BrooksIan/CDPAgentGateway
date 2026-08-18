@@ -1,6 +1,6 @@
 # Cloudera Blueprint: CDP Agent Gateway
 
-Bring third-party agents to [Cloudera Data Platform](https://www.cloudera.com/) through a north-south gateway. Agents present [Apache Knox](https://knox.apache.org/) JWTs. They never talk to Livy, HiveServer2, Impala, Ozone, or NiFi hostnames. Catalog fields live in [`METADATA.yaml`](METADATA.yaml).
+**Agent governance** for [Cloudera Data Platform](https://www.cloudera.com/). Third-party agents present [Apache Knox](https://knox.apache.org/) JWTs at a north-south gateway. They never talk to Livy, HiveServer2, Impala, Ozone, or NiFi hostnames. Ranger stays authorization. Catalog fields live in [`METADATA.yaml`](METADATA.yaml).
 
 This repo follows the [Cloudera Blueprints Standard](https://github.com/kevinbtalbert/Cloudera-Blueprints-Standard). After reading this page you should know what the blueprint does, who it is for, and how to run the local demo.
 
@@ -24,7 +24,7 @@ This repo follows the [Cloudera Blueprints Standard](https://github.com/kevinbta
 
 ![CDP Agent Gateway catalog cover](assets/AMP_thumbnail.jpg)
 
-CDP Agent Gateway sits in front of Cloudera Data Platform so Cursor, Claude, and other MCP hosts can run Spark without learning cluster topology. Apache APISIX terminates agent HTTP, validates Knox-issued RS256 JWTs, and forwards the same bearer into Knox `cdp-proxy-token` **Livy for Spark 3**. Agents use MCP at `/mcp/spark`. Operators can `GET` Livy for tests and stage job files with **WebHDFS** (`/cdp/webhdfs*`). Knox Trusted Proxy and Apache Ranger remain the authorization source of truth.
+CDP Agent Gateway is **agent governance** for Cloudera Data Platform. Cursor, Claude, and other MCP hosts can run Spark, Hive, and Impala without learning cluster topology and without a parallel credential path. Apache APISIX terminates agent HTTP, validates Knox-issued RS256 JWTs, and forwards the same bearer into Knox `cdp-proxy-token` **Livy for Spark 3**. Agents use MCP at `/mcp/spark`. Operators can `GET` Livy for tests and stage job files with **WebHDFS** (`/cdp/webhdfs*`). Knox Trusted Proxy and Apache Ranger remain the authorization source of truth. Operator quotas, burst caps, and audit join record which agent product and which Knox user called which tool.
 
 Hive is inventoried (`gateway jdbc add`) and agents use read-only MCP at `/mcp/hive`. Impala uses read-only MCP at `/mcp/impala`. `/cdp/hive` and `/cdp/impala` are not agent routes. Ozone and NiFi stay unpublished. Cloudera value is unchanged identity and data policy: agents do not get a parallel credential path into the lakehouse.
 
@@ -54,29 +54,31 @@ On a live cluster that notebook path is what produces the Spark History, Data Ca
 
 ## Use Case
 
-Enterprises want coding and analytics agents to submit Spark jobs and query Hive or Impala on CDP, but they cannot publish Livy, HiveServer2, or Impala to those tools. This blueprint gives one agent-facing address that allowlists Spark MCP plus read-only Hive and Impala MCP, enforces Knox user identity, and keeps Ranger in charge of data access without replacing the CDP perimeter.
+Enterprises need to **govern** coding and analytics agents that submit Spark jobs and query Hive or Impala on CDP. They cannot publish Livy, HiveServer2, or Impala to those tools, and they cannot mint a second identity plane. This blueprint gives one agent-facing address that allowlists Spark MCP plus read-only Hive and Impala MCP, binds each call to a Knox user, keeps Ranger in charge of data access, and gives operators quotas plus audit join — without replacing the CDP perimeter.
 
 ## How this compares to AI gateways
 
 This is a **CDP agent gateway**, not an **AI gateway**. Products in the AI-gateway class — [Envoy AI Gateway](https://github.com/envoyproxy/ai-gateway), Kong AI Gateway, LiteLLM-style proxies, and similar — sit in front of **models**. They unify OpenAI-shaped APIs, inject provider keys, meter tokens, and fail over across OpenAI, Bedrock, Anthropic, and self-hosted inference. Some also **multiplex** other people's MCP servers.
 
-This blueprint sits in front of **Cloudera Data Platform**. Agents present a Knox JWT. MCP adapters **implement** Spark, Hive, and Impala tools and forward the same bearer. Knox stays the CDP perimeter. Ranger still authorizes the token `sub`. There is no LLM translation, no token spend cap, and no catch-all MCP multiplexer.
+This blueprint sits in front of **Cloudera Data Platform** as an **agent governance** edge. Agents present a Knox JWT. MCP adapters **implement** Spark, Hive, and Impala tools and forward the same bearer. Knox stays the CDP perimeter. Ranger still authorizes the token `sub`. There is no LLM translation, no token spend cap, and no catch-all MCP multiplexer.
 
 They compose; they do not replace each other. A coding agent that reasons with an LLM and writes Iceberg via Livy wants an AI gateway on the model hop and this gateway on the lakehouse hop. Do not put Knox JWTs on the model path or provider API keys on Livy.
 
 | | This blueprint | AI gateways (e.g. Envoy AI Gateway) |
 | --- | --- | --- |
-| Job | Agents → CDP (Spark / Hive / Impala) | Apps → GenAI providers and self-hosted models |
+| Job | Agent governance: agents → CDP (Spark / Hive / Impala) | Apps → GenAI providers and self-hosted models |
 | Identity | Knox RS256 JWT (`sub`, `knox.id`); Compose `X-Agent-Key` names the agent product | OAuth/OIDC to clients; API keys injected toward providers |
 | Authorization | Apache Ranger on the Knox subject | Gateway policy (token quotas, tool filters, CEL) |
 | MCP | Three adapters that **are** the tools (`/mcp/spark`, `/mcp/hive`, `/mcp/impala`); POST JSON-RPC | Multiplex N upstream MCP servers; often Streamable HTTP |
 | Rate limit | HTTP burst per Knox `sub` plus operator daily quotas | LLM tokens (input / output / cached / reasoning) |
+| Audit | Operator join of tool, Knox `sub`, `knox.id`, and `X-Request-Id` | Provider usage logs toward models |
 | Must not | Replace Knox, proxy raw Hive/Impala, mint a second user JWT | Validate Knox, honor Ranger, submit Livy batches |
 
 Architecture constraints: [docs/architecture.md](docs/architecture.md). Identity: [docs/identity-and-auth.md](docs/identity-and-auth.md).
 
 ## Key Features
 
+- Agent governance — Knox identity, Ranger authorization, MCP allowlists, per-user quotas, and audit join
 - Knox JWT at the agent edge — no second token format, no APISIX-minted user credentials
 - Dual identity — Compose MCP `X-Agent-Key` names the agent product; Knox JWT `sub` / `knox.id` is the CDP user. AMP is JWT-only (CML project is the agent).
 - RFC 9728 PRM — `GET /.well-known/oauth-protected-resource`; `401 WWW-Authenticate` includes `resource_metadata`
@@ -140,7 +142,7 @@ Do not commit Knox tokens, JDBC passwords, or private keys.
 
 ## Architecture / Software Components
 
-Agents terminate at APISIX (Compose) or at a Cloudera AI Application (optional AMP). The `mcp-spark`, `mcp-hive`, and `mcp-impala` adapters sit behind that edge and forward the caller's Knox bearer to Livy, Hive, or Impala. Knox remains the only hop that presents cluster credentials. The admin UI is not an agent route (localhost `:9090` on Compose; CML login on AMP).
+Agents terminate at APISIX (Compose) or at a Cloudera AI Application (optional AMP). That edge is the **agent governance** hop: Knox JWT, caller key, allowlisted MCP, quotas, and audit. The `mcp-spark`, `mcp-hive`, and `mcp-impala` adapters sit behind it and forward the caller's Knox bearer to Livy, Hive, or Impala. Knox remains the only hop that presents cluster credentials. The admin UI is not an agent route (localhost `:9090` on Compose; CML login on AMP).
 
 ![CDP Agent Gateway traffic path](assets/architecture.svg)
 
@@ -173,7 +175,7 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 
 ## Target Audience
 
-- Platform and security architects who must put agents on CDP without a second identity plane
+- Platform and security architects who need **agent governance** on CDP without a second identity plane
 - Data engineers and SEs running a laptop lab against mock Knox or a VPN-connected cluster
 - Partner / ISV teams onboarding MCP hosts (Cursor, Claude) behind Knox
 - Cloudera AI Workbench operators who want an optional AMP profile against live Knox

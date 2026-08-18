@@ -1,6 +1,6 @@
 # Optional Cloudera AI AMP
 
-This is a **second runtime profile**, not a replacement for Docker Compose. Apache APISIX remains the laptop and production-shaped agent edge. The AMP path is a Cloudera AI Workbench (CML) application that still terminates on Knox.
+This is a **second runtime profile**, not a replacement for Docker Compose. Apache APISIX remains the laptop and production-shaped **agent governance** edge. The AMP path is a Cloudera AI Workbench (CML) application that still terminates on Knox: same JWT, Ranger subject, MCP allowlist, quotas, and audit.
 
 `METADATA.yaml` stays `launchable: false` until a workbench import against live Knox is recorded in [testing.md](testing.md). Do not advertise one-click catalog launch before that.
 

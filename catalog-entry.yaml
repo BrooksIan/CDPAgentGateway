@@ -4,25 +4,30 @@ entries:
   - title: CDP Agent Gateway
     label: cdp-agent-gateway
     short_description: |
-      Front third-party agents with Knox JWTs so Cloudera Data Platform stays behind Ranger.
-      Spark MCP and read-only Hive and Impala MCP are published. Optional Cloudera AI Workbench application.
+      Agent governance for CDP: Knox JWTs, Ranger authorization, allowlisted Spark/Hive/Impala MCP,
+      quotas, and audit. Optional Cloudera AI Workbench application.
     long_description: |
-      CDP Agent Gateway lets Cursor and other MCP hosts reach CDP as the Knox token
-      subject. Spark MCP (/mcp/spark), read-only Hive MCP (/mcp/hive), and read-only
-      Impala MCP (/mcp/impala) are the published agent paths. Operators stage Spark
-      files at /cdp/webhdfs. /cdp/hive and /cdp/impala stay 404. Ozone and NiFi stay unpublished.
+      CDP Agent Gateway is agent governance for Cloudera Data Platform. Cursor and other
+      MCP hosts reach CDP as the Knox token subject; Ranger authorizes that subject.
+      Spark MCP (/mcp/spark), read-only Hive MCP (/mcp/hive), and read-only Impala MCP
+      (/mcp/impala) are the published agent paths. Operator quotas and audit join record
+      who called which tool. Operators stage Spark files at /cdp/webhdfs. /cdp/hive and
+      /cdp/impala stay 404. Ozone and NiFi stay unpublished.
       The AMP profile publishes MCP adapters as CML Applications and an APISIX
       agent-gateway application (same knox-jwt.lua as Compose) against live Knox.
       Apache Knox remains the CDP perimeter. Compose remains the laptop path.
       This catalog entry is packaging only until a workbench
       proof sets METADATA.yaml launchable to true.
     long_description_html: |
-      <p>CDP Agent Gateway lets Cursor and other MCP hosts reach CDP as the Knox token
-      subject. Spark MCP and read-only Hive and Impala MCP are published. Operators stage Spark
-      files at /cdp/webhdfs. /cdp/hive and /cdp/impala stay 404. Apache Knox remains the CDP perimeter.</p>
+      <p>CDP Agent Gateway is agent governance for Cloudera Data Platform. Cursor and other
+      MCP hosts reach CDP as the Knox token subject; Ranger authorizes that subject.
+      Spark MCP and read-only Hive and Impala MCP are published. Operator quotas and
+      audit join record who called which tool. Operators stage Spark files at /cdp/webhdfs.
+      /cdp/hive and /cdp/impala stay 404. Apache Knox remains the CDP perimeter.</p>
     image_path: assets/AMP_thumbnail.jpg # Use a raw HTTPS URL once the repo is public
     tags:
       - agents
+      - agent-governance
       - mcp
       - spark
       - hive

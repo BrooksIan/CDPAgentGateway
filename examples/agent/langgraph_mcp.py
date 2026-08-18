@@ -229,23 +229,162 @@ def langchain_tools(
     return tools
 
 
-def chat_model(*, temperature: float = 0) -> Any:
-    """OpenAI when OPENAI_API_KEY is set, else Anthropic when ANTHROPIC_API_KEY is set."""
-    if (os.environ.get("OPENAI_API_KEY") or "").strip():
-        from langchain_openai import ChatOpenAI
+def apply_model_settings(*, url: str = "", model_id: str = "", token: str = "") -> dict[str, Any]:
+    """Store OpenAI-compatible endpoint settings for this engine only. Never returns the token."""
+    cleaned_url = (url or "").strip().rstrip("/")
+    cleaned_id = (model_id or "").strip()
+    cleaned_token = (token or "").strip()
+    if cleaned_url:
+        os.environ["MODEL_URL"] = cleaned_url
+    if cleaned_id:
+        os.environ["MODEL_ID"] = cleaned_id
+        os.environ["LANGGRAPH_MODEL"] = cleaned_id
+    if cleaned_token:
+        os.environ["MODEL_TOKEN"] = cleaned_token
+    return resolved_model_endpoint()
 
-        model = (os.environ.get("LANGGRAPH_MODEL") or os.environ.get("OPENAI_MODEL") or "gpt-4o-mini").strip()
-        return ChatOpenAI(model=model, temperature=temperature)
+
+def resolved_model_endpoint() -> dict[str, Any]:
+    """url, model_id, token_set. Never includes the model token."""
+    url = (
+        os.environ.get("MODEL_URL")
+        or os.environ.get("OPENAI_BASE_URL")
+        or os.environ.get("OPENAI_API_BASE")
+        or ""
+    ).strip().rstrip("/")
+    model_id = (
+        os.environ.get("MODEL_ID") or os.environ.get("LANGGRAPH_MODEL") or os.environ.get("OPENAI_MODEL") or ""
+    ).strip()
+    token = (os.environ.get("MODEL_TOKEN") or os.environ.get("OPENAI_API_KEY") or "").strip()
+    return {"url": url, "model_id": model_id, "token_set": bool(token)}
+
+
+def show_model_form() -> dict[str, Any] | None:
+    """IPython widgets for model URL, id, and token. None if ipywidgets is unavailable."""
+    try:
+        import ipywidgets as widgets
+        from IPython.display import display
+    except ImportError:
+        return None
+    layout = widgets.Layout(width="90%")
+    style = {"description_width": "110px"}
+    current = resolved_model_endpoint()
+    url = widgets.Text(
+        value=current["url"],
+        description="Model URL",
+        placeholder="https://host/v1",
+        layout=layout,
+        style=style,
+    )
+    model_id = widgets.Text(
+        value=current["model_id"],
+        description="Model ID",
+        placeholder="served model name",
+        layout=layout,
+        style=style,
+    )
+    token = widgets.Password(
+        description="Model token",
+        placeholder="session only, not echoed",
+        layout=layout,
+        style=style,
+    )
+    save = widgets.Button(description="Save for this session", button_style="primary")
+    status = widgets.HTML(value="<i>Fill the form, click Save, or run the next cell.</i>")
+
+    def _on_save(_button=None) -> None:
+        apply_model_settings(url=url.value, model_id=model_id.value, token=token.value)
+        saved = resolved_model_endpoint()
+        status.value = (
+            f"<b>saved</b> url={saved['url'] or '(missing)'} "
+            f"id={saved['model_id'] or '(missing)'} "
+            f"token={'set' if saved['token_set'] else 'missing'}"
+        )
+
+    save.on_click(_on_save)
+    display(widgets.VBox([url, model_id, token, save, status]))
+    return {"url": url, "model_id": model_id, "token": token, "save": save, "status": status}
+
+
+def apply_model_form(form: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Copy widget values into the engine env, then require a usable endpoint."""
+    if form:
+        apply_model_settings(
+            url=str(getattr(form.get("url"), "value", "") or ""),
+            model_id=str(getattr(form.get("model_id"), "value", "") or ""),
+            token=str(getattr(form.get("token"), "value", "") or ""),
+        )
+    status = resolved_model_endpoint()
+    has_cloud = bool(
+        (os.environ.get("OPENAI_API_KEY") or "").strip() or (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+    )
+    if status["url"] and status["model_id"] and status["token_set"]:
+        status["hint"] = "ok"
+        return status
+    if has_cloud and not status["url"]:
+        status["hint"] = "using OPENAI_API_KEY or ANTHROPIC_API_KEY"
+        return status
+    raise RuntimeError(
+        "Fill Model URL, Model ID, and Model token in the form (this session only). "
+        "Do not print the token or put it in AMP project env. The Knox JWT is separate."
+    )
+
+
+def _make_chat_openai(*, model: str, api_key: str, base_url: str | None, temperature: float) -> Any:
+    from langchain_openai import ChatOpenAI
+
+    params = inspect.signature(ChatOpenAI).parameters
+    kwargs: dict[str, Any] = {"temperature": temperature}
+    if "model" in params:
+        kwargs["model"] = model
+    else:
+        kwargs["model_name"] = model
+    if "api_key" in params:
+        kwargs["api_key"] = api_key
+    else:
+        kwargs["openai_api_key"] = api_key
+    if base_url:
+        if "base_url" in params:
+            kwargs["base_url"] = base_url
+        else:
+            kwargs["openai_api_base"] = base_url
+    return ChatOpenAI(**kwargs)
+
+
+def chat_model(*, temperature: float = 0) -> Any:
+    """OpenAI-compatible endpoint from the notebook form, else OpenAI/Anthropic cloud keys."""
+    url = (
+        os.environ.get("MODEL_URL")
+        or os.environ.get("OPENAI_BASE_URL")
+        or os.environ.get("OPENAI_API_BASE")
+        or ""
+    ).strip().rstrip("/")
+    token = (os.environ.get("MODEL_TOKEN") or os.environ.get("OPENAI_API_KEY") or "").strip()
+    model_id = (
+        os.environ.get("MODEL_ID") or os.environ.get("LANGGRAPH_MODEL") or os.environ.get("OPENAI_MODEL") or ""
+    ).strip()
+    if url:
+        if not token or not model_id:
+            raise RuntimeError(
+                "Model URL is set; also set Model ID and Model token in the form (session only)."
+            )
+        return _make_chat_openai(model=model_id, api_key=token, base_url=url, temperature=temperature)
+    if token:
+        return _make_chat_openai(
+            model=model_id or "gpt-4o-mini",
+            api_key=token,
+            base_url=None,
+            temperature=temperature,
+        )
     if (os.environ.get("ANTHROPIC_API_KEY") or "").strip():
         from langchain_anthropic import ChatAnthropic
 
-        model = (
-            os.environ.get("LANGGRAPH_MODEL") or os.environ.get("ANTHROPIC_MODEL") or "claude-sonnet-4-5"
-        ).strip()
+        model = (os.environ.get("LANGGRAPH_MODEL") or os.environ.get("ANTHROPIC_MODEL") or "claude-sonnet-4-5").strip()
         return ChatAnthropic(model=model, temperature=temperature)
     raise RuntimeError(
-        "Set OPENAI_API_KEY or ANTHROPIC_API_KEY for this engine only. Do not commit model keys "
-        "or put them in AMP project env. The Knox JWT is separate (getpass / KNOX_TOKEN)."
+        "Fill the model form (URL, id, token) for this engine, or set OPENAI_API_KEY / "
+        "ANTHROPIC_API_KEY. Do not commit model keys or put them in AMP project env. "
+        "The Knox JWT is separate (getpass / KNOX_TOKEN)."
     )
 
 

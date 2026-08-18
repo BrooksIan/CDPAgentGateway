@@ -12,7 +12,7 @@ Two notebooks call CDP Agent Gateway as an external MCP host. Both use POST JSON
 - **Knox JWT** pasted in the notebook token cell (`getpass`, session only). It must be a Token API **JWT** (`eyJ…`, three segments, `alg=RS256`, `iss=KNOXSSO`). A Knox passcode, cookie, or `Bearer eyJ…` paste becomes `401 invalid_token`. Optional: `KNOX_TOKEN` for this engine, or `KNOX_TOKEN_FILE`. Never commit tokens, never add them to AMP project env, never print them.
 - **Compose:** `gateway up` on `http://127.0.0.1:9080`. MCP routes need `X-Agent-Key` (default `lab-agent`).
 - **AMP:** `agent-gateway` plus Spark/Hive/Impala MCP applications. Knox JWT as `Authorization: Bearer`.
-- **LangGraph notebook only:** `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for this engine. Optional `LANGGRAPH_MODEL`. The notebook pins LangGraph / `langchain-core` **0.3.x** (`<0.4`) so it can share a Cloudera AI Workbench engine with CML's `langchain` 0.3. Do not install langchain-core 1.x on AMP. Do not commit model keys.
+- **LangGraph notebook only:** a form for **Model URL**, **Model ID**, and **Model token** (OpenAI-compatible endpoint, this engine only). Optional cloud keys: `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`. The notebook pins LangGraph / `langchain-core` **0.3.x** (`<0.4`) so it can share a Cloudera AI Workbench engine with CML's `langchain` 0.3. Do not install langchain-core 1.x on AMP. Do not commit model keys.
 
 ## URLs
 
@@ -28,7 +28,7 @@ Override with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if your works
 1. Open a notebook in Workbench (Python 3.11+) or Jupyter locally.
 2. Run cells in order. The **Knox JWT** cell prompts with `getpass` (not echoed).
 3. Scripted notebook: health, `tools/list`, Spark → Hive.
-4. LangGraph notebook: bind MCP tools, then a read-only ReAct turn (list batches / Hive databases). Set `LANGGRAPH_RUN_SUBMIT=1` only if the job file is already staged.
+4. LangGraph notebook: Knox JWT, **model form** (URL / id / token), bind MCP tools, then a read-only ReAct turn. Set `LANGGRAPH_RUN_SUBMIT=1` only if the job file is already staged.
 
 On AMP, stage the job on HDFS first (or set `SPARK_FILE_URI`). Spark jobs can take several minutes; override wait with `SPARK_POLL_TIMEOUT` (seconds). If a previous notebook cell installed langchain-core 1.x, **restart the Workbench session** and re-run so CML's langchain 0.3 stack is intact.
 

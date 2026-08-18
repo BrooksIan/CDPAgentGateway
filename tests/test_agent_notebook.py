@@ -335,6 +335,11 @@ def test_langgraph_notebook_present() -> None:
     assert "knox_token_status" in source
     assert "getpass" in source or "Knox JWT" in source
     assert "install_langgraph_deps" in source
+    assert "show_model_form" in source
+    assert "apply_model_form" in source
+    assert "Model URL" in source
+    assert "Model ID" in source
+    assert "Model token" in source
     assert "LANGGRAPH_RUN_SUBMIT" in source
     assert "Streamable HTTP" in source
     assert "print(token)" not in source
@@ -461,4 +466,64 @@ def test_require_langchain_core_03_rejects_1x(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(lg, "_dist_version", lambda _name: "1.5.6")
     with pytest.raises(RuntimeError, match="1.x"):
         lg.require_langchain_core_03()
+
+
+def test_apply_model_settings_omits_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+    monkeypatch.delenv("MODEL_URL", raising=False)
+    monkeypatch.delenv("MODEL_ID", raising=False)
+    monkeypatch.delenv("MODEL_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    status = lg.apply_model_settings(
+        url="https://llm.example/v1/",
+        model_id="llama-8b",
+        token="secret-model-token",
+    )
+    assert status["url"] == "https://llm.example/v1"
+    assert status["model_id"] == "llama-8b"
+    assert status["token_set"] is True
+    assert "secret-model-token" not in json.dumps(status)
+    assert os.environ["MODEL_TOKEN"] == "secret-model-token"
+
+
+def test_chat_model_uses_form_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+    monkeypatch.setenv("MODEL_URL", "https://llm.example/v1")
+    monkeypatch.setenv("MODEL_ID", "llama-8b")
+    monkeypatch.setenv("MODEL_TOKEN", "secret-model-token")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    seen: dict[str, object] = {}
+
+    def fake_chat(**kwargs):
+        seen.update(kwargs)
+        return "llm"
+
+    monkeypatch.setattr(lg, "_make_chat_openai", fake_chat)
+    assert lg.chat_model() == "llm"
+    assert seen["model"] == "llama-8b"
+    assert seen["base_url"] == "https://llm.example/v1"
+    assert seen["api_key"] == "secret-model-token"
+
+
+def test_apply_model_form_reads_widget_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    class Box:
+        def __init__(self, value: str) -> None:
+            self.value = value
+
+    status = lg.apply_model_form(
+        {
+            "url": Box("https://models.example/v1"),
+            "model_id": Box("qwen"),
+            "token": Box("secret-model-token-xyz"),
+        }
+    )
+    assert status["hint"] == "ok"
+    assert status["url"] == "https://models.example/v1"
+    assert status["model_id"] == "qwen"
+    assert "secret-model-token-xyz" not in json.dumps(status)
 

@@ -192,6 +192,16 @@ def test_notebook_runs_spark_to_hive_example() -> None:
     assert "print(token)" not in source
 
 
+def test_notebooks_have_cell_ids() -> None:
+    for rel in (
+        "examples/agent/third_party_agent.ipynb",
+        "examples/agent/langgraph_agent.ipynb",
+    ):
+        nb = json.loads((ROOT / rel).read_text())
+        missing = [i for i, cell in enumerate(nb["cells"]) if not cell.get("id")]
+        assert missing == [], f"{rel} cells missing id: {missing}"
+
+
 def test_third_party_notebook_present() -> None:
     assert (ROOT / "examples/agent/third_party_agent.ipynb").is_file()
     assert _AGENT_PATH.is_file()

@@ -154,7 +154,7 @@ def _header_map(scope: dict[str, Any]) -> dict[bytes, bytes]:
 
 def _set_header(scope: dict[str, Any], name: str, value: str) -> None:
     key = name.lower().encode("latin-1")
-    raw = value.encode("latin-1")
+    raw = str(value).encode("latin-1", "replace")
     headers = [pair for pair in scope.get("headers") or [] if pair[0] != key]
     headers.append((key, raw))
     scope["headers"] = headers
@@ -277,11 +277,29 @@ class KnoxJWTMiddleware:
             )
             return
         request_id = headers.get(b"x-request-id", b"").decode("latin-1").strip() or uuid.uuid4().hex
-        _set_header(scope, "X-Knox-User", identity.sub)
-        if identity.token_id:
-            _set_header(scope, "X-Knox-Token-Id", identity.token_id)
-        _set_header(scope, "X-Request-Id", request_id)
-        await self.app(scope, receive, send)
+        try:
+            _set_header(scope, "X-Knox-User", identity.sub)
+            if identity.token_id:
+                _set_header(scope, "X-Knox-Token-Id", identity.token_id)
+            _set_header(scope, "X-Request-Id", request_id)
+            await self.app(scope, receive, send)
+        except Exception as extra:  # noqa: BLE001 — never return uvicorn's plain Internal Server Error
+            print(
+                json.dumps(
+                    {
+                        "service": "agent-gateway",
+                        "event": "unhandled",
+                        "error": type(extra).__name__,
+                        "detail": str(extra)[:200],
+                    }
+                ),
+                flush=True,
+            )
+            await _send_json(
+                send,
+                status=500,
+                body={"error": "internal_error", "reason": type(extra).__name__},
+            )
 
 
 def _prm_routes() -> list[Route]:

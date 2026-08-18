@@ -22,6 +22,7 @@ from agentgateway.amp import (
     BurstLimiter,
     KnoxJWTMiddleware,
     _int_env,
+    _load_module,
     _prm_routes,
     amp_public_key_path,
     apply_live_upstream,
@@ -252,6 +253,35 @@ def _outbound_headers(response: httpx.Response) -> dict[str, str]:
     }
 
 
+_MCP_ADAPTER_DIRS = {
+    "spark": ("amp_edge_spark", "mcp-spark"),
+    "hive": ("amp_edge_hive", "mcp-hive"),
+    "impala": ("amp_edge_impala", "mcp-impala"),
+}
+
+
+def load_python_edge_mcp_endpoints() -> dict:
+    """Load MCP adapter endpoints in-process. CML cannot hairpin to sibling app HTTPS."""
+    endpoints: dict = {}
+    for adapter, (module_name, directory) in _MCP_ADAPTER_DIRS.items():
+        try:
+            endpoints[adapter] = _load_module(module_name, directory).mcp_endpoint
+        except Exception as extra:  # noqa: BLE001 — hive extra is optional on AMP
+            print(
+                json.dumps(
+                    {
+                        "service": "agent-gateway",
+                        "event": "mcp_load_failed",
+                        "adapter": adapter,
+                        "error": type(extra).__name__,
+                        "detail": str(extra)[:200],
+                    }
+                ),
+                flush=True,
+            )
+    return endpoints
+
+
 def _mcp_upstream_base(adapter: str, values: dict[str, str]) -> str:
     svc = adapter.upper()
     scheme = values[f"MCP_{svc}_UPSTREAM_SCHEME"]
@@ -273,10 +303,18 @@ def build_python_edge_app():
     prefix = (values.get("KNOX_PROXY_PREFIX") or "").rstrip("/")
     knox = _knox_origin()
     caller = agent_caller_key(values)
+    endpoints = load_python_edge_mcp_endpoints()
 
     async def health(_request: Request) -> JSONResponse:
         return JSONResponse(
-            {"status": "ok", "service": "agent-gateway", "profile": "amp", "engine": "python"}
+            {
+                "status": "ok",
+                "service": "agent-gateway",
+                "profile": "amp",
+                "engine": "python",
+                "mcp": "inprocess",
+                "adapters": sorted(endpoints),
+            }
         )
 
     async def _proxy(request: Request, url: str) -> Response:
@@ -297,6 +335,11 @@ def build_python_edge_app():
                 {"error": "upstream_unreachable", "reason": type(extra).__name__},
                 status_code=502,
             )
+        except Exception as extra:  # noqa: BLE001
+            return JSONResponse(
+                {"error": "upstream_error", "reason": type(extra).__name__},
+                status_code=502,
+            )
         try:
             return Response(
                 content=response.content,
@@ -313,18 +356,35 @@ def build_python_edge_app():
         path = request.url.path
         if caller and request.headers.get("x-agent-key") != caller:
             return JSONResponse({"error": "unauthorized", "reason": "missing_caller_key"}, status_code=401)
-        adapter = "spark"
-        rest = ""
+        adapter = None
         for name in ("spark", "hive", "impala"):
             marker = f"/mcp/{name}"
             if path == marker or path.startswith(marker + "/"):
                 adapter = name
-                rest = path[len(marker) :]
                 break
-        else:
+        if adapter is None:
             return JSONResponse({"error": "not_found"}, status_code=404)
-        target = f"{_mcp_upstream_base(adapter, values)}/mcp{rest}"
-        return await _proxy(request, target)
+        handler = endpoints.get(adapter)
+        if handler is None:
+            return JSONResponse({"error": "adapter_unavailable", "reason": adapter}, status_code=503)
+        try:
+            return await handler(request)
+        except Exception as extra:  # noqa: BLE001 — return JSON, not uvicorn's plain 500
+            print(
+                json.dumps(
+                    {
+                        "service": "agent-gateway",
+                        "event": "mcp_dispatch_failed",
+                        "adapter": adapter,
+                        "error": type(extra).__name__,
+                    }
+                ),
+                flush=True,
+            )
+            return JSONResponse(
+                {"error": "mcp_adapter_failed", "reason": type(extra).__name__},
+                status_code=502,
+            )
 
     async def cdp_proxy(request: Request) -> Response:
         path = request.url.path

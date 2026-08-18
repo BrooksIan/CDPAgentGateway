@@ -81,13 +81,12 @@ def test_python_edge_health_is_public(monkeypatch: pytest.MonkeyPatch) -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["engine"] == "python"
+    assert body["mcp"] == "inprocess"
     denied = client.post("/mcp/spark", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     assert denied.status_code == 401
 
 
-def test_python_edge_rewrites_host_and_strips_content_length(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_python_edge_tools_list_in_process(monkeypatch: pytest.MonkeyPatch) -> None:
     from starlette.testclient import TestClient
 
     from agentgateway.amp_apisix import build_python_edge_app
@@ -103,24 +102,8 @@ def test_python_edge_rewrites_host_and_strips_content_length(
     pem = ROOT / "conf" / "keys" / "public.pem"
     monkeypatch.setenv("KNOX_PUBLIC_KEY_FILE", str(pem))
     monkeypatch.setenv("AGENT_CALLER_KEY", "")
-    captured: dict[str, object] = {}
-
-    class FakeUpstream:
-        status_code = 200
-        content = b'{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}'
-        headers = {
-            "content-type": "application/json",
-            "content-length": "999",
-            "transfer-encoding": "chunked",
-        }
-
-    def fake_request(method, url, **kwargs):
-        captured["method"] = method
-        captured["url"] = url
-        captured["headers"] = kwargs.get("headers")
-        return FakeUpstream()
-
-    monkeypatch.setattr("httpx.request", fake_request)
+    monkeypatch.setenv("ADMIN_BACKEND", "sqlite")
+    monkeypatch.setenv("ADMIN_DB", str(ROOT / "data" / "gateway.sqlite"))
     client = TestClient(build_python_edge_app())
     token = sign_rs256(knox_claims(sub="analyst"))
     response = client.post(
@@ -129,11 +112,8 @@ def test_python_edge_rewrites_host_and_strips_content_length(
         json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
     )
     assert response.status_code == 200, response.text
-    assert captured["url"] == "https://mcp-spark.ml.example.com/mcp"
-    headers = captured["headers"]
-    assert isinstance(headers, dict)
-    assert headers["Host"] == "mcp-spark.ml.example.com"
-    assert "content-length" not in {key.lower() for key in headers}
+    names = [tool["name"] for tool in response.json()["result"]["tools"]]
+    assert "spark_list_batches" in names
 
 
 def test_startup_error_app_includes_detail() -> None:

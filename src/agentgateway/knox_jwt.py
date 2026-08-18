@@ -92,6 +92,8 @@ def verify_knox_jwt(
         raise KnoxJWTError("invalid_alg") from exc
     except jwt.exceptions.PyJWTError as exc:
         raise KnoxJWTError("invalid_token") from exc
+    except (ValueError, TypeError) as extra:
+        raise KnoxJWTError("gateway_misconfigured", status=500) from extra
 
     if issuer and payload.get("iss") != issuer:
         raise KnoxJWTError("invalid_issuer")

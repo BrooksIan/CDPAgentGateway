@@ -15,7 +15,7 @@ Template: [CML Community AMP Template](https://github.com/cloudera/CML_Community
 
 AMP also publishes direct MCP application URLs (`mcp-spark`, `mcp-hive`, `mcp-impala`) with Python Knox JWT for debugging. **Agents should use `https://agent-gateway.<workspace>/mcp/spark`** (and hive/impala) so they get the same APISIX routes as Compose: `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`, optional `X-Agent-Key`, and APISIX burst caps.
 
-AMP prefers the same `apache/apisix:3.16.0-debian` image as Compose when `docker` is on the engine. CML application engines usually have no Docker; then `agent-gateway` pins Knox JWKS itself (if Fetch JWKS did not write the PEM) and serves the same allowlisted routes in Python (`engine: python` on `GET /health`).
+AMP prefers the same `apache/apisix:3.16.0-debian` image as Compose when `docker` is on the engine. CML application engines usually have no Docker; then `agent-gateway` pins Knox JWKS and runs Spark/Hive/Impala MCP **in-process** (`engine: python`, `mcp: inprocess` on `GET /health`). That avoids CML hairpin HTTPS to sibling app hostnames, which otherwise surfaces as a generic `Internal Server Error`. Sibling MCP apps remain for direct debug URLs. `/cdp/livy_for_spark3*` and `/cdp/webhdfs*` still proxy to Knox.
 
 ```text
 MCP host → agent-gateway (APISIX, knox-jwt.lua) → mcp-spark|hive|impala → Knox → CDP
@@ -52,7 +52,7 @@ If applications exist but stay Starting or Failed, open Application logs. Typica
 - CML applications run in IPython, which already has an asyncio loop. AMP starts uvicorn in a background thread instead of `asyncio.run`.
 - `KNOX_PROXY_URL` must be set in **Project Settings → Environment**. An empty value skips JWKS pin; MCP POSTs then fail closed until you set it and rerun Fetch pinned Knox JWKS.
 - `GET /health` with `"error": "JSONDecodeError"` means Knox JWKS returned HTML or an empty body (common when the derived URL is `api/v1` and the cluster only serves `api/v2`). Set `KNOX_JWKS_URL` to the inventoried `.../homepage/knoxtoken/api/v2/jwks.json`, keep `UPSTREAM_TLS_VERIFY=false` for lab CAs, push this repo, then **Restart** Agent gateway. A healthy Python edge returns `"engine": "python"`.
-- Notebook `MCP HTTP 500` from `agent-gateway` after a valid JWT: check `mcp-spark` is running (`https://mcp-spark.<domain>/health`). `gateway_misconfigured` means that app has no Knox PEM — Restart Spark MCP and Agent gateway after a successful Fetch JWKS. Confirm `mcp-spark`, `mcp-hive`, and `mcp-impala` applications exist; the edge proxies to those hostnames.
+- Notebook `MCP HTTP 500` from `agent-gateway` after a valid JWT: check `GET /health` includes `"mcp": "inprocess"`. A body of plain `Internal Server Error` is CML's proxy wrapping an unhandled crash or a hairpin to `mcp-spark.<domain>`; restart Agent gateway after this in-process dispatch change. `gateway_misconfigured` means no Knox PEM.
 - The process exited before listening on `127.0.0.1:$CDSW_APP_PORT` (CML probes loopback, not `0.0.0.0`).
 - User CPU/memory quota cannot schedule four apps (each 1 CPU / 1 GB). Drop other workloads or raise the quota.
 - Static subdomains `mcp-spark`, `mcp-hive`, `mcp-impala`, or `gateway-admin` already exist from a previous AMP attempt.

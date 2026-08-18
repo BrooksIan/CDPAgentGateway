@@ -44,7 +44,7 @@ The admin console is for operators, not MCP hosts. Full walkthrough: [docs/admin
 
 On a live cluster the same Knox subject shows up in Spark History, Data Catalog access audits, and the operator activity log after `spark_submit_batch` writes `{user}.count_to_10` and Hive MCP selects it:
 
-![Spark History: count-to-10 batch as the Knox subject](assets/Spark_History_job_run.png)
+![Spark History: count-to-10 batch as the Knox subject](assets/Spark_History_agentActivity.png)
 
 ![Data Catalog access audits for count_to_10 after Hive MCP select](assets/CDP_agent_activity.png)
 

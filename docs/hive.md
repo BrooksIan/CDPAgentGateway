@@ -105,6 +105,8 @@ Ranger still authorizes that `SELECT` as the Knox `sub`. Data Catalog access aud
 
 ![Data Catalog access audits for count_to_10 after Hive MCP select](../assets/CDP_agent_activity.png)
 
+The same Spark → Hive path as a third-party MCP host, including **LangGraph**, is [examples/agent/](../examples/agent/README.md).
+
 Must not:
 
 - run DDL/DML or free-form SQL

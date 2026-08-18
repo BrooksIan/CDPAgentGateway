@@ -70,7 +70,7 @@ Example MCP host config (put the JWT in the host's secret store, never in git):
 }
 ```
 
-LangGraph over the same POST JSON-RPC tools: [examples/agent/langgraph_agent.ipynb](examples/agent/langgraph_agent.ipynb). Do not add Streamable HTTP.
+Third-party agent demos (POST JSON-RPC only; do not add Streamable HTTP): [examples/agent/third_party_agent.ipynb](examples/agent/third_party_agent.ipynb) is a scripted MCP host; [examples/agent/langgraph_agent.ipynb](examples/agent/langgraph_agent.ipynb) shows LangGraph ReAct over the same tools. How-to: [examples/agent/README.md](examples/agent/README.md).
 
 ## Code and config style
 

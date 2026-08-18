@@ -196,7 +196,7 @@ Poll with `spark_get_batch` until `state` is `success` or `dead`. Spark History 
 
 ![Spark History: count-to-10 batch as the Knox subject](../assets/Spark_History_agentActivity.png)
 
-Then query Hive (same JWT): [hive.md](hive.md), [examples/hive/README.md](../examples/hive/README.md).
+Then query Hive (same JWT): [hive.md](hive.md), [examples/hive/README.md](../examples/hive/README.md). The same Spark → Hive path as a third-party MCP host, including **LangGraph**, is [examples/agent/](../examples/agent/README.md).
 
 ```bash
 gateway mcp --adapter hive --tool hive_list_tables --arg database=$USER
@@ -240,7 +240,7 @@ Put the Knox JWT in the host secret store, never in git.
 }
 ```
 
-A LangGraph ReAct sample binds the same POST JSON-RPC tools: [`examples/agent/langgraph_agent.ipynb`](../examples/agent/langgraph_agent.ipynb). It does not add Streamable HTTP.
+Third-party agents are demonstrated with notebooks in [`examples/agent/`](../examples/agent/README.md). [`third_party_agent.ipynb`](../examples/agent/third_party_agent.ipynb) is a scripted MCP host. [`langgraph_agent.ipynb`](../examples/agent/langgraph_agent.ipynb) shows **LangGraph** ReAct over the same POST JSON-RPC tools. Neither adds Streamable HTTP.
 
 Agents should call `/mcp/spark`, `/mcp/hive`, or `/mcp/impala` only, with **POST JSON-RPC**. Streamable HTTP (GET SSE, MCP session) is **not** implemented and is held. Do not teach them the Knox URL, `/cdp/webhdfs`, `/cdp/hive`, `/cdp/impala`, or the operator admin UI (`:9090`). AMP hosts use `https://mcp-spark.<workspace>/mcp/spark`, `https://mcp-hive.<workspace>/mcp/hive`, or `https://mcp-impala.<workspace>/mcp/impala` instead of localhost; see [amp.md](amp.md).
 

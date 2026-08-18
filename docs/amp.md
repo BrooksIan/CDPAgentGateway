@@ -38,7 +38,7 @@ Fix clone access **before** launching the AMP:
 3. Add `catalog-entry.yaml` as a custom AMP source (**Site Administration → AMPs**), or use **New Project → ML Prototype** with this git URL.
 4. Open the **CDP Agent Gateway** tile → **Configure Project**. `KNOX_PROXY_URL` must have a **non-empty YAML default** (CML shows `Missing required environment variables` if the default is `null` or blank, even after you type a value). The form is pre-filled from `inventory/cdp.yaml`. Override it for another cluster. `ENABLE_MCP_SPARK` and `ENABLE_MCP_HIVE` default to `true`; `ENABLE_MCP_IMPALA` defaults to `false`. CML only offers text boxes, so type `true` or `false` (not checkboxes). AMP still starts every application slot; a disabled adapter serves `/health` as `disabled` and `/mcp*` as 404. The Python edge only loads enabled adapters (`GET /health` lists `adapters` and `disabled`). Do not add `KNOX_TOKEN` here.
 5. Click **Launch Project**. CML then runs tasks in order: install extras, **create and run** Fetch JWKS, **create and run** Smoke-check Knox, start MCP + admin apps, start **agent-gateway** (APISIX).
-6. Runtime: Workbench, **JupyterLab (Python 3.11 Standard)**, or PBJ Workbench, **Python 3.11 or greater** (3.12 is listed for Workbench/PBJ). No GPU. Do not pick Python 3.10 or older — `requires-python` is `>=3.11`. Open the agent notebooks in JupyterLab Python 3.11 Standard.
+6. Runtime: Workbench, **JupyterLab (Python 3.11 Standard)**, or PBJ Workbench, **Python 3.11 or greater** (3.12 is listed for Workbench/PBJ). No GPU. Do not pick Python 3.10 or older — `requires-python` is `>=3.11`. Third-party agents are demonstrated in JupyterLab Python 3.11 Standard with [`examples/agent/third_party_agent.ipynb`](../examples/agent/third_party_agent.ipynb) (scripted MCP host) and [`examples/agent/langgraph_agent.ipynb`](../examples/agent/langgraph_agent.ipynb) (**LangGraph** ReAct).
 
 A public clone does not need a PAT. Do not encode a token in `git_url`.
 
@@ -161,8 +161,8 @@ AMP is JWT-only for the agent product. Compose MCP caller keys and Phase 3 mTLS 
 | `5_app-mcp-hive/` | Hive MCP application |
 | `6_app-mcp-impala/` | Impala MCP application |
 | `7_app-agent-gateway/` | APISIX application (Docker, knox-jwt.lua, same routes as Compose) |
-| `examples/agent/third_party_agent.ipynb` | Workbench notebook: simulate a third-party MCP host against the AMP apps |
-| `examples/agent/langgraph_agent.ipynb` | Workbench LangGraph ReAct agent over the same MCP tools (LangGraph 0.2 or 0.3 to match CML langchain; model API key in the engine, not project env) |
+| `examples/agent/third_party_agent.ipynb` | Third-party agent demo: scripted MCP host against the AMP apps |
+| `examples/agent/langgraph_agent.ipynb` | Third-party agent demo: **LangGraph** ReAct over the same MCP tools (LangGraph 0.2 or 0.3 to match CML langchain; model API key in the engine, not project env) |
 
 Paste a Knox JWT in the notebook token cell (`getpass`), or set `KNOX_TOKEN` for that engine only. Do not add `KNOX_TOKEN` or model API keys to project environment or `.project-metadata.yaml`. Override MCP URLs with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if needed. Default is `https://agent-gateway.<CDSW_DOMAIN>/mcp/*`.
 

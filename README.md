@@ -42,7 +42,9 @@ A recorded Reprise walkthrough is not published yet. The current path is the loc
 
 The admin console is for operators, not MCP hosts. Full walkthrough: [docs/admin.md](docs/admin.md).
 
-On a live cluster the same Knox subject shows up in Spark History, Data Catalog access audits, and the operator activity log after `spark_submit_batch` writes `{user}.count_to_10` and Hive MCP selects it:
+Third-party agents are demonstrated with the Jupyter notebooks in [`examples/agent/`](examples/agent/README.md), not the operator CLI. [`third_party_agent.ipynb`](examples/agent/third_party_agent.ipynb) is a scripted MCP host (the same POST JSON-RPC a Cursor or Claude host would send). [`langgraph_agent.ipynb`](examples/agent/langgraph_agent.ipynb) shows **LangGraph**: a ReAct agent bound to the same Spark, Hive, and Impala tools. Both present a Knox JWT and never call cluster APIs directly.
+
+On a live cluster that notebook path is what produces the Spark History, Data Catalog, and operator activity evidence below: `spark_submit_batch` writes `{user}.count_to_10` as the Knox subject, then Hive MCP selects it.
 
 ![Spark History: count-to-10 batch as the Knox subject](assets/Spark_History_agentActivity.png)
 
@@ -86,6 +88,7 @@ Architecture constraints: [docs/architecture.md](docs/architecture.md). Identity
 - Operator admin UI — UTC-day usage, quotas vs burst 429s, audit join on localhost `:9090`
 - MCP burst cap — `limit-count` on `/mcp/spark`, `/mcp/hive`, and `/mcp/impala` keyed by Knox `sub` (default 60/minute)
 - Ranger stays authoritative — the gateway does not impersonate a different user than the token subject
+- Third-party agent notebooks — [`examples/agent/`](examples/agent/README.md) demos an MCP host (`third_party_agent.ipynb`) and a **LangGraph** ReAct agent (`langgraph_agent.ipynb`) against `/mcp/spark`, `/mcp/hive`, and `/mcp/impala`
 
 ## Quickstart
 
@@ -129,7 +132,9 @@ Architecture constraints: [docs/architecture.md](docs/architecture.md). Identity
 
    `gateway knox` writes host, port, `cdp-proxy-token` prefix, and JWKS URL into `.env`. Spark: [docs/spark.md](docs/spark.md). Hive: [docs/hive.md](docs/hive.md). Impala: [docs/impala.md](docs/impala.md). Do not commit `.env`.
 
-6. Optional — Cloudera AI Workbench AMP (not Docker Compose). Live Knox only; `launchable` stays false until a workbench proof. How-to: [docs/amp.md](docs/amp.md).
+6. Optional — demonstrate third-party agents with the notebooks in [`examples/agent/`](examples/agent/README.md). [`third_party_agent.ipynb`](examples/agent/third_party_agent.ipynb) is a scripted MCP host; [`langgraph_agent.ipynb`](examples/agent/langgraph_agent.ipynb) shows **LangGraph** ReAct over the same tools. Paste a Knox JWT in the notebook (`getpass`); do not put it in git or AMP project env. LangGraph locally: `pip install -e ".[langgraph]"`.
+
+7. Optional — Cloudera AI Workbench AMP (not Docker Compose). Live Knox only; `launchable` stays false until a workbench proof. How-to: [docs/amp.md](docs/amp.md).
 
 Do not commit Knox tokens, JDBC passwords, or private keys.
 
@@ -195,7 +200,7 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 | `examples/spark/` | Sample Spark 3 batch (`count_to_10.py`) that writes Iceberg for Hive |
 | `examples/hive/` | Query that table with Hive MCP (`hive_list_tables` / `hive_describe_table` / `hive_select`) |
 | `examples/impala/` | Same Iceberg table through Impala MCP when metadata is visible |
-| `examples/agent/` | Jupyter notebooks + helper: MCP host simulation and LangGraph ReAct agent |
+| `examples/agent/` | Third-party agent demo notebooks: scripted MCP host (`third_party_agent.ipynb`) and **LangGraph** ReAct (`langgraph_agent.ipynb`) |
 | `tests/` | Inventory, CLI, gateway, and MCP pytest |
 | `AGENTS.md` | Instructions for coding agents |
 | `.cursor/rules/` | Cursor project rules |
@@ -236,6 +241,7 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 - [Build phases](docs/phases.md)
 - [Phase 0 inventory](docs/phase-0-inventory.md)
 - [Test cases](docs/testing.md)
+- [Third-party agent notebooks](examples/agent/README.md) (scripted MCP host and LangGraph)
 - [Agent instructions](AGENTS.md)
 - [Cloudera Knox Token API](https://docs.cloudera.com/runtime/7.3.1/knox-authentication/topics/security-knox-token-api.html)
 - [APISIX Learning Center](https://apisix.apache.org/learning-center/)

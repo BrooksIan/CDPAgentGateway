@@ -1,11 +1,11 @@
 # Third-party agent demo
 
-Two notebooks call CDP Agent Gateway as an external MCP host. Both use POST JSON-RPC only; they never talk to Knox or Livy directly.
+These notebooks **demonstrate third-party agents** against CDP Agent Gateway. They stand in for Cursor, Claude, or a partner SDK: POST JSON-RPC to `/mcp/spark`, `/mcp/hive`, and `/mcp/impala` with a Knox JWT. They never talk to Knox, Livy, HiveServer2, or Impala directly.
 
-| Notebook | Role |
+| Notebook | What it demonstrates |
 | --- | --- |
-| [`third_party_agent.ipynb`](third_party_agent.ipynb) | Scripted host: health, `tools/list`, Spark → Hive |
-| [`langgraph_agent.ipynb`](langgraph_agent.ipynb) | LangGraph ReAct agent bound to the same MCP tools |
+| [`third_party_agent.ipynb`](third_party_agent.ipynb) | Scripted third-party MCP host: health, `tools/list`, Spark → Hive |
+| [`langgraph_agent.ipynb`](langgraph_agent.ipynb) | **LangGraph** ReAct agent bound to the same MCP tools |
 
 ## Prerequisites
 

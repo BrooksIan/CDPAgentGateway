@@ -44,7 +44,7 @@ When the log shows `iceberg_table=…` (or `spark_get_batch` is `success`), Spar
 
 ![Spark History: count-to-10 batch as the Knox subject](../../assets/Spark_History_agentActivity.png)
 
-Then query Hive: [examples/hive/README.md](../hive/README.md).
+Then query Hive: [examples/hive/README.md](../hive/README.md). The same Spark → Hive path as a third-party MCP host (and as **LangGraph**) is [examples/agent/](../agent/README.md).
 
 ```bash
 gateway mcp --adapter hive --tool hive_list_tables --arg database=$USER

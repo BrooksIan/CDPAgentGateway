@@ -42,6 +42,14 @@ A recorded Reprise walkthrough is not published yet. The current path is the loc
 
 The admin console is for operators, not MCP hosts. Full walkthrough: [docs/admin.md](docs/admin.md).
 
+On a live cluster the same Knox subject shows up in Spark History, Data Catalog access audits, and the operator activity log after `spark_submit_batch` writes `{user}.count_to_10` and Hive MCP selects it:
+
+![Spark History: count-to-10 batch as the Knox subject](assets/Spark_History_job_run.png)
+
+![Data Catalog access audits for count_to_10 after Hive MCP select](assets/CDP_agent_activity.png)
+
+![Operator console: Spark and Hive MCP usage keyed by Knox sub](assets/Agent_audit_activity.png)
+
 ## Use Case
 
 Enterprises want coding and analytics agents to submit Spark jobs and query Hive or Impala on CDP, but they cannot publish Livy, HiveServer2, or Impala to those tools. This blueprint gives one agent-facing address that allowlists Spark MCP plus read-only Hive and Impala MCP, enforces Knox user identity, and keeps Ranger in charge of data access without replacing the CDP perimeter.
@@ -169,7 +177,7 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 
 | Path | Description |
 | --- | --- |
-| `assets/` | Architecture diagram, AMP catalog cover, admin UI screenshots |
+| `assets/` | Architecture diagram, AMP catalog cover, admin UI, Spark History, and Data Catalog screenshots |
 | `deploy/` | Docker Compose (APISIX, mock CDP, mcp-spark, mcp-hive, mcp-impala, admin) |
 | `docs/` | Architecture, Spark, Hive, Impala, admin, identity, AMP, phases, tests |
 | `LICENSE` | Apache License 2.0 |

@@ -101,6 +101,10 @@ gateway mcp --adapter hive --tool hive_select \
 
 A successful `hive_select` looks like `kind=select`, `columns=["n"]`, `returned=10`, `rows` `{"n":"1"}` … `{"n":"10"}`. Named columns are required; `SELECT *` is rejected. If Hive has not seen the table yet, the tool error names `count_to_10` (HTTP 200 JSON-RPC `isError`, not a raw 500).
 
+Ranger still authorizes that `SELECT` as the Knox `sub`. Data Catalog access audits on `{user}.count_to_10` show `ALLOWED` for the same subject:
+
+![Data Catalog access audits for count_to_10 after Hive MCP select](../assets/CDP_agent_activity.png)
+
 Must not:
 
 - run DDL/DML or free-form SQL

@@ -67,6 +67,10 @@ gateway mcp --adapter hive --tool hive_select \
 
 `hive_describe_table` should show `n` / `bigint` before you select.
 
+Ranger records those reads on `{user}.count_to_10`. Data Catalog **Access Audits** shows `ALLOWED` `SELECT` as the Knox `sub`:
+
+![Data Catalog access audits for count_to_10 after Hive MCP select](../../assets/CDP_agent_activity.png)
+
 If `hive_list_tables` does not list `count_to_10`, wait for `spark_get_batch` `state=success` and retry. Hive MCP returns a tool error when the table is missing; it does not run CREATE TABLE.
 
 ## Lab mock

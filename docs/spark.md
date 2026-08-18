@@ -192,7 +192,11 @@ gateway mcp --tool spark_submit_batch \
   --arg name=count-to-10
 ```
 
-Poll with `spark_get_batch` until `state` is `success` or `dead`. Then query Hive (same JWT): [hive.md](hive.md), [examples/hive/README.md](../examples/hive/README.md).
+Poll with `spark_get_batch` until `state` is `success` or `dead`. Spark History lists the same batch (`count-to-10`) as the Knox subject:
+
+![Spark History: count-to-10 batch as the Knox subject](../assets/Spark_History_job_run.png)
+
+Then query Hive (same JWT): [hive.md](hive.md), [examples/hive/README.md](../examples/hive/README.md).
 
 ```bash
 gateway mcp --adapter hive --tool hive_list_tables --arg database=$USER

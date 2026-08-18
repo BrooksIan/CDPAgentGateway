@@ -12,9 +12,11 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import re
 import subprocess
 import sys
 import time
+import uuid
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
@@ -26,17 +28,24 @@ from mcp_agent import (
     load_knox_token,
 )
 
-# LangGraph 0.3 needs langchain-core 0.3.x. CML workbenches may already have langchain 0.2
-# or 0.3 plus langchain-aws/community. Do not install langchain-core 1.x. Pip will warn
-# about CML's older langchain pins; this notebook does not import those packages.
+# Local / CML-0.3 workbenches: LangGraph 0.3 + langchain-core 0.3.x. Never install 1.x.
+# AMP workbenches that still ship langchain 0.2.x stay on LangGraph 0.2 + core 0.2.x.
 LANGGRAPH_PIP_PACKAGES = (
     "langgraph>=0.3.5,<0.4",
     "langchain-core>=0.3.85,<0.4",
     "langchain-openai>=0.3,<0.4",
 )
+_LANGGRAPH_PIP_02 = (
+    "langgraph>=0.2.27,<0.3",
+    "langchain-core>=0.2.43,<0.3",
+    "langchain-openai>=0.1.22,<0.3",
+    "langsmith>=0.1.112,<0.2",
+)
 _ANTHROPIC_EXTRA = "langchain-anthropic>=0.3,<0.4"
+_ANTHROPIC_02 = "langchain-anthropic>=0.1.23,<0.3"
 _AMP_OPENAI = "openai>=1.104.2,<2"
 _CONSTRAINTS = Path(__file__).resolve().parent / "langgraph-constraints.txt"
+_CONSTRAINTS_02 = Path(__file__).resolve().parent / "langgraph-constraints-02.txt"
 
 _TERMINAL_BATCH = {"success", "dead", "killed", "error"}
 
@@ -62,33 +71,58 @@ def _amp_runtime() -> bool:
     return bool(os.environ.get("CDSW_PROJECT") or os.environ.get("CDSW_DOMAIN"))
 
 
+def langchain_core_line(*, amp: bool | None = None) -> str:
+    """AMP follows CML's langchain metapackage (0.2 vs 0.3). Local Compose stays on 0.3."""
+    forced = (os.environ.get("LANGGRAPH_CORE_LINE") or "").strip()
+    if forced in {"0.2", "0.3"}:
+        return forced
+    if amp is None:
+        amp = _amp_runtime()
+    if not amp:
+        return "0.3"
+    langchain = _dist_version("langchain") or ""
+    if langchain.startswith("0.2."):
+        return "0.2"
+    core = _dist_version("langchain-core") or ""
+    if core.startswith("0.2."):
+        return "0.2"
+    return "0.3"
+
+
 def langgraph_pip_packages(*, amp: bool | None = None) -> list[str]:
-    """Package specs for LangGraph 0.3 (langchain-core 0.3.x, <0.4).
+    """Package specs that match the workbench LangChain line (0.2 or 0.3).
 
     AMP does not install or pin protobuf (CML plugins disagree: mlflow 4.25.3 vs raz-client 7.34.0).
     AMP skips Anthropic unless ANTHROPIC_API_KEY or LANGGRAPH_INSTALL_ANTHROPIC is set.
-    CML langchain 0.2.x / langchain-community / langchain-aws pin warnings are expected.
     """
-    packages = list(LANGGRAPH_PIP_PACKAGES)
     if amp is None:
         amp = _amp_runtime()
+    line = langchain_core_line(amp=amp)
+    if line == "0.2":
+        packages = list(_LANGGRAPH_PIP_02)
+        anthropic = _ANTHROPIC_02
+    else:
+        packages = list(LANGGRAPH_PIP_PACKAGES)
+        anthropic = _ANTHROPIC_EXTRA
+        if amp:
+            core = _dist_version("langchain-core")
+            if core and core.startswith("0.3."):
+                packages = [item for item in packages if not item.startswith("langchain-core")]
+            packages.append(_AMP_OPENAI)
     if amp:
-        core = _dist_version("langchain-core")
-        if core and core.startswith("0.3."):
-            packages = [item for item in packages if not item.startswith("langchain-core")]
-        packages.append(_AMP_OPENAI)
         want_anthropic = bool(
             (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("LANGGRAPH_INSTALL_ANTHROPIC") or "").strip()
         )
         if want_anthropic:
-            packages.append(_ANTHROPIC_EXTRA)
+            packages.append(anthropic)
     else:
-        packages.append(_ANTHROPIC_EXTRA)
+        packages.append(anthropic)
     return packages
 
 
-def require_langchain_core_03() -> str:
-    """Fail closed unless langchain-core is 0.3.x (LangGraph 0.3; never 1.x on AMP)."""
+def require_langchain_core() -> str:
+    """Fail closed on langchain-core 1.x. AMP 0.2 runtimes must stay on core 0.2.x."""
+    line = langchain_core_line()
     core = _dist_version("langchain-core")
     if not core:
         raise RuntimeError("langchain-core is not installed")
@@ -97,14 +131,13 @@ def require_langchain_core_03() -> str:
     minor = int(parts[1]) if len(parts) > 1 else 0
     if major >= 1:
         raise RuntimeError(
-            f"langchain-core {core} is 1.x; this notebook needs 0.3.x (<0.4). "
-            "Restart this session, then re-run the install cell "
-            "(it pins langchain-core>=0.3.85,<0.4). Do not pip install langchain-core 1.x on AMP."
+            f"langchain-core {core} is 1.x; this notebook needs 0.2.x or 0.3.x. "
+            "Restart this session, then re-run the install cell. Do not pip install langchain-core 1.x on AMP."
         )
-    if major != 0 or minor != 3:
+    want_minor = 2 if line == "0.2" else 3
+    if major != 0 or minor != want_minor:
         raise RuntimeError(
-            f"langchain-core {core} is not 0.3.x. Re-run the install cell "
-            "(it pins langchain-core>=0.3.85,<0.4)."
+            f"langchain-core {core} is not 0.{want_minor}.x. Re-run the install cell."
         )
     loaded = sys.modules.get("langchain_core")
     loaded_ver = getattr(loaded, "__version__", "") if loaded is not None else ""
@@ -112,12 +145,22 @@ def require_langchain_core_03() -> str:
         raise RuntimeError(
             "This kernel still has langchain-core 1.x imported. Restart the kernel and re-run."
         )
+    if loaded_ver and not loaded_ver.startswith(f"0.{want_minor}."):
+        raise RuntimeError(
+            f"This kernel still has langchain-core {loaded_ver} imported; disk is {core}. "
+            "Restart this Workbench session, then re-run from the first cell."
+        )
     return core
 
 
+def require_langchain_core_03() -> str:
+    return require_langchain_core()
+
+
 def install_langgraph_deps(*, root: Path | None = None) -> list[str]:
-    """Install the 0.3-line LangGraph stack. On AMP, do not reinstall the gateway extra."""
+    """Install LangGraph to match CML langchain (0.2 or 0.3). Never install core 1.x."""
     amp = _amp_runtime()
+    line = langchain_core_line(amp=amp)
     packages = langgraph_pip_packages(amp=amp)
     cmd = [
         sys.executable,
@@ -129,18 +172,22 @@ def install_langgraph_deps(*, root: Path | None = None) -> list[str]:
     ]
     if amp:
         cmd.append("--user")
-    if _CONSTRAINTS.is_file():
-        cmd.extend(["-c", str(_CONSTRAINTS)])
+    constraints = _CONSTRAINTS_02 if line == "0.2" else _CONSTRAINTS
+    if constraints.is_file():
+        cmd.extend(["-c", str(constraints)])
     cmd.extend(packages)
+    core_before = _dist_version("langchain-core") or ""
+    if amp and line == "0.2" and core_before.startswith("0.3."):
+        print(
+            "CML langchain is 0.2.x; pinning langchain-core back to 0.2.x "
+            "(undoes a previous 0.3 install that conflicted with langchain-aws)."
+        )
     print("langgraph pip:", " ".join(packages))
     subprocess.check_call(cmd, cwd=str(root or Path.cwd()))
-    print("langchain-core:", require_langchain_core_03())
+    print("langchain-core:", require_langchain_core())
+    print("langgraph line:", line)
     if amp:
-        print(
-            "note: ignore CML pip conflicts (langchain 0.2.x / langchain-community / "
-            "langchain-aws want core<0.3; protobuf / typing-extensions). This notebook "
-            "uses langchain-core 0.3 + LangGraph 0.3 only. It does not change protobuf."
-        )
+        print("note: AMP does not change protobuf. Ignore remaining CML typing-extensions pins.")
     return packages
 
 
@@ -445,6 +492,167 @@ def _omit_vllm_auto_tool_choice(llm: Any) -> Any:
     return llm
 
 
+_TOOL_JSON_KEYS = ("name", "tool")
+
+
+def _tool_names(tools: list[Any]) -> set[str]:
+    names: set[str] = set()
+    for tool in tools:
+        name = getattr(tool, "name", None)
+        if not name and isinstance(tool, dict):
+            name = tool.get("name") or (tool.get("function") or {}).get("name")
+        if name:
+            names.add(str(name))
+    return names
+
+
+def _tool_brief(tool: Any) -> str:
+    name = getattr(tool, "name", None) or (tool.get("name") if isinstance(tool, dict) else "") or ""
+    desc = (getattr(tool, "description", None) or "").strip().split("\n", 1)[0]
+    schema = getattr(tool, "args_schema", None)
+    keys: list[str] = []
+    if schema is not None:
+        try:
+            dumped = schema.model_json_schema() if hasattr(schema, "model_json_schema") else schema.schema()
+            keys = list((dumped.get("properties") or {}).keys())
+        except Exception:  # noqa: BLE001
+            keys = []
+    args = f" args={','.join(keys)}" if keys else ""
+    return f"- {name}{args}: {desc}".strip()
+
+
+def _tool_catalog_text(tools: list[Any]) -> str:
+    lines = [
+        "Call at most one MCP tool per turn. Reply with JSON only:",
+        '{"name": "<tool>", "arguments": {<object>}}',
+        "If you can answer without a tool, reply in plain text (no JSON object).",
+        "Tools:",
+    ]
+    lines.extend(_tool_brief(tool) for tool in tools)
+    return "\n".join(lines)
+
+
+def _as_messages(value: Any) -> list[Any]:
+    if isinstance(value, dict) and value.get("messages") is not None:
+        return list(value["messages"])
+    if isinstance(value, list):
+        return list(value)
+    return [value]
+
+
+def _json_objects(text: str) -> list[dict[str, Any]]:
+    blobs: list[str] = []
+    stripped = (text or "").strip()
+    if stripped.startswith("{") and stripped.endswith("}"):
+        blobs.append(stripped)
+    blobs.extend(re.findall(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", text or "", flags=re.DOTALL))
+    blobs.extend(re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", text or "", flags=re.DOTALL))
+    start = (text or "").find("{")
+    end = (text or "").rfind("}")
+    if start >= 0 and end > start:
+        blobs.append((text or "")[start : end + 1])
+    found: list[dict[str, Any]] = []
+    for blob in blobs:
+        try:
+            obj = json.loads(blob)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            found.append(obj)
+    return found
+
+
+def parse_prompt_tool_call(text: str, tools: list[Any]) -> dict[str, Any] | None:
+    """Parse a model reply into one {name, args} tool call. Never logs secrets."""
+    allowed = _tool_names(tools)
+    for obj in _json_objects(text):
+        name = None
+        for key in _TOOL_JSON_KEYS:
+            raw = obj.get(key)
+            if isinstance(raw, str) and raw.strip():
+                name = raw.strip()
+                break
+        if not name or (allowed and name not in allowed):
+            continue
+        args = obj.get("arguments") if "arguments" in obj else obj.get("args", obj.get("parameters"))
+        if not isinstance(args, dict):
+            args = {}
+        return {"name": name, "args": args}
+    return None
+
+
+def _attach_parsed_tool_calls(ai: Any, tools: list[Any]) -> Any:
+    if getattr(ai, "tool_calls", None):
+        return ai
+    content = getattr(ai, "content", ai)
+    if not isinstance(content, str):
+        return ai
+    parsed = parse_prompt_tool_call(content, tools)
+    if not parsed:
+        return ai
+    from langchain_core.messages import AIMessage
+
+    return AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": parsed["name"],
+                "args": parsed["args"],
+                "id": f"call_{uuid.uuid4().hex[:8]}",
+                "type": "tool_call",
+            }
+        ],
+    )
+
+
+def _with_tool_catalog(messages: list[Any], tools: list[Any]) -> list[Any]:
+    if not tools:
+        return messages
+    from langchain_core.messages import SystemMessage
+
+    catalog = SystemMessage(content=_tool_catalog_text(tools))
+    if messages and getattr(messages[0], "type", None) == "system":
+        first = messages[0]
+        content = f"{getattr(first, 'content', '')}\n\n{catalog.content}".strip()
+        return [SystemMessage(content=content), *messages[1:]]
+    return [catalog, *messages]
+
+
+def _prompt_tool_chat(llm: Any, tools: list[Any] | None = None) -> Any:
+    """Chat wrapper: LangGraph bind_tools without sending OpenAI `tools` (vLLM auto default)."""
+    from langchain_core.runnables import Runnable
+
+    class PromptToolChat(Runnable):
+        def __init__(self, inner: Any, bound_tools: list[Any] | None = None) -> None:
+            super().__init__()
+            self.llm = inner
+            self.tools = list(bound_tools or [])
+            self._agentgateway_prompt_tools = True
+
+        def bind_tools(self, next_tools, *, tool_choice=None, **kwargs):  # noqa: ANN001
+            return PromptToolChat(self.llm, list(next_tools))
+
+        def invoke(self, input, config=None, **kwargs):  # noqa: ANN001
+            kwargs = {key: value for key, value in kwargs.items() if key not in {"tools", "tool_choice"}}
+            messages = _with_tool_catalog(_as_messages(input), self.tools)
+            ai = self.llm.invoke(messages, config=config, **kwargs)
+            return _attach_parsed_tool_calls(ai, self.tools)
+
+        async def ainvoke(self, input, config=None, **kwargs):  # noqa: ANN001
+            kwargs = {key: value for key, value in kwargs.items() if key not in {"tools", "tool_choice"}}
+            messages = _with_tool_catalog(_as_messages(input), self.tools)
+            inner = getattr(self.llm, "ainvoke", None)
+            if inner is None:
+                ai = self.llm.invoke(messages, config=config, **kwargs)
+            else:
+                ai = await inner(messages, config=config, **kwargs)
+            return _attach_parsed_tool_calls(ai, self.tools)
+
+    wrapped = PromptToolChat(llm, tools)
+    wrapped._agentgateway_prompt_tools = True
+    return wrapped
+
+
 def _make_chat_openai(*, model: str, api_key: str, base_url: str | None, temperature: float) -> Any:
     from langchain_openai import ChatOpenAI
 
@@ -465,7 +673,8 @@ def _make_chat_openai(*, model: str, api_key: str, base_url: str | None, tempera
             kwargs["openai_api_base"] = base_url
     llm = ChatOpenAI(**kwargs)
     if _should_omit_auto_tool_choice(base_url):
-        return _omit_vllm_auto_tool_choice(llm)
+        llm = _omit_vllm_auto_tool_choice(llm)
+        return _prompt_tool_chat(llm)
     return llm
 
 
@@ -506,6 +715,19 @@ def chat_model(*, temperature: float = 0) -> Any:
     )
 
 
+def _ignore_langgraph_pending_warnings() -> None:
+    """LangGraph 0.2 imports JsonPlusSerializer with a pending allowed_objects default."""
+    import warnings
+
+    warnings.filterwarnings("ignore", message=r".*allowed_objects.*")
+    try:
+        from langchain_core._api.deprecation import LangChainPendingDeprecationWarning
+    except ImportError:
+        LangChainPendingDeprecationWarning = None  # type: ignore[misc, assignment]
+    if LangChainPendingDeprecationWarning is not None:
+        warnings.filterwarnings("ignore", category=LangChainPendingDeprecationWarning, message=r".*allowed_objects.*")
+
+
 def make_agent(
     model: Any | None = None,
     *,
@@ -513,21 +735,20 @@ def make_agent(
     system: str = SYSTEM_PROMPT,
 ) -> Any:
     """create_react_agent over gateway MCP tools. Prompt kwarg name varies by LangGraph version."""
+    _ignore_langgraph_pending_warnings()
     from langgraph.prebuilt import create_react_agent
 
     bound = tools if tools is not None else langchain_tools()
     llm = model if model is not None else chat_model()
+    if _should_omit_auto_tool_choice() and not getattr(llm, "_agentgateway_prompt_tools", False):
+        llm = _prompt_tool_chat(llm)
     params = inspect.signature(create_react_agent).parameters
     kwargs: dict[str, Any] = {}
     if "prompt" in params:
         kwargs["prompt"] = system
     elif "state_modifier" in params:
         kwargs["state_modifier"] = system
-    import warnings
-
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=".*allowed_objects.*")
-        return create_react_agent(llm, bound, **kwargs)
+    return create_react_agent(llm, bound, **kwargs)
 
 
 def last_ai_text(result: dict[str, Any]) -> str:
@@ -592,10 +813,10 @@ def invoke_agent(
             "tool choice" in text.lower() and "auto" in text.lower()
         ):
             raise RuntimeError(
-                "The model server rejected tool_choice=auto (typical vLLM without "
-                "--enable-auto-tool-choice). Re-run the model-form apply cell and the "
-                "make_agent cell; custom MODEL_URL now omits tool_choice=auto. "
-                "To send auto anyway, set MODEL_TOOL_CHOICE=auto. To enable it on the "
-                "server: --enable-auto-tool-choice --tool-call-parser <parser>."
+                "The model server rejected tool_choice=auto. vLLM treats OpenAI `tools` "
+                "without tool_choice as auto, so custom MODEL_URL now uses prompt-parsed "
+                "tool calls (no `tools` in the HTTP body). Re-run make_agent after pulling "
+                "that helper. If this vLLM has --enable-auto-tool-choice, set "
+                "MODEL_TOOL_CHOICE=auto for native OpenAI tools."
             ) from exc
         raise

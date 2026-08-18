@@ -201,7 +201,7 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 - `pip install -e ".[dev]"` installs the `gateway` CLI (`make` is optional)
 - `pip install -e ".[amp]"` only for the Cloudera AI Workbench profile
 - `pip install -e ".[hive]"` only if you run `gateway hive` (impyla)
-- Optional: `pip install -e ".[langgraph]"` for the LangGraph agent notebook (langchain-core 0.3.x; the notebook cell can install it)
+- Optional: `pip install -e ".[langgraph]"` for the LangGraph agent notebook (langchain-core 0.3.x locally; the AMP install cell matches CML langchain 0.2 or 0.3)
 - Local demo: no CDP entitlement; mock Knox runs in Compose
 - Live cluster: CDP Private Cloud Base or Public Cloud, VPN or allowlisted laptop, Knox Token API / Token Generation, JWKS URL, Ranger-allowed test user
 - Optional AMP: Cloudera AI Workbench that can reach Knox; not Docker-in-CML

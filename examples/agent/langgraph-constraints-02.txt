@@ -1,0 +1,6 @@
+# Cloudera AI Workbench langchain 0.2.x (langchain-aws / community want core<0.3).
+# Do not pin protobuf: CML plugins disagree (mlflow 4.25.3 vs raz-client 7.34.0).
+langchain-core>=0.2.43,<0.3
+langgraph>=0.2.27,<0.3
+langchain-openai>=0.1.22,<0.3
+langsmith>=0.1.112,<0.2

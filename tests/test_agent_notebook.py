@@ -480,6 +480,10 @@ def test_langgraph_extra_pins_core_03() -> None:
     constraints = (ROOT / "examples/agent/langgraph-constraints.txt").read_text()
     assert "langchain-core>=0.3.85,<0.4" in constraints
     assert not any(line.startswith("protobuf") for line in constraints.splitlines())
+    constraints_02 = (ROOT / "examples/agent/langgraph-constraints-02.txt").read_text()
+    assert "langchain-core>=0.2.43,<0.3" in constraints_02
+    assert "langgraph>=0.2.27,<0.3" in constraints_02
+    assert "langsmith>=0.1.112,<0.2" in constraints_02
 
 
 def test_langgraph_pip_packages_amp_keeps_core_03(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -487,10 +491,34 @@ def test_langgraph_pip_packages_amp_keeps_core_03(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(lg, "_dist_version", lambda _name: "0.3.85")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("LANGGRAPH_INSTALL_ANTHROPIC", raising=False)
+    monkeypatch.delenv("LANGGRAPH_CORE_LINE", raising=False)
     packages = lg.langgraph_pip_packages(amp=True)
     assert all(not item.startswith("langchain-core") for item in packages)
     assert any(item.startswith("langgraph") and "<0.4" in item for item in packages)
     assert all(not item.startswith("langchain-anthropic") for item in packages)
+    assert all("protobuf" not in item for item in packages)
+
+
+def test_langgraph_pip_packages_amp_matches_langchain_02(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+
+    def fake_version(name: str) -> str | None:
+        if name == "langchain":
+            return "0.2.17"
+        if name == "langchain-core":
+            return "0.3.86"
+        return None
+
+    monkeypatch.setattr(lg, "_dist_version", fake_version)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("LANGGRAPH_INSTALL_ANTHROPIC", raising=False)
+    monkeypatch.delenv("LANGGRAPH_CORE_LINE", raising=False)
+    packages = lg.langgraph_pip_packages(amp=True)
+    assert lg.langchain_core_line(amp=True) == "0.2"
+    assert any(item.startswith("langgraph") and "<0.3" in item for item in packages)
+    assert any(item.startswith("langchain-core") and "<0.3" in item for item in packages)
+    assert any(item.startswith("langsmith") and "<0.2" in item for item in packages)
+    assert all(not item.startswith("openai") for item in packages)
     assert all("protobuf" not in item for item in packages)
 
 
@@ -520,6 +548,7 @@ def test_langgraph_pip_packages_amp_skips_protobuf(monkeypatch: pytest.MonkeyPat
 
 def test_require_langchain_core_03_rejects_1x(monkeypatch: pytest.MonkeyPatch) -> None:
     lg = _load_langgraph_mcp()
+    monkeypatch.delenv("LANGGRAPH_CORE_LINE", raising=False)
     monkeypatch.setattr(lg, "_dist_version", lambda _name: "1.5.6")
     with pytest.raises(RuntimeError, match="1.x"):
         lg.require_langchain_core_03()
@@ -527,9 +556,18 @@ def test_require_langchain_core_03_rejects_1x(monkeypatch: pytest.MonkeyPatch) -
 
 def test_require_langchain_core_03_rejects_02(monkeypatch: pytest.MonkeyPatch) -> None:
     lg = _load_langgraph_mcp()
+    monkeypatch.setenv("LANGGRAPH_CORE_LINE", "0.3")
     monkeypatch.setattr(lg, "_dist_version", lambda _name: "0.2.43")
     with pytest.raises(RuntimeError, match="not 0.3.x"):
         lg.require_langchain_core_03()
+
+
+def test_require_langchain_core_accepts_02_on_cml_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+    monkeypatch.setenv("LANGGRAPH_CORE_LINE", "0.2")
+    monkeypatch.setattr(lg, "_dist_version", lambda _name: "0.2.43")
+    monkeypatch.delitem(sys.modules, "langchain_core", raising=False)
+    assert lg.require_langchain_core() == "0.2.43"
 
 
 def test_apply_model_settings_omits_token(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -623,6 +661,64 @@ def test_omit_vllm_auto_tool_choice_strips_payload(monkeypatch: pytest.MonkeyPat
     assert bound.get("tool_choice") is None
 
 
+def test_parse_prompt_tool_call_json() -> None:
+    lg = _load_langgraph_mcp()
+
+    class Tool:
+        name = "hive_list_databases"
+
+    parsed = lg.parse_prompt_tool_call(
+        '{"name": "hive_list_databases", "arguments": {"limit": 5}}',
+        [Tool()],
+    )
+    assert parsed == {"name": "hive_list_databases", "args": {"limit": 5}}
+    hermes = lg.parse_prompt_tool_call(
+        '<tool_call>{"name": "hive_list_databases", "arguments": {}}</tool_call>',
+        [Tool()],
+    )
+    assert hermes == {"name": "hive_list_databases", "args": {}}
+    assert lg.parse_prompt_tool_call("Spark batches look idle.", [Tool()]) is None
+
+
+def test_prompt_tool_chat_invoke_does_not_send_openai_tools() -> None:
+    pytest.importorskip("langchain_core")
+    lg = _load_langgraph_mcp()
+    seen: dict[str, object] = {}
+
+    class Inner:
+        def invoke(self, messages, config=None, **kwargs):
+            seen["kwargs"] = kwargs
+            seen["n_messages"] = len(messages)
+
+            class AI:
+                content = '{"name": "hive_list_databases", "arguments": {}}'
+                tool_calls = []
+
+            return AI()
+
+    class Tool:
+        name = "hive_list_databases"
+        description = "List Hive databases"
+        args_schema = None
+
+    bound = lg._prompt_tool_chat(Inner()).bind_tools([Tool()])
+    result = bound.invoke([type("Msg", (), {"type": "human", "content": "list dbs"})()])
+    assert seen["kwargs"] == {}
+    assert int(seen["n_messages"] or 0) >= 2
+    assert result.tool_calls[0]["name"] == "hive_list_databases"
+
+
+def test_ignore_langgraph_pending_warnings_registers_filter() -> None:
+    import warnings
+
+    lg = _load_langgraph_mcp()
+    lg._ignore_langgraph_pending_warnings()
+    assert any(
+        action == "ignore" and "allowed_objects" in str(message)
+        for action, message, *_rest in warnings.filters
+    )
+
+
 def test_invoke_agent_explains_vllm_auto_tool_choice(monkeypatch: pytest.MonkeyPatch) -> None:
     lg = _load_langgraph_mcp()
     monkeypatch.setenv("KNOX_TOKEN", "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhIn0.sig")
@@ -634,7 +730,7 @@ def test_invoke_agent_explains_vllm_auto_tool_choice(monkeypatch: pytest.MonkeyP
             )
 
     monkeypatch.setattr(lg, "make_agent", lambda: Boom())
-    with pytest.raises(RuntimeError, match="omits tool_choice=auto"):
+    with pytest.raises(RuntimeError, match="prompt-parsed"):
         lg.invoke_agent("list databases", agent=Boom())
 
 

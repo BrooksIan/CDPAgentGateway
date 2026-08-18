@@ -506,6 +506,57 @@ def test_chat_model_uses_form_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
     assert seen["api_key"] == "secret-model-token"
 
 
+def test_should_omit_auto_tool_choice_on_custom_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+    monkeypatch.setenv("MODEL_URL", "https://vllm.example/v1")
+    monkeypatch.delenv("MODEL_TOOL_CHOICE", raising=False)
+    assert lg._should_omit_auto_tool_choice("https://vllm.example/v1") is True
+    monkeypatch.setenv("MODEL_TOOL_CHOICE", "auto")
+    assert lg._should_omit_auto_tool_choice("https://vllm.example/v1") is False
+    monkeypatch.setenv("MODEL_TOOL_CHOICE", "omit")
+    monkeypatch.delenv("MODEL_URL", raising=False)
+    assert lg._should_omit_auto_tool_choice(None) is True
+
+
+def test_omit_vllm_auto_tool_choice_strips_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+    monkeypatch.setenv("MODEL_URL", "https://vllm.example/v1")
+    monkeypatch.delenv("MODEL_TOOL_CHOICE", raising=False)
+
+    class Dummy:
+        def bind_tools(self, tools, *, tool_choice=None, **kwargs):
+            return {"tools": tools, "tool_choice": tool_choice, **kwargs}
+
+        def _get_request_payload(self, *_args, **_kwargs):
+            return {"model": "x", "tools": [], "tool_choice": "auto"}
+
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            return kwargs
+
+    dummy = Dummy()
+    patched = lg._omit_vllm_auto_tool_choice(dummy)
+    payload = patched._get_request_payload([])
+    assert payload.get("tool_choice") != "auto"
+    assert "tool_choice" not in payload
+    bound = patched.bind_tools(["hive_list_databases"], tool_choice="auto")
+    assert bound.get("tool_choice") is None
+
+
+def test_invoke_agent_explains_vllm_auto_tool_choice(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+    monkeypatch.setenv("KNOX_TOKEN", "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhIn0.sig")
+
+    class Boom:
+        def invoke(self, *_args, **_kwargs):
+            raise RuntimeError(
+                '"auto" tool choice requires --enable-auto-tool-choice and --tool-call-parser to be set'
+            )
+
+    monkeypatch.setattr(lg, "make_agent", lambda: Boom())
+    with pytest.raises(RuntimeError, match="omits tool_choice=auto"):
+        lg.invoke_agent("list databases", agent=Boom())
+
+
 def test_apply_model_form_reads_widget_values(monkeypatch: pytest.MonkeyPatch) -> None:
     lg = _load_langgraph_mcp()
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)

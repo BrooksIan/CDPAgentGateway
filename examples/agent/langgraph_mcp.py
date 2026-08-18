@@ -330,6 +330,83 @@ def apply_model_form(form: dict[str, Any] | None = None) -> dict[str, Any]:
     )
 
 
+def _should_omit_auto_tool_choice(base_url: str | None = None) -> bool:
+    """vLLM rejects tool_choice=auto unless started with --enable-auto-tool-choice."""
+    choice = (os.environ.get("MODEL_TOOL_CHOICE") or "").strip().lower()
+    if choice == "auto":
+        return False
+    if choice in {"omit", "off"}:
+        return True
+    url = (
+        (base_url or "").strip()
+        or os.environ.get("MODEL_URL")
+        or os.environ.get("OPENAI_BASE_URL")
+        or os.environ.get("OPENAI_API_BASE")
+        or ""
+    ).strip()
+    return bool(url)
+
+
+def _drop_auto_tool_choice(payload: dict[str, Any]) -> dict[str, Any]:
+    if payload.get("tool_choice") == "auto":
+        payload = dict(payload)
+        payload.pop("tool_choice", None)
+    return payload
+
+
+def _omit_vllm_auto_tool_choice(llm: Any) -> Any:
+    """Keep `tools` on the request but do not send tool_choice=auto (vLLM 400)."""
+    import types
+
+    orig_bind = llm.bind_tools
+
+    def bind_tools(self, tools, *, tool_choice=None, **kwargs):  # noqa: ANN001
+        if _should_omit_auto_tool_choice() and tool_choice in {None, "auto"}:
+            kwargs = {key: value for key, value in kwargs.items() if key != "tool_choice"}
+            try:
+                return orig_bind(tools, tool_choice=None, **kwargs)
+            except TypeError:
+                return orig_bind(tools, **kwargs)
+        return orig_bind(tools, tool_choice=tool_choice, **kwargs)
+
+    llm.bind_tools = types.MethodType(bind_tools, llm)
+
+    if hasattr(llm, "_get_request_payload"):
+        orig_payload = llm._get_request_payload
+
+        def _get_request_payload(self, *args, **kwargs):  # noqa: ANN001
+            payload = orig_payload(*args, **kwargs)
+            if isinstance(payload, dict) and _should_omit_auto_tool_choice():
+                return _drop_auto_tool_choice(payload)
+            return payload
+
+        llm._get_request_payload = types.MethodType(_get_request_payload, llm)
+
+    orig_generate = llm._generate
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):  # noqa: ANN001
+        if _should_omit_auto_tool_choice() and kwargs.get("tool_choice") == "auto":
+            kwargs = {key: value for key, value in kwargs.items() if key != "tool_choice"}
+        try:
+            return orig_generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+        except TypeError:
+            return orig_generate(messages, stop=stop, **kwargs)
+
+    llm._generate = types.MethodType(_generate, llm)
+
+    client = getattr(llm, "client", None)
+    orig_create = getattr(client, "create", None) if client is not None else None
+    if orig_create is not None:
+
+        def create(*args, **kwargs):  # noqa: ANN001
+            if _should_omit_auto_tool_choice() and kwargs.get("tool_choice") == "auto":
+                kwargs = {key: value for key, value in kwargs.items() if key != "tool_choice"}
+            return orig_create(*args, **kwargs)
+
+        client.create = create
+    return llm
+
+
 def _make_chat_openai(*, model: str, api_key: str, base_url: str | None, temperature: float) -> Any:
     from langchain_openai import ChatOpenAI
 
@@ -348,7 +425,10 @@ def _make_chat_openai(*, model: str, api_key: str, base_url: str | None, tempera
             kwargs["base_url"] = base_url
         else:
             kwargs["openai_api_base"] = base_url
-    return ChatOpenAI(**kwargs)
+    llm = ChatOpenAI(**kwargs)
+    if _should_omit_auto_tool_choice(base_url):
+        return _omit_vllm_auto_tool_choice(llm)
+    return llm
 
 
 def chat_model(*, temperature: float = 0) -> Any:
@@ -405,7 +485,11 @@ def make_agent(
         kwargs["prompt"] = system
     elif "state_modifier" in params:
         kwargs["state_modifier"] = system
-    return create_react_agent(llm, bound, **kwargs)
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*allowed_objects.*")
+        return create_react_agent(llm, bound, **kwargs)
 
 
 def last_ai_text(result: dict[str, Any]) -> str:
@@ -459,7 +543,21 @@ def invoke_agent(
     limit = recursion_limit
     if limit is None:
         limit = int(os.environ.get("LANGGRAPH_RECURSION_LIMIT", "40"))
-    return graph.invoke(
-        {"messages": [("user", question)]},
-        config={"recursion_limit": limit},
-    )
+    try:
+        return graph.invoke(
+            {"messages": [("user", question)]},
+            config={"recursion_limit": limit},
+        )
+    except Exception as exc:
+        text = str(exc)
+        if "enable-auto-tool-choice" in text or (
+            "tool choice" in text.lower() and "auto" in text.lower()
+        ):
+            raise RuntimeError(
+                "The model server rejected tool_choice=auto (typical vLLM without "
+                "--enable-auto-tool-choice). Re-run the model-form apply cell and the "
+                "make_agent cell; custom MODEL_URL now omits tool_choice=auto. "
+                "To send auto anyway, set MODEL_TOOL_CHOICE=auto. To enable it on the "
+                "server: --enable-auto-tool-choice --tool-call-parser <parser>."
+            ) from exc
+        raise

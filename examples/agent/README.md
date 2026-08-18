@@ -28,7 +28,7 @@ Override with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if your works
 1. Open a notebook in Workbench (Python 3.11+) or Jupyter locally.
 2. Run cells in order. The **Knox JWT** cell prompts with `getpass` (not echoed).
 3. Scripted notebook: health, `tools/list`, Spark → Hive.
-4. LangGraph notebook: Knox JWT, **model form** (URL / id / token), bind MCP tools, then a read-only ReAct turn. Set `LANGGRAPH_RUN_SUBMIT=1` only if the job file is already staged.
+4. LangGraph notebook: Knox JWT, **model form** (URL / id / token), bind MCP tools, then a read-only ReAct turn. Custom model URLs omit vLLM-incompatible `tool_choice=auto`. Set `LANGGRAPH_RUN_SUBMIT=1` only if the job file is already staged.
 
 On AMP, stage the job on HDFS first (or set `SPARK_FILE_URI`). Spark jobs can take several minutes; override wait with `SPARK_POLL_TIMEOUT` (seconds). If a previous notebook cell installed langchain-core 1.x, **restart the Workbench session** and re-run so CML's langchain 0.3 stack is intact.
 

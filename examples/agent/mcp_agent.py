@@ -1,7 +1,8 @@
 """Minimal MCP JSON-RPC client for third-party agent demos (Compose or CML AMP).
 
-Never log or print the Knox bearer. Set KNOX_TOKEN in the environment (project env on
-CML; `.env` or a secret store locally). Do not commit tokens.
+Never log or print the Knox bearer. Paste it in the notebook token cell (`getpass`) or set
+`KNOX_TOKEN` / `KNOX_TOKEN_FILE` for this process only. Do not commit tokens or put them in
+AMP project environment.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import json
 import os
 import sys
 import time
+from getpass import getpass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
@@ -37,14 +39,32 @@ def _repo_src() -> Path:
     return root / "src"
 
 
-def _load_token() -> str:
+def load_knox_token(*, prompt: bool = True) -> str:
+    """Load a Knox JWT for this process only. Never print or persist it to git."""
     token = (os.environ.get("KNOX_TOKEN") or "").strip()
-    if not token:
-        raise RuntimeError(
-            "Set KNOX_TOKEN in project environment (CML) or your secret store (local). "
-            "Never paste tokens into git or notebook outputs."
-        )
-    return token
+    if token:
+        return token
+    path = (os.environ.get("KNOX_TOKEN_FILE") or "").strip()
+    if path:
+        file = Path(path).expanduser()
+        if file.is_file():
+            token = file.read_text().strip()
+            if token:
+                os.environ["KNOX_TOKEN"] = token
+                return token
+    if prompt:
+        token = getpass("Knox JWT (not echoed; session only): ").strip()
+        if token:
+            os.environ["KNOX_TOKEN"] = token
+            return token
+    raise RuntimeError(
+        "No Knox JWT in this session. Run the notebook token cell (getpass) or export "
+        "KNOX_TOKEN for this engine only. Do not put the bearer in AMP project env or git."
+    )
+
+
+def _load_token() -> str:
+    return load_knox_token(prompt=True)
 
 
 def profile() -> str:

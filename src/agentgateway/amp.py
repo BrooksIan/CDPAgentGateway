@@ -382,16 +382,30 @@ def build_admin_app():
 
 def startup_error_app(service: str, exc: BaseException):
     """Listen anyway so CML marks the application running; MCP stays fail-closed."""
+    detail = f"{type(exc).__name__}: {exc}".replace("\n", " ")[:400]
     print(
         json.dumps(
-            {"service": service, "event": "startup_failed", "error": type(exc).__name__, "profile": "amp"}
+            {
+                "service": service,
+                "event": "startup_failed",
+                "error": type(exc).__name__,
+                "detail": detail,
+                "profile": "amp",
+            }
         ),
         flush=True,
     )
 
     async def health(_request: Request) -> JSONResponse:
         return JSONResponse(
-            {"status": "error", "service": service, "profile": "amp", "reason": "startup_failed"}
+            {
+                "status": "error",
+                "service": service,
+                "profile": "amp",
+                "reason": "startup_failed",
+                "error": type(exc).__name__,
+                "detail": detail,
+            }
         )
 
     return Starlette(

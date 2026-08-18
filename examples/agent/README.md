@@ -4,9 +4,9 @@
 
 ## Prerequisites
 
-- **Knox JWT** in `KNOX_TOKEN` (project environment on CML; local secret store or `.env` on Compose). Never commit tokens or paste them into git.
+- **Knox JWT** pasted in the notebook token cell (`getpass`, session only). Optional: `KNOX_TOKEN` for this engine, or `KNOX_TOKEN_FILE`. Never commit tokens, never add them to AMP project env, never print them.
 - **Compose:** `gateway up` on `http://127.0.0.1:9080`. MCP routes need `X-Agent-Key` (default `lab-agent`).
-- **AMP:** Spark, Hive, and Impala MCP applications running. JWT only; no caller key.
+- **AMP:** `agent-gateway` plus Spark/Hive/Impala MCP applications. Knox JWT as `Authorization: Bearer`.
 
 ## URLs
 
@@ -20,8 +20,7 @@ Override with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if your works
 ## Run
 
 1. Open the notebook in Workbench (Python 3.11+) or Jupyter locally.
-2. Set `KNOX_TOKEN` in project settings (CML) or export it in your shell (Compose).
-3. Run all cells. After health and `tools/list`, the notebook runs the Spark → Hive example: stage `count_to_10.py` (Compose WebHDFS only), `spark_submit_batch`, poll `spark_get_batch`, then `hive_select` `{sub}.count_to_10`.
+2. Run cells in order. The **Knox JWT** cell prompts with `getpass` (not echoed). Then health, `tools/list`, Spark → Hive.
 
 On AMP, stage the job on HDFS first (or set `SPARK_FILE_URI`). Spark jobs can take several minutes; override wait with `SPARK_POLL_TIMEOUT` (seconds).
 

@@ -1,7 +1,7 @@
-"""Run Apache APISIX on Cloudera AI Workbench as the AMP agent edge.
+"""Run the AMP agent edge: Docker APISIX when available, otherwise a Python proxy.
 
-Compose uses the apisix Docker service from deploy/docker-compose.yml. AMP runs the
-same image bound to CDSW_APP_PORT and renders upstreams to the sibling MCP apps.
+Compose still uses deploy/docker-compose.yml. CML engines often have no Docker, so this
+module pins Knox JWKS, then either runs apache/apisix or the same allowlisted routes in Python.
 """
 
 from __future__ import annotations
@@ -17,8 +17,19 @@ from typing import IO
 
 import httpx
 
-from agentgateway.amp import apply_live_upstream, cml_port, serve_cml_app, startup_error_app
-from agentgateway.env import load_env, render_apisix_yaml
+from agentgateway.amp import (
+    BurstLimiter,
+    KnoxJWTMiddleware,
+    _int_env,
+    _prm_routes,
+    amp_public_key_path,
+    apply_live_upstream,
+    cml_port,
+    serve_cml_app,
+    startup_error_app,
+)
+from agentgateway.env import agent_caller_key, load_env, render_apisix_yaml
+from agentgateway.keys import fetch_pinned_knox_pubkey
 from agentgateway.paths import repo_root
 
 APISIX_IMAGE = os.environ.get("APISIX_IMAGE", "apache/apisix:3.16.0-debian")
@@ -43,13 +54,37 @@ def build_amp_apisix_env() -> dict[str, str]:
     return merged
 
 
+def ensure_amp_knox_pem(root: Path | None = None) -> Path:
+    """Fetch the pinned Knox PEM when the JWKS job did not write it yet."""
+    root = root or repo_root()
+    generated = root / "conf" / "generated" / "knox-public.pem"
+    if generated.is_file() and generated.read_text().strip():
+        return generated
+    apply_live_upstream()
+    proxy = (os.environ.get("KNOX_PROXY_URL") or "").strip()
+    if not proxy:
+        raise FileNotFoundError(
+            "Missing conf/generated/knox-public.pem and KNOX_PROXY_URL. "
+            "Set KNOX_PROXY_URL on the AMP form, then restart Agent gateway."
+        )
+    insecure = os.environ.get("UPSTREAM_TLS_VERIFY", "true").lower() not in {"true", "1", "yes"}
+    generated.parent.mkdir(parents=True, exist_ok=True)
+    out = fetch_pinned_knox_pubkey(
+        knox_proxy_url=proxy,
+        jwks_url=os.environ.get("KNOX_JWKS_URL"),
+        out=generated,
+        insecure=insecure,
+    )
+    live = root / "conf" / "keys" / "knox-live.pem"
+    live.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(out, live)
+    print(json.dumps({"service": "agent-gateway", "event": "jwks_pinned", "pem": str(out)}), flush=True)
+    return out
+
+
 def write_amp_apisix_config(root: Path | None = None) -> Path:
     root = root or repo_root()
-    pem = root / "conf" / "generated" / "knox-public.pem"
-    if not pem.is_file():
-        raise FileNotFoundError(
-            "Missing conf/generated/knox-public.pem. Run the Fetch JWKS AMP job before Agent gateway (APISIX)."
-        )
+    ensure_amp_knox_pem(root)
     values = build_amp_apisix_env()
     template = (root / "conf" / "apisix.yaml.tpl").read_text()
     rendered = render_apisix_yaml(template, values)
@@ -166,9 +201,159 @@ def run_apisix_process() -> int:
         return 0
 
 
+def _tls_verify() -> bool:
+    return os.environ.get("UPSTREAM_TLS_VERIFY", "true").lower() in {"true", "1", "yes"}
+
+
+def _knox_origin() -> str:
+    scheme = os.environ.get("UPSTREAM_SCHEME") or "https"
+    host = os.environ.get("UPSTREAM_HOST") or ""
+    port = os.environ.get("UPSTREAM_PORT") or "443"
+    if not host:
+        raise ValueError("UPSTREAM_HOST is empty; set KNOX_PROXY_URL")
+    if (scheme == "https" and port in {"443", ""}) or (scheme == "http" and port in {"80", ""}):
+        return f"{scheme}://{host}"
+    return f"{scheme}://{host}:{port}"
+
+
+def _forward_headers(request) -> dict[str, str]:
+    skip = {
+        "host",
+        "content-length",
+        "connection",
+        "keep-alive",
+        "transfer-encoding",
+        "te",
+        "trailer",
+        "upgrade",
+    }
+    return {key: value for key, value in request.headers.items() if key.lower() not in skip}
+
+
+def _mcp_upstream_base(adapter: str, values: dict[str, str]) -> str:
+    svc = adapter.upper()
+    scheme = values[f"MCP_{svc}_UPSTREAM_SCHEME"]
+    host = values[f"MCP_{svc}_UPSTREAM_HOST"]
+    port = values[f"MCP_{svc}_UPSTREAM_PORT"]
+    if (scheme == "https" and port in {"443", ""}) or (scheme == "http" and port in {"80", ""}):
+        return f"{scheme}://{host}"
+    return f"{scheme}://{host}:{port}"
+
+
+def build_python_edge_app():
+    """Same allowlisted routes as Compose APISIX when Docker is not on the CML engine."""
+    from starlette.applications import Starlette
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse, Response
+    from starlette.routing import Route
+
+    values = build_amp_apisix_env()
+    prefix = (values.get("KNOX_PROXY_PREFIX") or "").rstrip("/")
+    knox = _knox_origin()
+    caller = agent_caller_key(values)
+
+    async def health(_request: Request) -> JSONResponse:
+        return JSONResponse(
+            {"status": "ok", "service": "agent-gateway", "profile": "amp", "engine": "python"}
+        )
+
+    async def _proxy(request: Request, url: str) -> Response:
+        body = await request.body()
+        try:
+            response = httpx.request(
+                request.method,
+                url,
+                headers=_forward_headers(request),
+                content=body or None,
+                params=request.query_params,
+                timeout=120.0,
+                verify=_tls_verify(),
+                follow_redirects=False,
+            )
+        except httpx.HTTPError as extra:
+            return JSONResponse({"error": "upstream_unreachable", "reason": type(extra).__name__}, status_code=502)
+        out_headers = {
+            key: value
+            for key, value in response.headers.items()
+            if key.lower() not in {"content-encoding", "transfer-encoding", "connection"}
+        }
+        return Response(content=response.content, status_code=response.status_code, headers=out_headers)
+
+    async def mcp_proxy(request: Request) -> Response:
+        path = request.url.path
+        if caller and request.headers.get("x-agent-key") != caller:
+            return JSONResponse({"error": "unauthorized", "reason": "missing_caller_key"}, status_code=401)
+        adapter = "spark"
+        rest = ""
+        for name in ("spark", "hive", "impala"):
+            marker = f"/mcp/{name}"
+            if path == marker or path.startswith(marker + "/"):
+                adapter = name
+                rest = path[len(marker) :]
+                break
+        else:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        target = f"{_mcp_upstream_base(adapter, values)}/mcp{rest}"
+        return await _proxy(request, target)
+
+    async def cdp_proxy(request: Request) -> Response:
+        path = request.url.path
+        method = request.method.upper()
+        if path.startswith("/cdp/livy_for_spark3"):
+            if method not in {"GET", "HEAD"}:
+                return JSONResponse({"error": "not_found"}, status_code=404)
+        elif path.startswith("/cdp/webhdfs"):
+            if method not in {"GET", "HEAD", "PUT"}:
+                return JSONResponse({"error": "not_found"}, status_code=404)
+        else:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        rel = path[len("/cdp") :]
+        return await _proxy(request, f"{knox}{prefix}{rel}")
+
+    app = Starlette(
+        routes=[
+            *_prm_routes(),
+            Route("/health", health, methods=["GET", "HEAD"]),
+            Route("/healthcheck", health, methods=["GET", "HEAD"]),
+            Route("/", health, methods=["GET", "HEAD"]),
+            Route("/mcp/spark", mcp_proxy, methods=["GET", "HEAD", "POST", "DELETE"]),
+            Route("/mcp/spark/{rest:path}", mcp_proxy, methods=["GET", "HEAD", "POST", "DELETE"]),
+            Route("/mcp/hive", mcp_proxy, methods=["GET", "HEAD", "POST", "DELETE"]),
+            Route("/mcp/hive/{rest:path}", mcp_proxy, methods=["GET", "HEAD", "POST", "DELETE"]),
+            Route("/mcp/impala", mcp_proxy, methods=["GET", "HEAD", "POST", "DELETE"]),
+            Route("/mcp/impala/{rest:path}", mcp_proxy, methods=["GET", "HEAD", "POST", "DELETE"]),
+            Route("/cdp/{rest:path}", cdp_proxy, methods=["GET", "HEAD", "PUT", "POST", "DELETE"]),
+        ]
+    )
+    limiter = BurstLimiter(_int_env("MCP_RATE_COUNT", 60), _int_env("MCP_RATE_WINDOW", 60))
+    return KnoxJWTMiddleware(app, public_key_file=amp_public_key_path(), limiter=limiter)
+
+
 def serve_amp_apisix() -> int:
     try:
-        return run_apisix_process()
-    except Exception as exc:
-        serve_cml_app(startup_error_app("agent-gateway", exc), service="agent-gateway")
+        ensure_amp_knox_pem()
+        if shutil.which("docker"):
+            try:
+                return run_apisix_process()
+            except Exception as extra:
+                print(
+                    json.dumps(
+                        {
+                            "service": "agent-gateway",
+                            "event": "docker_apisix_failed",
+                            "error": type(extra).__name__,
+                            "detail": str(extra)[:300],
+                        }
+                    ),
+                    flush=True,
+                )
+        else:
+            print(
+                json.dumps({"service": "agent-gateway", "event": "python_edge", "reason": "docker_not_on_path"}),
+                flush=True,
+            )
+        serve_cml_app(build_python_edge_app(), service="agent-gateway")
+        return 0
+    except Exception as extra:
+        serve_cml_app(startup_error_app("agent-gateway", extra), service="agent-gateway")
         return 1

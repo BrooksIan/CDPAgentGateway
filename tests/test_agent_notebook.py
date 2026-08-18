@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -107,7 +108,17 @@ def test_tools_list_parses_response(monkeypatch: pytest.MonkeyPatch) -> None:
     assert tools[0]["name"] == "spark_list_batches"
 
 
-def test_tool_payload_decodes_content_text() -> None:
+def test_load_knox_token_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KNOX_TOKEN", "session-jwt")
+    assert mcp_agent.load_knox_token(prompt=False) == "session-jwt"
+
+
+def test_load_knox_token_prompts_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("KNOX_TOKEN", raising=False)
+    monkeypatch.delenv("KNOX_TOKEN_FILE", raising=False)
+    monkeypatch.setattr(mcp_agent, "getpass", lambda _prompt: "pasted-jwt")
+    assert mcp_agent.load_knox_token(prompt=True) == "pasted-jwt"
+    assert os.environ["KNOX_TOKEN"] == "pasted-jwt"
     payload = {"content": [{"text": json.dumps({"kind": "batches", "items": []})}]}
     assert mcp_agent.tool_payload(payload) == {"kind": "batches", "items": []}
 
@@ -146,7 +157,8 @@ def test_notebook_runs_spark_to_hive_example() -> None:
     assert "spark_submit_batch" in source
     assert "hive_select" in source
     assert "poll_spark_batch" in source
-    assert "count_to_10" in source
+    assert "load_knox_token" in source
+    assert "getpass" in source or "Knox JWT" in source
 
 
 def test_third_party_notebook_present() -> None:

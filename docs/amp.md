@@ -15,7 +15,7 @@ Template: [CML Community AMP Template](https://github.com/cloudera/CML_Community
 
 AMP also publishes direct MCP application URLs (`mcp-spark`, `mcp-hive`, `mcp-impala`) with Python Knox JWT for debugging. **Agents should use `https://agent-gateway.<workspace>/mcp/spark`** (and hive/impala) so they get the same APISIX routes as Compose: `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`, optional `X-Agent-Key`, and APISIX burst caps.
 
-AMP runs the same `apache/apisix:3.16.0-debian` image as Compose (Docker on the engine, bound to `CDSW_APP_PORT`). It is live Knox only (`--mint` does not apply). Mock Knox stays Compose-only.
+AMP prefers the same `apache/apisix:3.16.0-debian` image as Compose when `docker` is on the engine. CML application engines usually have no Docker; then `agent-gateway` pins Knox JWKS itself (if Fetch JWKS did not write the PEM) and serves the same allowlisted routes in Python (`engine: python` on `GET /health`).
 
 ```text
 MCP host → agent-gateway (APISIX, knox-jwt.lua) → mcp-spark|hive|impala → Knox → CDP

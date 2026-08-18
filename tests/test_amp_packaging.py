@@ -41,6 +41,7 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
         assert "Python 3.12" in task_kernels
     install = next(task for task in amp["tasks"] if task.get("script") == "0_session-install-dependencies/install_dependencies.py")
     assert install["type"] == "run_session"
+    assert install["entity_label"] == "install_deps"
     assert "cpu" in install and "memory" in install
     mcp = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-spark")
     hive = next(task for task in amp["tasks"] if task.get("subdomain") == "mcp-hive")
@@ -55,9 +56,10 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert apisix["type"] == "start_application"
     assert apisix["bypass_authentication"] is True
     assert admin["bypass_authentication"] is False
-    first_app = next(i for i, task in enumerate(amp["tasks"]) if task["type"] == "start_application")
-    first_knox = next(i for i, task in enumerate(amp["tasks"]) if task.get("entity_label") == "fetch_jwks")
-    assert first_app < first_knox, "start_application must run before Knox jobs or a failed JWKS task skips the apps"
+    labels = [task.get("entity_label") for task in amp["tasks"] if task.get("entity_label")]
+    assert labels.index("spark-mcp") < labels.index("fetch_jwks")
+    assert labels.index("fetch_jwks") < labels.index("agent-gateway")
+    assert labels.index("smoke_knox") < labels.index("agent-gateway")
 
     install_src = (ROOT / "0_session-install-dependencies" / "install_dependencies.py").read_text()
     assert "--user" in install_src

@@ -11,9 +11,10 @@ entries:
       subject. Spark MCP (/mcp/spark), read-only Hive MCP (/mcp/hive), and read-only
       Impala MCP (/mcp/impala) are the published agent paths. Operators stage Spark
       files at /cdp/webhdfs. /cdp/hive and /cdp/impala stay 404. Ozone and NiFi stay unpublished.
-      The AMP profile runs MCP as CML Applications with in-process Knox JWT validation.
-      Apache Knox remains the CDP perimeter. Compose/APISIX remains the laptop and
-      production-shaped edge. This catalog entry is packaging only until a workbench
+      The AMP profile publishes MCP adapters as CML Applications and an APISIX
+      agent-gateway application (same knox-jwt.lua as Compose) against live Knox.
+      Apache Knox remains the CDP perimeter. Compose remains the laptop path.
+      This catalog entry is packaging only until a workbench
       proof sets METADATA.yaml launchable to true.
     long_description_html: |
       <p>CDP Agent Gateway lets Cursor and other MCP hosts reach CDP as the Knox token

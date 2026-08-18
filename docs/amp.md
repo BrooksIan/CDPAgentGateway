@@ -23,6 +23,8 @@ MCP host → agent-gateway (APISIX, knox-jwt.lua) → mcp-spark|hive|impala → 
 
 ## Import
 
+The **Configure Project** form and auto-run jobs only happen when you launch from the AMP catalog (or **New Project → ML Prototype**). A plain Git clone does not run `.project-metadata.yaml` and does not show the form.
+
 Workbench project creation **clones git first**. AMP jobs do not run until that clone succeeds. `catalog-entry.yaml` `git_url` is `https://github.com/BrooksIan/CDPAgentGateway.git`. That repo is private today, so an unattended HTTPS clone fails with:
 
 ```text
@@ -33,16 +35,16 @@ Fix clone access **before** launching the AMP:
 
 1. In GitHub, create a personal access token with `repo` scope (classic) or Contents read on `BrooksIan/CDPAgentGateway` (fine-grained). Do not put the token in git or `catalog-entry.yaml`.
 2. In the workbench, add Git credentials for `github.com` (user settings, or site administration if AMP catalog clone uses the workspace credential store). Username is the GitHub user; password is the PAT.
-3. Create the project from this git URL, or add `catalog-entry.yaml` as a custom AMP source and launch the tile.
-4. Set project environment variables. **Required:** `KNOX_PROXY_URL` (Livy-for-Spark-3 on `cdp-proxy-token`). Optional: `KNOX_JWKS_URL` if it is not the URL derived from the proxy URL. Host must match Knox; foreign `jku` values are refused. Optional Impala CDW: `IMPALA_HOST`, `IMPALA_PORT`, `IMPALA_SCHEME`, `IMPALA_HTTP_PATH` (`cliservice`). JDBC `auth=browser` is not used; the app forwards the Knox JWT.
-5. Runtime: Workbench or PBJ Workbench, **Python 3.11 or greater** (3.12 is listed), Standard. No GPU. Do not pick Python 3.10 or older — `requires-python` is `>=3.11`. `run_session` requires `cpu` and `memory`; `start_application` requires `subdomain` and `kernel`.
-6. AMP tasks run **in order** and **stop on the first failure**. This runbook installs extras, starts MCP + admin applications, pins JWKS, smoke-checks Knox, then starts **agent-gateway (APISIX)** last (it needs the PEM). After a failed setup use **Resume** or **Redeploy** in the AMP setup steps ([restart a failed AMP](https://docs.cloudera.com/machine-learning/cloud/applied-ml-prototypes/topics/ml-restart-failed-amp-setup.html)).
+3. Add `catalog-entry.yaml` as a custom AMP source (**Site Administration → AMPs**), or use **New Project → ML Prototype** with this git URL.
+4. Open the **CDP Agent Gateway** tile → **Configure Project**. `KNOX_PROXY_URL` must have a **non-empty YAML default** (CML shows `Missing required environment variables` if the default is `null` or blank, even after you type a value). The form is pre-filled from `inventory/cdp.yaml`. Override it for another cluster. Do not add `KNOX_TOKEN` here.
+5. Click **Launch Project**. CML then runs tasks in order: install extras, **create and run** Fetch JWKS, **create and run** Smoke-check Knox, start MCP + admin apps, start **agent-gateway** (APISIX).
+6. Runtime: Workbench or PBJ Workbench, **Python 3.11 or greater** (3.12 is listed), Standard. No GPU. Do not pick Python 3.10 or older — `requires-python` is `>=3.11`.
 
 A public clone does not need a PAT. Do not encode a token in `git_url`.
 
 Do not put `KNOX_TOKEN` in project env or git. Paste the Knox JWT into the MCP host secret store.
 
-If the project clones but **applications are never created**, the AMP stopped on an earlier task (usually Install dependencies). Open that session/job log, then **Resume** or **Redeploy**.
+If a Knox job fails (bad `KNOX_PROXY_URL`), later tasks including applications do not start. Fix the project environment, then **Resume** or **Redeploy** ([restart a failed AMP](https://docs.cloudera.com/machine-learning/cloud/applied-ml-prototypes/topics/ml-restart-failed-amp-setup.html)).
 
 If applications exist but stay Starting or Failed, open Application logs. Typical causes:
 

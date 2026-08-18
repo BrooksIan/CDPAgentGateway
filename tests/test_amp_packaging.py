@@ -16,8 +16,22 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     amp = yaml.safe_load((ROOT / ".project-metadata.yaml").read_text())
     assert amp["name"] == "CDP Agent Gateway"
     env = amp["environment_variables"]
-    assert env["KNOX_PROXY_URL"]["required"] is True
+    knox_url = env["KNOX_PROXY_URL"]
+    assert knox_url["required"] is True
+    default = knox_url.get("default") or ""
+    assert default.startswith("https://")
+    assert "cdp-proxy-token" in default
+    assert "livy_for_spark3" in default
     assert "KNOX_TOKEN" not in env
+    types = [task["type"] for task in amp["tasks"]]
+    assert types.count("create_job") == 2
+    assert types.count("run_job") == 2
+    fetch_create = next(i for i, task in enumerate(amp["tasks"]) if task.get("type") == "create_job" and task.get("entity_label") == "fetch_jwks")
+    fetch_run = next(i for i, task in enumerate(amp["tasks"]) if task.get("type") == "run_job" and task.get("entity_label") == "fetch_jwks")
+    assert fetch_run == fetch_create + 1
+    smoke_create = next(i for i, task in enumerate(amp["tasks"]) if task.get("type") == "create_job" and task.get("entity_label") == "smoke_knox")
+    smoke_run = next(i for i, task in enumerate(amp["tasks"]) if task.get("type") == "run_job" and task.get("entity_label") == "smoke_knox")
+    assert smoke_run == smoke_create + 1
     scripts = [task.get("script") for task in amp["tasks"] if "script" in task]
     assert "0_session-install-dependencies/install_dependencies.py" in scripts
     assert "1_job-fetch-jwks/fetch_jwks.py" in scripts
@@ -57,9 +71,10 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert apisix["bypass_authentication"] is True
     assert admin["bypass_authentication"] is False
     labels = [task.get("entity_label") for task in amp["tasks"] if task.get("entity_label")]
-    assert labels.index("spark-mcp") < labels.index("fetch_jwks")
-    assert labels.index("fetch_jwks") < labels.index("agent-gateway")
-    assert labels.index("smoke_knox") < labels.index("agent-gateway")
+    assert labels.index("install_deps") < labels.index("fetch_jwks")
+    assert labels.index("fetch_jwks") < labels.index("spark-mcp")
+    assert labels.index("smoke_knox") < labels.index("spark-mcp")
+    assert labels.index("spark-mcp") < labels.index("agent-gateway")
 
     install_src = (ROOT / "0_session-install-dependencies" / "install_dependencies.py").read_text()
     assert "--user" in install_src

@@ -11,76 +11,64 @@ date: "2026-08-17"
 
 environment_variables:
   KNOX_PROXY_URL:
-    default: ""
-    description: >-
-      HTTPS Livy-for-Spark-3 URL on cdp-proxy-token
-      (example: https://knox.example/env/cdp-proxy-token/livy_for_spark3/). Required.
+    default: "https://go01-obser-de-gateway.go01-dem.ylcu-atmi.cloudera.site:443/go01-obser-de/cdp-proxy-token/livy_for_spark3/"
+    description: "HTTPS Livy-for-Spark-3 URL on Knox cdp-proxy-token (include /livy_for_spark3/)."
     required: true
   KNOX_JWKS_URL:
-    default: ""
-    description: >-
-      Knox homepage JWKS URL. Host must match KNOX_PROXY_URL. Leave empty to use the
-      URL derived from KNOX_PROXY_URL.
+    default: "https://go01-obser-de-gateway.go01-dem.ylcu-atmi.cloudera.site/go01-obser-de/homepage/knoxtoken/api/v2/jwks.json"
+    description: "Knox JWKS URL. Host must match KNOX_PROXY_URL."
     required: false
   KNOX_ISSUER:
     default: "KNOXSSO"
-    description: Expected JWT iss claim.
+    description: "Expected JWT iss claim."
     required: false
   KNOX_EXPECTED_ALG:
     default: "RS256"
-    description: Expected JWT alg. Anything else is rejected.
+    description: "Expected JWT alg. Anything else is rejected."
     required: false
   KNOX_CLOCK_SKEW:
     default: "60"
-    description: Seconds of leeway for exp and nbf.
+    description: "Seconds of leeway for exp and nbf."
     required: false
   UPSTREAM_TLS_VERIFY:
-    default: "true"
-    description: Verify TLS when fetching JWKS and calling Knox. Set false only for lab CAs.
+    default: "false"
+    description: "Verify TLS when fetching JWKS and calling Knox. false for lab CAs; true for public CAs."
     required: false
   MCP_RATE_COUNT:
     default: "60"
-    description: Burst cap on MCP POSTs per Knox sub.
+    description: "Burst cap on MCP POSTs per Knox sub."
     required: false
   MCP_RATE_WINDOW:
     default: "60"
-    description: Burst window in seconds.
-    required: false
-  ADMIN_INTERNAL_TOKEN:
-    default: ""
-    description: Unused when both AMP apps share sqlite. Leave empty.
+    description: "Burst window in seconds."
     required: false
   IMPALA_HOST:
     default: ""
-    description: >-
-      CDW Impala Virtual Warehouse coordinator hostname from jdbc:impala://.
-      Leave empty to use Knox {prefix}/impala. Does not replace KNOX_PROXY_URL.
+    description: "Optional CDW Impala coordinator hostname from jdbc:impala://. Leave empty to use Knox {prefix}/impala."
     required: false
   IMPALA_PORT:
     default: "443"
-    description: CDW Impala HS2 HTTP port (usually 443).
+    description: "CDW Impala HS2 HTTP port (usually 443)."
     required: false
   IMPALA_SCHEME:
     default: "https"
-    description: CDW Impala HTTP scheme.
+    description: "CDW Impala HTTP scheme."
     required: false
   IMPALA_HTTP_PATH:
     default: "cliservice"
-    description: CDW Impala HS2 httpPath (cliservice). Ignored when IMPALA_HOST is empty.
+    description: "CDW Impala HS2 httpPath. Ignored when IMPALA_HOST is empty."
     required: false
   IMPALA_TLS_VERIFY:
     default: "true"
-    description: Verify TLS to the CDW Impala coordinator. Set false only for lab CAs.
+    description: "Verify TLS to the CDW Impala coordinator. Set false only for lab CAs."
     required: false
   AGENT_CALLER_KEY:
     default: ""
-    description: >-
-      Partner MCP caller key (X-Agent-Key) enforced by APISIX on /mcp/* when set. Same as Compose.
+    description: "Optional partner MCP caller key (X-Agent-Key) enforced by APISIX on /mcp/*."
     required: false
   GATEWAY_PUBLIC_URL:
     default: ""
-    description: >-
-      Public agent URL for RFC 9728 metadata. Leave empty on AMP to use https://agent-gateway.<CDSW_DOMAIN>.
+    description: "Optional public agent URL for RFC 9728. Leave empty to use https://agent-gateway.<CDSW_DOMAIN>."
     required: false
 
 runtimes:
@@ -120,6 +108,70 @@ tasks:
     memory: 2.0
     gpu: 0
     short_summary: Install AMP extras into the project user site so applications can import them.
+
+  - type: create_job
+    name: Fetch pinned Knox JWKS
+    entity_label: fetch_jwks
+    script: 1_job-fetch-jwks/fetch_jwks.py
+    arguments: None
+    kernel: python3
+    runtimes:
+      - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: Workbench
+        kernel: Python 3.12
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.12
+        edition: Standard
+    cpu: 1.0
+    memory: 1.0
+    gpu: 0
+    timeout: 10
+    short_summary: Create the job that downloads JWKS from the Knox host and writes the verifying PEM.
+    environment:
+      TASK_TYPE: CREATE/RUN_JOB
+
+  - type: run_job
+    entity_label: fetch_jwks
+    short_summary: Run Fetch pinned Knox JWKS.
+    long_summary: Pins JWKS using KNOX_PROXY_URL from the Configure Project form. Refuses a foreign jku host.
+
+  - type: create_job
+    name: Smoke-check Knox
+    entity_label: smoke_knox
+    script: 2_job-smoke-knox/smoke_knox.py
+    arguments: None
+    kernel: python3
+    runtimes:
+      - editor: Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: Workbench
+        kernel: Python 3.12
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.11
+        edition: Standard
+      - editor: PBJ Workbench
+        kernel: Python 3.12
+        edition: Standard
+    cpu: 1.0
+    memory: 1.0
+    gpu: 0
+    timeout: 10
+    short_summary: Create the job that confirms the PEM exists and JWKS is reachable.
+    environment:
+      TASK_TYPE: CREATE/RUN_JOB
+
+  - type: run_job
+    entity_label: smoke_knox
+    short_summary: Run Smoke-check Knox.
+    long_summary: Reachability check after Fetch JWKS. Never prints the bearer.
 
   - type: start_application
     name: Spark MCP
@@ -240,64 +292,6 @@ tasks:
     static_subdomain: true
     short_summary: Usage and quotas for operators. CML login required. Not an MCP route.
     description: Operator usage and quotas. CML login required. Not an MCP route.
-
-  - type: create_job
-    name: Fetch pinned Knox JWKS
-    entity_label: fetch_jwks
-    script: 1_job-fetch-jwks/fetch_jwks.py
-    arguments: None
-    kernel: python3
-    runtimes:
-      - editor: Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: Workbench
-        kernel: Python 3.12
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.12
-        edition: Standard
-    cpu: 1.0
-    memory: 1.0
-    gpu: 0
-    timeout: 10
-    short_summary: Download JWKS from the inventory Knox host and write a verifying PEM.
-
-  - type: run_job
-    entity_label: fetch_jwks
-    short_summary: Pin JWKS; refuse a foreign jku host.
-
-  - type: create_job
-    name: Smoke-check Knox
-    entity_label: smoke_knox
-    script: 2_job-smoke-knox/smoke_knox.py
-    arguments: None
-    kernel: python3
-    runtimes:
-      - editor: Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: Workbench
-        kernel: Python 3.12
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.11
-        edition: Standard
-      - editor: PBJ Workbench
-        kernel: Python 3.12
-        edition: Standard
-    cpu: 1.0
-    memory: 1.0
-    gpu: 0
-    timeout: 10
-    short_summary: Confirm the PEM exists and JWKS is reachable. Optional Livy GET if KNOX_TOKEN is set in the job.
-
-  - type: run_job
-    entity_label: smoke_knox
-    short_summary: Reachability check; never prints the bearer.
 
   - type: start_application
     name: Agent gateway (APISIX)

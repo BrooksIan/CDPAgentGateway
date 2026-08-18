@@ -226,26 +226,40 @@ def schema_model(tool_name: str, schema: dict[str, Any] | None) -> type:
 
 def _coerce_arguments(arguments: dict[str, Any], schema: dict[str, Any] | None) -> dict[str, Any]:
     properties = (schema or {}).get("properties") if isinstance((schema or {}).get("properties"), dict) else {}
+    required = set((schema or {}).get("required") or [])
     coerced: dict[str, Any] = {}
     for key, value in (arguments or {}).items():
         if value is None:
+            continue
+        if isinstance(value, str) and not value.strip() and key not in required:
             continue
         spec = properties.get(key) if isinstance(properties.get(key), dict) else {}
         if spec.get("type") == "integer" and isinstance(value, str) and value.isdigit():
             coerced[key] = int(value)
             continue
+        if spec.get("type") == "array" and isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, list):
+                coerced[key] = parsed
+                continue
+            if not value.strip():
+                continue
         coerced[key] = value
     return coerced
 
 
-def _invoke_mcp(name: str, adapter: str, schema: dict[str, Any] | None, timeout: float, **kwargs: Any) -> str:
+def _invoke_mcp(tool_name: str, adapter: str, schema: dict[str, Any] | None, timeout: float, **kwargs: Any) -> str:
+    """Run tools/call. kwargs may include `name` (Livy batch name); do not collide with tool_name."""
     payload = call_gateway_tool(
-        name,
+        tool_name,
         _coerce_arguments(kwargs, schema),
         adapter=adapter,
         timeout=timeout,
     )
-    if name == "spark_get_batch":
+    if tool_name == "spark_get_batch":
         state = str(payload.get("state") or "").lower()
         if state and state not in _TERMINAL_BATCH:
             time.sleep(max(float(os.environ.get("SPARK_POLL_INTERVAL", "10")), 1.0))
@@ -522,10 +536,13 @@ def _tool_brief(tool: Any) -> str:
 
 
 def _tool_catalog_text(tools: list[Any]) -> str:
+    names = ", ".join(sorted(_tool_names(tools))) or "(none)"
     lines = [
-        "Call at most one MCP tool per turn. Reply with JSON only:",
-        '{"name": "<tool>", "arguments": {<object>}}',
-        "If you can answer without a tool, reply in plain text (no JSON object).",
+        "Call at most one MCP tool per turn.",
+        'Reply with a single JSON object: {"name": "<tool>", "arguments": {}}',
+        "Do not emit XML, <function=>, <tool_call>, or <think> wrappers.",
+        "If you can answer without a tool, reply in plain text with no JSON object.",
+        f"Allowed tool names: {names}",
         "Tools:",
     ]
     lines.extend(_tool_brief(tool) for tool in tools)
@@ -538,6 +555,22 @@ def _as_messages(value: Any) -> list[Any]:
     if isinstance(value, list):
         return list(value)
     return [value]
+
+
+def _message_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict):
+                parts.append(str(block.get("text") or block.get("content") or ""))
+            else:
+                parts.append(str(getattr(block, "text", "") or getattr(block, "content", "") or ""))
+        return "\n".join(part for part in parts if part)
+    return "" if content is None else str(content)
 
 
 def _json_objects(text: str) -> list[dict[str, Any]]:
@@ -562,10 +595,48 @@ def _json_objects(text: str) -> list[dict[str, Any]]:
     return found
 
 
+def _xml_parameters(text: str) -> dict[str, Any]:
+    args: dict[str, Any] = {}
+    for key, raw in re.findall(
+        r"<parameter\s*=\s*([A-Za-z0-9_]+)>(.*?)</parameter>",
+        text or "",
+        flags=re.DOTALL,
+    ):
+        value = raw.strip()
+        if not value:
+            continue
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            parsed = value
+        args[key] = parsed
+    return args
+
+
+def _markup_tool_call(text: str, allowed: set[str]) -> dict[str, Any] | None:
+    """Qwen/Hermes XML and similar vLLM chat-template tool markup."""
+    body = text or ""
+    for name in sorted(allowed, key=len, reverse=True):
+        escaped = re.escape(name)
+        patterns = (
+            rf"<function\s*=\s*{escaped}\b",
+            rf"<tool_call>\s*{escaped}\b",
+            rf"✿FUNCTION✿\s*{escaped}\b",
+            rf"<tool_call>\s*<function\s*=\s*{escaped}\b",
+        )
+        if any(re.search(pattern, body) for pattern in patterns):
+            return {"name": name, "args": _xml_parameters(body)}
+    return None
+
+
 def parse_prompt_tool_call(text: str, tools: list[Any]) -> dict[str, Any] | None:
     """Parse a model reply into one {name, args} tool call. Never logs secrets."""
     allowed = _tool_names(tools)
-    for obj in _json_objects(text):
+    body = _message_text(text)
+    marked = _markup_tool_call(body, allowed)
+    if marked:
+        return marked
+    for obj in _json_objects(body):
         name = None
         for key in _TOOL_JSON_KEYS:
             raw = obj.get(key)
@@ -584,10 +655,7 @@ def parse_prompt_tool_call(text: str, tools: list[Any]) -> dict[str, Any] | None
 def _attach_parsed_tool_calls(ai: Any, tools: list[Any]) -> Any:
     if getattr(ai, "tool_calls", None):
         return ai
-    content = getattr(ai, "content", ai)
-    if not isinstance(content, str):
-        return ai
-    parsed = parse_prompt_tool_call(content, tools)
+    parsed = parse_prompt_tool_call(getattr(ai, "content", ai), tools)
     if not parsed:
         return ai
     from langchain_core.messages import AIMessage

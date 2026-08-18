@@ -406,6 +406,25 @@ def test_langgraph_coerce_and_last_message() -> None:
         "required": ["batch_id"],
     }
     assert lg._coerce_arguments({"batch_id": "7", "unused": None}, schema) == {"batch_id": 7}
+    submit_schema = {
+        "type": "object",
+        "properties": {
+            "file": {"type": "string"},
+            "className": {"type": "string"},
+            "name": {"type": "string"},
+            "args": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["file"],
+    }
+    assert lg._coerce_arguments(
+        {
+            "file": "hdfs:///user/a/x.py",
+            "name": "count-to-10",
+            "className": "",
+            "args": "[]",
+        },
+        submit_schema,
+    ) == {"file": "hdfs:///user/a/x.py", "name": "count-to-10", "args": []}
 
     class Msg:
         def __init__(self, type: str, content: object, **extra: object) -> None:
@@ -457,6 +476,56 @@ def test_langchain_tools_call_mcp(monkeypatch: pytest.MonkeyPatch) -> None:
     assert payload == {"items": ["default"]}
     assert seen["name"] == "hive_list_databases"
     assert seen["adapter"] == "hive"
+
+
+def test_langchain_tools_submit_batch_accepts_name_arg(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("langchain_core")
+    pytest.importorskip("pydantic")
+    lg = _load_langgraph_mcp()
+    monkeypatch.setenv("KNOX_TOKEN", "test-token")
+    catalog = [
+        {
+            "name": "spark_submit_batch",
+            "description": "Submit a batch",
+            "adapter": "spark",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "file": {"type": "string"},
+                    "className": {"type": "string"},
+                    "name": {"type": "string"},
+                    "args": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["file"],
+            },
+        }
+    ]
+    seen: dict[str, object] = {}
+
+    def fake_call(name, arguments=None, **kwargs):
+        seen["name"] = name
+        seen["arguments"] = arguments
+        return {"id": 7, "state": "starting"}
+
+    monkeypatch.setattr(lg, "call_gateway_tool", fake_call)
+    tools = lg.langchain_tools(catalog=catalog)
+    payload = json.loads(
+        tools[0].invoke(
+            {
+                "file": "hdfs:///user/ibrooks/examples/count_to_10.py",
+                "name": "count-to-10",
+                "className": "",
+                "args": [],
+            }
+        )
+    )
+    assert payload["id"] == 7
+    assert seen["name"] == "spark_submit_batch"
+    assert seen["arguments"] == {
+        "file": "hdfs:///user/ibrooks/examples/count_to_10.py",
+        "name": "count-to-10",
+        "args": [],
+    }
 
 
 def test_schema_model_required_integer() -> None:
@@ -678,6 +747,38 @@ def test_parse_prompt_tool_call_json() -> None:
     )
     assert hermes == {"name": "hive_list_databases", "args": {}}
     assert lg.parse_prompt_tool_call("Spark batches look idle.", [Tool()]) is None
+    qwen = lg.parse_prompt_tool_call(
+        "We need to list Hive databases.\n</think>\n<tool_call>\n"
+        "<function=hive_list_databases>\n</function>\n",
+        [Tool()],
+    )
+    assert qwen == {"name": "hive_list_databases", "args": {}}
+    params = lg.parse_prompt_tool_call(
+        "<function=hive_list_databases><parameter=limit>5</parameter></function>",
+        [Tool()],
+    )
+    assert params == {"name": "hive_list_databases", "args": {"limit": 5}}
+
+    class Submit:
+        name = "spark_submit_batch"
+
+    submit = lg.parse_prompt_tool_call(
+        "<function=spark_submit_batch>\n"
+        "<parameter=file>\nhdfs:///user/ibrooks/examples/count_to_10.py\n</parameter>\n"
+        "<parameter=className>\n\n</parameter>\n"
+        "<parameter=name>\ncount-to-10\n</parameter>\n"
+        "<parameter=args>\n[]\n</parameter>\n"
+        "</function>",
+        [Submit()],
+    )
+    assert submit == {
+        "name": "spark_submit_batch",
+        "args": {
+            "file": "hdfs:///user/ibrooks/examples/count_to_10.py",
+            "name": "count-to-10",
+            "args": [],
+        },
+    }
 
 
 def test_prompt_tool_chat_invoke_does_not_send_openai_tools() -> None:

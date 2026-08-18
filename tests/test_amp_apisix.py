@@ -76,6 +76,9 @@ def test_python_edge_health_is_public(monkeypatch: pytest.MonkeyPatch) -> None:
     pem = ROOT / "conf" / "keys" / "public.pem"
     monkeypatch.setenv("KNOX_PUBLIC_KEY_FILE", str(pem))
     monkeypatch.setenv("ADMIN_BACKEND", "sqlite")
+    monkeypatch.setenv("ENABLE_MCP_SPARK", "true")
+    monkeypatch.setenv("ENABLE_MCP_HIVE", "true")
+    monkeypatch.setenv("ENABLE_MCP_IMPALA", "false")
     client = TestClient(build_python_edge_app())
     response = client.get("/health")
     assert response.status_code == 200
@@ -83,6 +86,8 @@ def test_python_edge_health_is_public(monkeypatch: pytest.MonkeyPatch) -> None:
     assert body["status"] == "ok"
     assert body["engine"] == "python"
     assert body["mcp"] == "inprocess"
+    assert body["adapters"] == ["hive", "spark"]
+    assert body["disabled"] == ["impala"]
     denied = client.post("/mcp/spark", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     assert denied.status_code == 401
 
@@ -105,6 +110,9 @@ def test_python_edge_tools_list_in_process(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("AGENT_CALLER_KEY", "")
     monkeypatch.setenv("ADMIN_BACKEND", "sqlite")
     monkeypatch.setenv("ADMIN_DB", str(ROOT / "data" / "gateway.sqlite"))
+    monkeypatch.setenv("ENABLE_MCP_SPARK", "true")
+    monkeypatch.setenv("ENABLE_MCP_HIVE", "true")
+    monkeypatch.setenv("ENABLE_MCP_IMPALA", "false")
     client = TestClient(build_python_edge_app())
     token = sign_rs256(knox_claims(sub="analyst"))
     response = client.post(
@@ -139,6 +147,9 @@ def test_python_edge_list_batches_loads_admin_store(
     monkeypatch.setenv("AGENT_CALLER_KEY", "")
     monkeypatch.setenv("ADMIN_BACKEND", "sqlite")
     monkeypatch.setenv("ADMIN_DB", str(tmp_path / "gateway.sqlite"))
+    monkeypatch.setenv("ENABLE_MCP_SPARK", "true")
+    monkeypatch.setenv("ENABLE_MCP_HIVE", "true")
+    monkeypatch.setenv("ENABLE_MCP_IMPALA", "false")
     app = build_python_edge_app()
     spark = sys.modules["amp_edge_spark"]
 
@@ -161,6 +172,62 @@ def test_python_edge_list_batches_loads_admin_store(
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["result"]["isError"] is False
+
+
+def test_mcp_adapter_enabled_defaults() -> None:
+    from agentgateway.env import mcp_adapter_enabled
+
+    assert mcp_adapter_enabled("spark", {}) is True
+    assert mcp_adapter_enabled("hive", {}) is True
+    assert mcp_adapter_enabled("impala", {}) is False
+    assert mcp_adapter_enabled("impala", {"ENABLE_MCP_IMPALA": "true"}) is True
+    assert mcp_adapter_enabled("spark", {"ENABLE_MCP_SPARK": "false"}) is False
+    assert mcp_adapter_enabled("unknown", {}) is False
+
+
+def test_python_edge_disabled_impala_is_404(monkeypatch: pytest.MonkeyPatch) -> None:
+    from starlette.testclient import TestClient
+
+    from agentgateway.amp_apisix import build_python_edge_app
+    from agentgateway.keys import generate_test_keys
+    from agentgateway.token import knox_claims, sign_rs256
+
+    monkeypatch.setenv("CDSW_DOMAIN", "ml.example.com")
+    monkeypatch.setenv(
+        "KNOX_PROXY_URL",
+        "https://knox.example.com/gateway/cdp-proxy-token/livy_for_spark3/",
+    )
+    generate_test_keys()
+    pem = ROOT / "conf" / "keys" / "public.pem"
+    monkeypatch.setenv("KNOX_PUBLIC_KEY_FILE", str(pem))
+    monkeypatch.setenv("AGENT_CALLER_KEY", "")
+    monkeypatch.setenv("ADMIN_BACKEND", "sqlite")
+    monkeypatch.setenv("ENABLE_MCP_SPARK", "true")
+    monkeypatch.setenv("ENABLE_MCP_HIVE", "true")
+    monkeypatch.setenv("ENABLE_MCP_IMPALA", "false")
+    client = TestClient(build_python_edge_app())
+    token = sign_rs256(knox_claims(sub="analyst"))
+    response = client.post(
+        "/mcp/impala",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+    )
+    assert response.status_code == 404
+    assert response.json() == {"error": "adapter_disabled", "reason": "impala"}
+
+
+def test_disabled_mcp_app_health_is_public() -> None:
+    from starlette.testclient import TestClient
+
+    from agentgateway.amp import disabled_mcp_app
+
+    client = TestClient(disabled_mcp_app("mcp-impala"))
+    body = client.get("/health").json()
+    assert body["status"] == "disabled"
+    assert body["service"] == "mcp-impala"
+    denied = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    assert denied.status_code == 404
+    assert denied.json()["error"] == "adapter_disabled"
 
 
 def test_startup_error_app_includes_detail() -> None:

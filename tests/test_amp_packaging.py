@@ -23,6 +23,12 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert "cdp-proxy-token" in default
     assert "livy_for_spark3" in default
     assert "KNOX_TOKEN" not in env
+    assert env["ENABLE_MCP_SPARK"]["default"] == "true"
+    assert env["ENABLE_MCP_HIVE"]["default"] == "true"
+    assert env["ENABLE_MCP_IMPALA"]["default"] == "false"
+    assert env["ENABLE_MCP_SPARK"]["required"] is False
+    assert env["ENABLE_MCP_HIVE"]["required"] is False
+    assert env["ENABLE_MCP_IMPALA"]["required"] is False
     types = [task["type"] for task in amp["tasks"]]
     assert types.count("create_job") == 2
     assert types.count("run_job") == 2

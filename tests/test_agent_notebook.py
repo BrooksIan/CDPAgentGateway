@@ -428,15 +428,19 @@ def test_langgraph_extra_pins_core_03() -> None:
     assert "langgraph>=0.3.5,<0.4" in text
     constraints = (ROOT / "examples/agent/langgraph-constraints.txt").read_text()
     assert "langchain-core>=0.3.85,<0.4" in constraints
-    assert "protobuf>=3.12.0,<6" in constraints
+    assert not any(line.startswith("protobuf") for line in constraints.splitlines())
 
 
 def test_langgraph_pip_packages_amp_keeps_core_03(monkeypatch: pytest.MonkeyPatch) -> None:
     lg = _load_langgraph_mcp()
     monkeypatch.setattr(lg, "_dist_version", lambda _name: "0.3.85")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("LANGGRAPH_INSTALL_ANTHROPIC", raising=False)
     packages = lg.langgraph_pip_packages(amp=True)
     assert all(not item.startswith("langchain-core") for item in packages)
     assert any(item.startswith("langgraph") and "<0.4" in item for item in packages)
+    assert all(not item.startswith("langchain-anthropic") for item in packages)
+    assert all("protobuf" not in item for item in packages)
 
 
 def test_langgraph_pip_packages_amp_downgrades_core_1(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -446,7 +450,7 @@ def test_langgraph_pip_packages_amp_downgrades_core_1(monkeypatch: pytest.Monkey
     assert any(item.startswith("langchain-core") and "<0.4" in item for item in packages)
 
 
-def test_langgraph_pip_packages_amp_rolls_back_protobuf7(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_langgraph_pip_packages_amp_skips_protobuf(monkeypatch: pytest.MonkeyPatch) -> None:
     lg = _load_langgraph_mcp()
 
     def fake_version(name: str) -> str | None:
@@ -457,8 +461,10 @@ def test_langgraph_pip_packages_amp_rolls_back_protobuf7(monkeypatch: pytest.Mon
         return None
 
     monkeypatch.setattr(lg, "_dist_version", fake_version)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("LANGGRAPH_INSTALL_ANTHROPIC", raising=False)
     packages = lg.langgraph_pip_packages(amp=True)
-    assert "protobuf>=3.12.0,<6" in packages
+    assert all("protobuf" not in item for item in packages)
 
 
 def test_require_langchain_core_03_rejects_1x(monkeypatch: pytest.MonkeyPatch) -> None:

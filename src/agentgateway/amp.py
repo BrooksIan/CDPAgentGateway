@@ -414,6 +414,33 @@ def build_admin_app():
     return _load_module("amp_admin_server", "admin").app
 
 
+def disabled_mcp_app(service: str):
+    """Listen when ENABLE_MCP_* is false. AMP cannot skip start_application tasks."""
+
+    async def health(_request: Request) -> JSONResponse:
+        return JSONResponse(
+            {
+                "status": "disabled",
+                "service": service,
+                "profile": "amp",
+                "reason": "adapter_disabled",
+            }
+        )
+
+    async def mcp(_request: Request) -> JSONResponse:
+        return JSONResponse({"error": "adapter_disabled", "service": service}, status_code=404)
+
+    return Starlette(
+        routes=[
+            Route("/health", health, methods=["GET", "HEAD"]),
+            Route("/healthcheck", health, methods=["GET", "HEAD"]),
+            Route("/", health, methods=["GET", "HEAD"]),
+            Route("/mcp", mcp, methods=["GET", "HEAD", "POST", "DELETE"]),
+            Route("/mcp/{rest:path}", mcp, methods=["GET", "HEAD", "POST", "DELETE"]),
+        ]
+    )
+
+
 def startup_error_app(service: str, exc: BaseException):
     """Listen anyway so CML marks the application running; MCP stays fail-closed."""
     detail = f"{type(exc).__name__}: {exc}".replace("\n", " ")[:400]

@@ -13,10 +13,14 @@ from agentgateway.cml_boot import ensure_amp_extra, ensure_src_path, project_roo
 _ROOT = project_root()
 ensure_src_path(_ROOT)
 ensure_amp_extra(_ROOT, extra="amp,hive")
-from agentgateway.amp import build_hive_mcp_app, serve_cml_app, startup_error_app
-try:
-    app = build_hive_mcp_app()
-except Exception as exc:
-    app = startup_error_app("mcp-hive", exc)
+from agentgateway.env import mcp_adapter_enabled
+from agentgateway.amp import build_hive_mcp_app, disabled_mcp_app, serve_cml_app, startup_error_app
+if not mcp_adapter_enabled("hive"):
+    app = disabled_mcp_app("mcp-hive")
+else:
+    try:
+        app = build_hive_mcp_app()
+    except Exception as err:
+        app = startup_error_app("mcp-hive", err)
 if __name__ == "__main__" or os.environ.get("CDSW_APP_PORT"):
     serve_cml_app(app, service="mcp-hive")

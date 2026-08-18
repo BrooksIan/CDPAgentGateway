@@ -36,7 +36,7 @@ Fix clone access **before** launching the AMP:
 1. In GitHub, create a personal access token with `repo` scope (classic) or Contents read on `BrooksIan/CDPAgentGateway` (fine-grained). Do not put the token in git or `catalog-entry.yaml`.
 2. In the workbench, add Git credentials for `github.com` (user settings, or site administration if AMP catalog clone uses the workspace credential store). Username is the GitHub user; password is the PAT.
 3. Add `catalog-entry.yaml` as a custom AMP source (**Site Administration → AMPs**), or use **New Project → ML Prototype** with this git URL.
-4. Open the **CDP Agent Gateway** tile → **Configure Project**. `KNOX_PROXY_URL` must have a **non-empty YAML default** (CML shows `Missing required environment variables` if the default is `null` or blank, even after you type a value). The form is pre-filled from `inventory/cdp.yaml`. Override it for another cluster. Do not add `KNOX_TOKEN` here.
+4. Open the **CDP Agent Gateway** tile → **Configure Project**. `KNOX_PROXY_URL` must have a **non-empty YAML default** (CML shows `Missing required environment variables` if the default is `null` or blank, even after you type a value). The form is pre-filled from `inventory/cdp.yaml`. Override it for another cluster. `ENABLE_MCP_SPARK` and `ENABLE_MCP_HIVE` default to `true`; `ENABLE_MCP_IMPALA` defaults to `false`. CML only offers text boxes, so type `true` or `false` (not checkboxes). AMP still starts every application slot; a disabled adapter serves `/health` as `disabled` and `/mcp*` as 404. The Python edge only loads enabled adapters (`GET /health` lists `adapters` and `disabled`). Do not add `KNOX_TOKEN` here.
 5. Click **Launch Project**. CML then runs tasks in order: install extras, **create and run** Fetch JWKS, **create and run** Smoke-check Knox, start MCP + admin apps, start **agent-gateway** (APISIX).
 6. Runtime: Workbench, **JupyterLab (Python 3.11 Standard)**, or PBJ Workbench, **Python 3.11 or greater** (3.12 is listed for Workbench/PBJ). No GPU. Do not pick Python 3.10 or older — `requires-python` is `>=3.11`. Open the agent notebooks in JupyterLab Python 3.11 Standard.
 
@@ -66,7 +66,7 @@ Push this repo to GitHub, then **Redeploy** the AMP so the workbench re-imports 
 | **`agent-gateway`** | Bypassed | **Agent edge.** Docker APISIX when `docker` exists; otherwise Python (`engine: python`). `/mcp/spark`, `/mcp/hive`, `/mcp/impala`, `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`. Knox JWT + optional `X-Agent-Key`. |
 | `mcp-spark` | Bypassed (MCP hosts cannot send CML cookies) | MCP adapter upstream. Direct URL still works (Python JWT). Prefer `agent-gateway`. |
 | `mcp-hive` | Bypassed | POST JSON-RPC Hive (read-only). Knox JWT required. `/cdp/hive` is not this app. |
-| `mcp-impala` | Bypassed | POST JSON-RPC Impala (read-only). Knox JWT required. `/cdp/impala` is not this app. CDW `HTTP code 401` after a valid JWT is warehouse trust, not APISIX. |
+| `mcp-impala` | Bypassed | POST JSON-RPC Impala (read-only). Off unless `ENABLE_MCP_IMPALA=true`. Knox JWT required. `/cdp/impala` is not this app. CDW `HTTP code 401` after a valid JWT is warehouse trust, not APISIX. |
 | `gateway-admin` | Required | Operator usage/quotas. Shares `data/gateway.sqlite`. Not an agent route. |
 
 Quotas use sqlite on the project filesystem (`ADMIN_BACKEND=sqlite`). Compose still uses HTTP to the admin container and fails open if that container is down.

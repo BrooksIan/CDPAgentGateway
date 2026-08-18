@@ -14,6 +14,18 @@ environment_variables:
     default: "https://go01-obser-de-gateway.go01-dem.ylcu-atmi.cloudera.site:443/go01-obser-de/cdp-proxy-token/livy_for_spark3/"
     description: "HTTPS Livy-for-Spark-3 URL on Knox cdp-proxy-token (include /livy_for_spark3/)."
     required: true
+  ENABLE_MCP_SPARK:
+    default: "true"
+    description: "Enable Spark MCP (true/false). AMP still starts the app slot; agent-gateway only serves enabled adapters."
+    required: false
+  ENABLE_MCP_HIVE:
+    default: "true"
+    description: "Enable Hive MCP (true/false). AMP still starts the app slot; agent-gateway only serves enabled adapters."
+    required: false
+  ENABLE_MCP_IMPALA:
+    default: "false"
+    description: "Enable Impala MCP (true/false). Default false. AMP still starts the app slot; agent-gateway only serves enabled adapters."
+    required: false
   KNOX_JWKS_URL:
     default: "https://go01-obser-de-gateway.go01-dem.ylcu-atmi.cloudera.site/go01-obser-de/homepage/knoxtoken/api/v2/jwks.json"
     description: "Knox JWKS URL. Host must match KNOX_PROXY_URL."

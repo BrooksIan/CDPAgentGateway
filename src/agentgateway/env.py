@@ -126,6 +126,22 @@ def agent_caller_key(values: dict[str, str] | None = None) -> str:
     return (env.get("AGENT_CALLER_KEY") or "").strip()
 
 
+_MCP_ADAPTERS = ("spark", "hive", "impala")
+_MCP_ADAPTER_DEFAULTS = {"spark": True, "hive": True, "impala": False}
+
+
+def mcp_adapter_enabled(adapter: str, values: dict[str, str] | None = None) -> bool:
+    """AMP form ENABLE_MCP_* flags. Unset uses spark/hive on, impala off."""
+    key = (adapter or "").strip().lower()
+    if key not in _MCP_ADAPTER_DEFAULTS:
+        return False
+    env = os.environ if values is None else values
+    raw = env.get(f"ENABLE_MCP_{key.upper()}")
+    if raw is None or str(raw).strip() == "":
+        return _MCP_ADAPTER_DEFAULTS[key]
+    return str(raw).strip().lower() in {"true", "1", "yes", "on"}
+
+
 def agent_headers(token: str, *, path: str = "") -> dict[str, str]:
     headers = {"Authorization": f"Bearer {token}"}
     if path.startswith("/mcp"):

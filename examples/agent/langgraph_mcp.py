@@ -32,8 +32,9 @@ LANGGRAPH_PIP_PACKAGES = (
     "langgraph>=0.3.5,<0.4",
     "langchain-core>=0.3.85,<0.4",
     "langchain-openai>=0.3,<0.4",
-    "langchain-anthropic>=0.3,<0.4",
 )
+_ANTHROPIC_EXTRA = "langchain-anthropic>=0.3,<0.4"
+_AMP_OPENAI = "openai>=1.104.2,<2"
 _CONSTRAINTS = Path(__file__).resolve().parent / "langgraph-constraints.txt"
 
 _TERMINAL_BATCH = {"success", "dead", "killed", "error"}
@@ -61,7 +62,11 @@ def _amp_runtime() -> bool:
 
 
 def langgraph_pip_packages(*, amp: bool | None = None) -> list[str]:
-    """Package specs that coexist with CML langchain 0.3 (langchain-core<0.4)."""
+    """Package specs that coexist with CML langchain 0.3 (langchain-core<0.4).
+
+    AMP does not install or pin protobuf (CML plugins disagree: mlflow 4.25.3 vs raz-client 7.34.0).
+    AMP skips Anthropic unless ANTHROPIC_API_KEY or LANGGRAPH_INSTALL_ANTHROPIC is set.
+    """
     packages = list(LANGGRAPH_PIP_PACKAGES)
     if amp is None:
         amp = _amp_runtime()
@@ -69,14 +74,14 @@ def langgraph_pip_packages(*, amp: bool | None = None) -> list[str]:
         core = _dist_version("langchain-core")
         if core and core.startswith("0.3."):
             packages = [item for item in packages if not item.startswith("langchain-core")]
-        proto = _dist_version("protobuf")
-        if proto:
-            try:
-                proto_major = int(proto.split(".", 1)[0])
-            except ValueError:
-                proto_major = 0
-            if proto_major >= 6:
-                packages.append("protobuf>=3.12.0,<6")
+        packages.append(_AMP_OPENAI)
+        want_anthropic = bool(
+            (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("LANGGRAPH_INSTALL_ANTHROPIC") or "").strip()
+        )
+        if want_anthropic:
+            packages.append(_ANTHROPIC_EXTRA)
+    else:
+        packages.append(_ANTHROPIC_EXTRA)
     return packages
 
 
@@ -121,6 +126,11 @@ def install_langgraph_deps(*, root: Path | None = None) -> list[str]:
     print("langgraph pip:", " ".join(packages))
     subprocess.check_call(cmd, cwd=str(root or Path.cwd()))
     print("langchain-core:", require_langchain_core_03())
+    if amp:
+        print(
+            "note: ignore CML pip pin warnings (protobuf / typing-extensions). "
+            "This install does not change protobuf. langchain-core must stay 0.3.x."
+        )
     return packages
 
 

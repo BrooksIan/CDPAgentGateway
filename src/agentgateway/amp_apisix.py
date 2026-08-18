@@ -30,7 +30,7 @@ from agentgateway.amp import (
     serve_cml_app,
     startup_error_app,
 )
-from agentgateway.env import agent_caller_key, load_env, render_apisix_yaml
+from agentgateway.env import agent_caller_key, load_env, mcp_adapter_enabled, render_apisix_yaml
 from agentgateway.keys import fetch_pinned_knox_pubkey
 from agentgateway.paths import repo_root
 
@@ -260,10 +260,12 @@ _MCP_ADAPTER_DIRS = {
 }
 
 
-def load_python_edge_mcp_endpoints() -> dict:
-    """Load MCP adapter endpoints in-process. CML cannot hairpin to sibling app HTTPS."""
+def load_python_edge_mcp_endpoints(values: dict[str, str] | None = None) -> dict:
+    """Load enabled MCP adapters in-process. CML cannot hairpin to sibling app HTTPS."""
     endpoints: dict = {}
     for adapter, (module_name, directory) in _MCP_ADAPTER_DIRS.items():
+        if not mcp_adapter_enabled(adapter, values):
+            continue
         try:
             endpoints[adapter] = _load_module(module_name, directory).mcp_endpoint
         except Exception as extra:  # noqa: BLE001 — hive extra is optional on AMP
@@ -303,7 +305,8 @@ def build_python_edge_app():
     prefix = (values.get("KNOX_PROXY_PREFIX") or "").rstrip("/")
     knox = _knox_origin()
     caller = agent_caller_key(values)
-    endpoints = load_python_edge_mcp_endpoints()
+    endpoints = load_python_edge_mcp_endpoints(values)
+    disabled = [name for name in ("spark", "hive", "impala") if not mcp_adapter_enabled(name, values)]
 
     async def health(_request: Request) -> JSONResponse:
         return JSONResponse(
@@ -314,6 +317,7 @@ def build_python_edge_app():
                 "engine": "python",
                 "mcp": "inprocess",
                 "adapters": sorted(endpoints),
+                "disabled": disabled,
             }
         )
 
@@ -364,6 +368,8 @@ def build_python_edge_app():
                 break
         if adapter is None:
             return JSONResponse({"error": "not_found"}, status_code=404)
+        if not mcp_adapter_enabled(adapter, values):
+            return JSONResponse({"error": "adapter_disabled", "reason": adapter}, status_code=404)
         handler = endpoints.get(adapter)
         if handler is None:
             return JSONResponse({"error": "adapter_unavailable", "reason": adapter}, status_code=503)

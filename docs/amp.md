@@ -51,6 +51,7 @@ If applications exist but stay Starting or Failed, open Application logs. Typica
 - Install wrote packages into the session engine instead of `/home/cdsw/.local` (`pip install --user` is required).
 - CML applications run in IPython, which already has an asyncio loop. AMP starts uvicorn in a background thread instead of `asyncio.run`.
 - `KNOX_PROXY_URL` must be set in **Project Settings → Environment**. An empty value skips JWKS pin; MCP POSTs then fail closed until you set it and rerun Fetch pinned Knox JWKS.
+- `GET /health` with `"error": "JSONDecodeError"` means Knox JWKS returned HTML or an empty body (common when the derived URL is `api/v1` and the cluster only serves `api/v2`). Set `KNOX_JWKS_URL` to the inventoried `.../homepage/knoxtoken/api/v2/jwks.json`, keep `UPSTREAM_TLS_VERIFY=false` for lab CAs, push this repo, then **Restart** Agent gateway. A healthy Python edge returns `"engine": "python"`.
 - The process exited before listening on `127.0.0.1:$CDSW_APP_PORT` (CML probes loopback, not `0.0.0.0`).
 - User CPU/memory quota cannot schedule four apps (each 1 CPU / 1 GB). Drop other workloads or raise the quota.
 - Static subdomains `mcp-spark`, `mcp-hive`, `mcp-impala`, or `gateway-admin` already exist from a previous AMP attempt.
@@ -61,7 +62,7 @@ Push this repo to GitHub, then **Redeploy** the AMP so the workbench re-imports 
 
 | Subdomain | CML login | Role |
 | --- | --- | --- |
-| **`agent-gateway`** | Bypassed | **APISIX agent edge.** `/mcp/spark`, `/mcp/hive`, `/mcp/impala`, `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`. Knox JWT + optional `X-Agent-Key`. Requires Docker and Fetch JWKS PEM. |
+| **`agent-gateway`** | Bypassed | **Agent edge.** Docker APISIX when `docker` exists; otherwise Python (`engine: python`). `/mcp/spark`, `/mcp/hive`, `/mcp/impala`, `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`. Knox JWT + optional `X-Agent-Key`. |
 | `mcp-spark` | Bypassed (MCP hosts cannot send CML cookies) | MCP adapter upstream. Direct URL still works (Python JWT). Prefer `agent-gateway`. |
 | `mcp-hive` | Bypassed | POST JSON-RPC Hive (read-only). Knox JWT required. `/cdp/hive` is not this app. |
 | `mcp-impala` | Bypassed | POST JSON-RPC Impala (read-only). Knox JWT required. `/cdp/impala` is not this app. CDW `HTTP code 401` after a valid JWT is warehouse trust, not APISIX. |

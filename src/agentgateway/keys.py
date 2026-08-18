@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import ssl
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -70,10 +71,42 @@ def jwk_to_pem(jwk: dict) -> bytes:
     )
 
 
+def jwks_url_candidates(primary: str) -> list[str]:
+    """Public Cloud Knox often serves JWKS at api/v2; parse_knox_proxy_url still emits v1."""
+    ordered: list[str] = []
+    for url in (primary,):
+        text = (url or "").strip()
+        if text and text not in ordered:
+            ordered.append(text)
+        if "/api/v1/jwks.json" in text:
+            alt = text.replace("/api/v1/jwks.json", "/api/v2/jwks.json")
+            if alt not in ordered:
+                ordered.append(alt)
+        elif "/api/v2/jwks.json" in text:
+            alt = text.replace("/api/v2/jwks.json", "/api/v1/jwks.json")
+            if alt not in ordered:
+                ordered.append(alt)
+    return ordered
+
+
 def fetch_knox_pubkey(jwks_url: str, out: Path, *, insecure: bool = False) -> Path:
     context = ssl._create_unverified_context() if insecure else ssl.create_default_context()
-    with urllib.request.urlopen(jwks_url, context=context, timeout=15) as response:
-        body = json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(jwks_url, context=context, timeout=15) as response:
+            raw = response.read()
+            status = getattr(response, "status", 200)
+    except urllib.error.HTTPError as extra:
+        snippet = extra.read()[:80].decode("utf-8", "replace").replace("\n", " ")
+        raise ValueError(f"JWKS HTTP {extra.code} from {jwks_url}: {snippet!r}") from extra
+    except urllib.error.URLError as extra:
+        raise ValueError(f"JWKS unreachable {jwks_url}: {extra.reason}") from extra
+    text = raw.decode("utf-8", "replace").lstrip("\ufeff").strip()
+    if status >= 400 or not text or text[0] not in "{[":
+        raise ValueError(f"JWKS URL did not return JSON (HTTP {status}): {jwks_url}")
+    try:
+        body = json.loads(text)
+    except json.JSONDecodeError as extra:
+        raise ValueError(f"JWKS URL did not return JSON: {jwks_url}") from extra
     keys = body.get("keys") or []
     if not keys:
         raise ValueError("JWKS document contained no keys")
@@ -93,8 +126,18 @@ def fetch_pinned_knox_pubkey(
     from agentgateway.knox import parse_knox_proxy_url, trusted_jku
 
     parsed = parse_knox_proxy_url(knox_proxy_url)
-    url = (jwks_url or parsed.get("KNOX_JWKS_URL") or "").strip()
-    if not url:
+    explicit = (jwks_url or "").strip()
+    candidates: list[str] = []
+    for url in (*jwks_url_candidates(explicit), *jwks_url_candidates(parsed.get("KNOX_JWKS_URL") or "")):
+        if url not in candidates:
+            candidates.append(url)
+    if not candidates:
         raise ValueError("Need KNOX_JWKS_URL or a Knox proxy URL that implies one")
-    trusted_jku(url, parsed["UPSTREAM_HOST"])
-    return fetch_knox_pubkey(url, out, insecure=insecure)
+    errors: list[str] = []
+    for url in candidates:
+        trusted_jku(url, parsed["UPSTREAM_HOST"])
+        try:
+            return fetch_knox_pubkey(url, out, insecure=insecure)
+        except ValueError as extra:
+            errors.append(str(extra))
+    raise ValueError("Knox JWKS was not JSON. Tried: " + " | ".join(errors[:4]))

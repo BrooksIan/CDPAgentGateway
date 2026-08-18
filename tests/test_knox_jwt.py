@@ -85,6 +85,74 @@ def test_fetch_pinned_jwks_refuses_foreign_host(tmp_path: Path) -> None:
         )
 
 
+def test_jwks_url_candidates_adds_v2() -> None:
+    from agentgateway.keys import jwks_url_candidates
+
+    v1 = "https://knox.example.com/gateway/homepage/knoxtoken/api/v1/jwks.json"
+    assert jwks_url_candidates(v1) == [
+        v1,
+        "https://knox.example.com/gateway/homepage/knoxtoken/api/v2/jwks.json",
+    ]
+
+
+def test_fetch_knox_pubkey_rejects_empty_body(tmp_path: Path) -> None:
+    from agentgateway.keys import fetch_knox_pubkey
+
+    class _Empty:
+        status = 200
+
+        def read(self) -> bytes:
+            return b""
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> bool:
+            return False
+
+    with patch("urllib.request.urlopen", return_value=_Empty()):
+        with pytest.raises(ValueError, match="did not return JSON"):
+            fetch_knox_pubkey("https://knox.example.com/jwks.json", tmp_path / "out.pem")
+
+
+def test_fetch_pinned_falls_back_to_v2_jwks(tmp_path: Path) -> None:
+    from agentgateway.keys import fetch_pinned_knox_pubkey
+
+    generate_test_keys()
+    jwks = (ROOT / "conf" / "keys" / "jwks.json").read_bytes()
+
+    class _Resp:
+        status = 200
+
+        def __init__(self, body: bytes) -> None:
+            self._body = body
+
+        def read(self) -> bytes:
+            return self._body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> bool:
+            return False
+
+    def _open(url: str, context=None, timeout=None):
+        if "/api/v1/jwks.json" in url:
+            return _Resp(b"<html>knox login</html>")
+        if "/api/v2/jwks.json" in url:
+            return _Resp(jwks)
+        raise AssertionError(url)
+
+    with patch("urllib.request.urlopen", side_effect=_open):
+        out = fetch_pinned_knox_pubkey(
+            knox_proxy_url="https://knox.example.com/gateway/cdp-proxy-token/livy_for_spark3/",
+            jwks_url=None,
+            out=tmp_path / "knox-public.pem",
+            insecure=True,
+        )
+    assert out.read_bytes().startswith(b"-----BEGIN PUBLIC KEY-----")
+
+
 def test_www_authenticate_includes_resource_metadata() -> None:
     value = www_authenticate(
         realm="knox",

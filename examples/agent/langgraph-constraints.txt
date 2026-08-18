@@ -1,0 +1,7 @@
+# Cloudera AI Workbench (AMP) ships langchain 0.3, langchain-aws, and mlflow with protobuf<6.
+# Do not install langchain-core 1.x or protobuf 7 into that engine.
+langchain-core>=0.3.85,<0.4
+langgraph>=0.3.5,<0.4
+langchain-openai>=0.3,<0.4
+langchain-anthropic>=0.3,<0.4
+protobuf>=3.12.0,<6

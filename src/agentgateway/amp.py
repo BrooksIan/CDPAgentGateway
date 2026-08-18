@@ -68,6 +68,9 @@ def apply_live_upstream() -> dict[str, str]:
     os.environ.setdefault("ADMIN_BACKEND", "sqlite")
     os.environ.setdefault("ADMIN_DB", str(repo_root() / "data" / "gateway.sqlite"))
     os.environ.setdefault("GATEWAY_MODE", "live")
+    admin = str(repo_root() / "admin")
+    if admin not in sys.path:
+        sys.path.append(admin)
     return parsed
 
 

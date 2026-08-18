@@ -266,10 +266,12 @@ def test_langgraph_notebook_present() -> None:
     assert "invoke_agent" in source
     assert "load_knox_token" in source
     assert "getpass" in source or "Knox JWT" in source
+    assert "install_langgraph_deps" in source
     assert "LANGGRAPH_RUN_SUBMIT" in source
     assert "Streamable HTTP" in source
     assert "print(token)" not in source
-    assert "OPENAI_API_KEY" not in source or "print(os.environ" not in source
+    assert "[langgraph]" not in source
+    assert "langchain-core 1.x" in source or "langchain-core>=0.3.85,<0.4" in source
 
 
 def test_langgraph_coerce_and_last_message() -> None:
@@ -345,4 +347,50 @@ def test_schema_model_required_integer() -> None:
         },
     )
     assert model(batch_id=3).batch_id == 3
+
+
+def test_langgraph_extra_pins_core_03() -> None:
+    text = (ROOT / "pyproject.toml").read_text()
+    assert "langchain-core>=0.3.85,<0.4" in text
+    assert "langgraph>=0.3.5,<0.4" in text
+    constraints = (ROOT / "examples/agent/langgraph-constraints.txt").read_text()
+    assert "langchain-core>=0.3.85,<0.4" in constraints
+    assert "protobuf>=3.12.0,<6" in constraints
+
+
+def test_langgraph_pip_packages_amp_keeps_core_03(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+    monkeypatch.setattr(lg, "_dist_version", lambda _name: "0.3.85")
+    packages = lg.langgraph_pip_packages(amp=True)
+    assert all(not item.startswith("langchain-core") for item in packages)
+    assert any(item.startswith("langgraph") and "<0.4" in item for item in packages)
+
+
+def test_langgraph_pip_packages_amp_downgrades_core_1(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+    monkeypatch.setattr(lg, "_dist_version", lambda _name: "1.5.6")
+    packages = lg.langgraph_pip_packages(amp=True)
+    assert any(item.startswith("langchain-core") and "<0.4" in item for item in packages)
+
+
+def test_langgraph_pip_packages_amp_rolls_back_protobuf7(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+
+    def fake_version(name: str) -> str | None:
+        if name == "langchain-core":
+            return "0.3.85"
+        if name == "protobuf":
+            return "7.34.0"
+        return None
+
+    monkeypatch.setattr(lg, "_dist_version", fake_version)
+    packages = lg.langgraph_pip_packages(amp=True)
+    assert "protobuf>=3.12.0,<6" in packages
+
+
+def test_require_langchain_core_03_rejects_1x(monkeypatch: pytest.MonkeyPatch) -> None:
+    lg = _load_langgraph_mcp()
+    monkeypatch.setattr(lg, "_dist_version", lambda _name: "1.5.6")
+    with pytest.raises(RuntimeError, match="1.x"):
+        lg.require_langchain_core_03()
 

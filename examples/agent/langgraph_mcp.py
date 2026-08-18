@@ -12,7 +12,11 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import subprocess
+import sys
 import time
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Any
 
 from mcp_agent import (
@@ -21,6 +25,16 @@ from mcp_agent import (
     list_gateway_tools,
     load_knox_token,
 )
+
+# CML workbench ships langchain 0.3 / langchain-aws (langchain-core<0.4). LangGraph 1.x
+# pulls langchain-core 1.x and breaks that runtime. Keep the 0.3 line.
+LANGGRAPH_PIP_PACKAGES = (
+    "langgraph>=0.3.5,<0.4",
+    "langchain-core>=0.3.85,<0.4",
+    "langchain-openai>=0.3,<0.4",
+    "langchain-anthropic>=0.3,<0.4",
+)
+_CONSTRAINTS = Path(__file__).resolve().parent / "langgraph-constraints.txt"
 
 _TERMINAL_BATCH = {"success", "dead", "killed", "error"}
 
@@ -33,6 +47,81 @@ SYSTEM_PROMPT = (
     "Hive and Impala tools are read-only: named columns only, limit at most 50, no SELECT *, "
     "no WHERE, no DDL/DML. /cdp/hive and /cdp/impala are unpublished."
 )
+
+
+def _dist_version(name: str) -> str | None:
+    try:
+        return version(name)
+    except PackageNotFoundError:
+        return None
+
+
+def _amp_runtime() -> bool:
+    return bool(os.environ.get("CDSW_PROJECT") or os.environ.get("CDSW_DOMAIN"))
+
+
+def langgraph_pip_packages(*, amp: bool | None = None) -> list[str]:
+    """Package specs that coexist with CML langchain 0.3 (langchain-core<0.4)."""
+    packages = list(LANGGRAPH_PIP_PACKAGES)
+    if amp is None:
+        amp = _amp_runtime()
+    if amp:
+        core = _dist_version("langchain-core")
+        if core and core.startswith("0.3."):
+            packages = [item for item in packages if not item.startswith("langchain-core")]
+        proto = _dist_version("protobuf")
+        if proto:
+            try:
+                proto_major = int(proto.split(".", 1)[0])
+            except ValueError:
+                proto_major = 0
+            if proto_major >= 6:
+                packages.append("protobuf>=3.12.0,<6")
+    return packages
+
+
+def require_langchain_core_03() -> str:
+    """Fail closed if this engine has langchain-core 1.x (breaks CML langchain 0.3)."""
+    core = _dist_version("langchain-core")
+    if not core:
+        raise RuntimeError("langchain-core is not installed")
+    major = int(core.split(".", 1)[0])
+    if major >= 1:
+        raise RuntimeError(
+            f"langchain-core {core} is 1.x; Cloudera AI Workbench langchain 0.3 needs <0.4. "
+            "Restart this session, then re-run the install cell "
+            "(it pins langchain-core>=0.3.85,<0.4). Do not pip install langchain-core 1.x on AMP."
+        )
+    loaded = sys.modules.get("langchain_core")
+    loaded_ver = getattr(loaded, "__version__", "") if loaded is not None else ""
+    if loaded_ver.startswith("1."):
+        raise RuntimeError(
+            "This kernel still has langchain-core 1.x imported. Restart the kernel and re-run."
+        )
+    return core
+
+
+def install_langgraph_deps(*, root: Path | None = None) -> list[str]:
+    """Install the 0.3-line LangGraph stack. On AMP, do not reinstall the gateway extra."""
+    amp = _amp_runtime()
+    packages = langgraph_pip_packages(amp=amp)
+    cmd = [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "--upgrade-strategy",
+        "only-if-needed",
+    ]
+    if amp:
+        cmd.append("--user")
+    if _CONSTRAINTS.is_file():
+        cmd.extend(["-c", str(_CONSTRAINTS)])
+    cmd.extend(packages)
+    print("langgraph pip:", " ".join(packages))
+    subprocess.check_call(cmd, cwd=str(root or Path.cwd()))
+    print("langchain-core:", require_langchain_core_03())
+    return packages
 
 
 def _python_type(spec: dict[str, Any]) -> Any:

@@ -16,6 +16,17 @@ TIMEOUT = 2.0
 _sqlite_cache: dict[str, Any] = {}
 
 
+def _store():
+    """admin/store.py. Do not rely on pytest pythonpath; AMP unloads adapter dirs after import."""
+    import importlib
+    import sys
+
+    admin = str(Path(__file__).resolve().parents[1] / "admin")
+    if admin not in sys.path:
+        sys.path.append(admin)
+    return importlib.import_module("store")
+
+
 class QuotaDenied(Exception):
     def __init__(self, decision: dict[str, Any]):
         super().__init__("gateway quota exceeded for this Knox user")
@@ -39,22 +50,20 @@ def _headers() -> dict[str, str]:
 
 
 def _sqlite_db():
-    from store import connect
-
+    store = _store()
     path = os.environ.get("ADMIN_DB") or "/data/gateway.sqlite"
     cached = _sqlite_cache.get(path)
     if cached is None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        cached = connect(path)
+        cached = store.connect(path)
         _sqlite_cache[path] = cached
     return cached
 
 
 def admit(*, sub: str | None, tool: str, request_id: str | None, token_id: str | None) -> dict[str, Any] | None:
     if _backend() == "sqlite":
-        from store import admit as store_admit
-
-        decision = store_admit(
+        store = _store()
+        decision = store.admit(
             _sqlite_db(),
             sub=sub or "unknown",
             tool=tool,
@@ -92,9 +101,8 @@ def record(
     status: int | None = None,
 ) -> None:
     if _backend() == "sqlite":
-        from store import record_event
-
-        record_event(
+        store = _store()
+        store.record_event(
             _sqlite_db(),
             sub=sub or "unknown",
             tool=tool,

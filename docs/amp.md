@@ -162,7 +162,7 @@ AMP is JWT-only for the agent product. Compose MCP caller keys and Phase 3 mTLS 
 | `6_app-mcp-impala/` | Impala MCP application |
 | `7_app-agent-gateway/` | APISIX application (Docker, knox-jwt.lua, same routes as Compose) |
 | `examples/agent/third_party_agent.ipynb` | Workbench notebook: simulate a third-party MCP host against the AMP apps |
-| `examples/agent/langgraph_agent.ipynb` | Workbench LangGraph ReAct agent over the same MCP tools (needs a model API key in the engine, not project env) |
+| `examples/agent/langgraph_agent.ipynb` | Workbench LangGraph ReAct agent over the same MCP tools (LangGraph / langchain-core 0.3.x; model API key in the engine, not project env) |
 
 Paste a Knox JWT in the notebook token cell (`getpass`), or set `KNOX_TOKEN` for that engine only. Do not add `KNOX_TOKEN` or model API keys to project environment or `.project-metadata.yaml`. Override MCP URLs with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if needed. Default is `https://agent-gateway.<CDSW_DOMAIN>/mcp/*`.
 

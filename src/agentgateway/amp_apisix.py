@@ -382,7 +382,11 @@ def build_python_edge_app():
                 flush=True,
             )
             return JSONResponse(
-                {"error": "mcp_adapter_failed", "reason": type(extra).__name__},
+                {
+                    "error": "mcp_adapter_failed",
+                    "reason": type(extra).__name__,
+                    "detail": str(extra).replace("\n", " ")[:200],
+                },
                 status_code=502,
             )
 

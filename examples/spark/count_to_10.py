@@ -58,8 +58,16 @@ def resolve_target(spark: SparkSession, argv: list[str]) -> tuple[str, str]:
     return hive_ident(database, field="database"), hive_ident(table, field="table")
 
 
+def spark_session() -> SparkSession:
+    """Reuse Livy's SparkSession. A second builder.appName().enableHiveSupport() starts another YARN app."""
+    active = SparkSession.getActiveSession()
+    if active is not None:
+        return active
+    return SparkSession.builder.appName("count-to-10").enableHiveSupport().getOrCreate()
+
+
 def main(argv: list[str] | None = None) -> None:
-    spark = SparkSession.builder.appName("count-to-10").enableHiveSupport().getOrCreate()
+    spark = spark_session()
     database, table = resolve_target(spark, argv if argv is not None else sys.argv)
     qualified = f"`{database}`.`{table}`"
 
@@ -91,7 +99,7 @@ def main(argv: list[str] | None = None) -> None:
         f"gateway mcp --adapter hive --tool hive_select "
         f"--arg database={database} --arg table={table} --arg columns=n --arg limit=10"
     )
-    spark.stop()
+    # Livy owns this session; stopping it here starts a second YARN application.
 
 
 if __name__ == "__main__":

@@ -15,4 +15,5 @@ def test_count_to_10_example_is_valid_python() -> None:
     assert "SparkSession" in source
     assert "iceberg" in source
     assert "hive_select" in source
-    assert "enableHiveSupport" in source
+    assert "getActiveSession" in source
+    assert "spark.stop(" not in source

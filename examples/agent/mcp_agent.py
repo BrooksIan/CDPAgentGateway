@@ -366,6 +366,45 @@ def spark_job_uri(knox_user: str) -> str:
     return f"hdfs:///user/{user}/examples/count_to_10.py"
 
 
+_REUSE_BATCH_STATES = frozenset({"not_started", "starting", "running", "recovering", "success"})
+
+
+def existing_spark_batch(name: str = "count-to-10") -> dict[str, Any] | None:
+    """Newest Livy batch with this name that is in-flight or already succeeded."""
+    payload = require_tool_ok(tools_call("spark_list_batches", {}, adapter="spark"))
+    items = payload.get("items") or []
+    named = [item for item in items if isinstance(item, dict) and str(item.get("name") or "") == name]
+    named.sort(key=lambda item: int(item["id"]) if str(item.get("id", "")).isdigit() else -1, reverse=True)
+    for batch in named:
+        if str(batch.get("state") or "").lower() in _REUSE_BATCH_STATES and batch.get("id") is not None:
+            return batch
+    return None
+
+
+def submit_spark_example(
+    *,
+    file_uri: str,
+    name: str = "count-to-10",
+    force: bool | None = None,
+) -> dict[str, Any]:
+    """Submit count-to-10, or reuse an in-flight/success batch so a notebook re-run does not double Livy."""
+    if force is None:
+        force = os.environ.get("SPARK_FORCE_SUBMIT", "").strip().lower() in {"1", "true", "yes"}
+    if not force:
+        found = existing_spark_batch(name)
+        if found is not None:
+            return {**found, "reused": True, "submitted": False}
+    submit = require_tool_ok(
+        tools_call(
+            "spark_submit_batch",
+            {"file": file_uri, "name": name},
+            adapter="spark",
+            timeout=120.0,
+        )
+    )
+    return {**submit, "reused": False}
+
+
 def poll_spark_batch(
     batch_id: int,
     *,

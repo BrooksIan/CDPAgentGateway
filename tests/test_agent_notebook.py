@@ -246,10 +246,66 @@ def test_poll_spark_batch_returns_on_success(monkeypatch: pytest.MonkeyPatch) ->
     assert calls["n"] == 2
 
 
+def test_submit_spark_example_reuses_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def fake_tools_call(name, arguments=None, **kwargs):
+        calls.append(name)
+        if name == "spark_list_batches":
+            return {
+                "isError": False,
+                "content": [
+                    {
+                        "text": json.dumps(
+                            {
+                                "kind": "batches",
+                                "items": [
+                                    {"id": 1, "name": "count-to-10", "state": "dead"},
+                                    {"id": 4, "name": "count-to-10", "state": "success"},
+                                    {"id": 2, "name": "other", "state": "running"},
+                                ],
+                            }
+                        )
+                    }
+                ],
+            }
+        raise AssertionError(f"unexpected tool {name}")
+
+    monkeypatch.setattr(mcp_agent, "tools_call", fake_tools_call)
+    result = mcp_agent.submit_spark_example(file_uri="hdfs:///user/a/count_to_10.py")
+    assert result["id"] == 4
+    assert result["reused"] is True
+    assert result["submitted"] is False
+    assert calls == ["spark_list_batches"]
+
+
+def test_submit_spark_example_force_submits(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def fake_tools_call(name, arguments=None, **kwargs):
+        calls.append(name)
+        if name == "spark_submit_batch":
+            return {
+                "isError": False,
+                "content": [{"text": json.dumps({"id": 9, "state": "starting", "name": arguments["name"]})}],
+            }
+        raise AssertionError(f"unexpected tool {name}")
+
+    monkeypatch.setattr(mcp_agent, "tools_call", fake_tools_call)
+    result = mcp_agent.submit_spark_example(
+        file_uri="hdfs:///user/a/count_to_10.py",
+        force=True,
+    )
+    assert result["id"] == 9
+    assert result["reused"] is False
+    assert calls == ["spark_submit_batch"]
+
+
 def test_notebook_runs_spark_to_hive_example() -> None:
     nb = json.loads((ROOT / "examples/agent/third_party_agent.ipynb").read_text())
     source = "".join("".join(cell.get("source") or []) for cell in nb["cells"])
     assert "spark_submit_batch" in source
+    assert "submit_spark_example" in source
     assert "hive_select" in source
     assert "poll_spark_batch" in source
     assert "load_knox_token" in source
@@ -392,6 +448,7 @@ def test_langgraph_notebook_present() -> None:
     assert "Model ID" in source
     assert "Model token" in source
     assert "LANGGRAPH_RUN_SUBMIT" in source
+    assert "submit_spark_example" in source
     assert "Streamable HTTP" in source
     assert "print(token)" not in source
     assert "[langgraph]" not in source

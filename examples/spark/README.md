@@ -30,7 +30,7 @@ gateway mcp --tool spark_submit_batch \
   --arg name=count-to-10
 ```
 
-Do not pass `--arg args=…` unless Livy on this cluster accepts batch `args` (this environment returned HTTP 400 when they were set). Defaults: Spark user as database, table `count_to_10`. Optional args, if used, are `<database> <table>`. Ranger must allow that subject to create the database/table. The cluster must already expose Iceberg on `spark_catalog` (CDE Spark 3 does).
+Do not pass `--arg args=…` unless Livy on this cluster accepts batch `args` (this environment returned HTTP 400 when they were set). Defaults: Spark user as database, table `count_to_10`. Optional args, if used, are `<database> <table>`. Ranger must allow that subject to create the database/table. The cluster must already expose Iceberg on `spark_catalog` (CDE Spark 3 does). The script reuses Livy's SparkSession and does not `spark.stop()`; a second `SparkSession.builder` in the same batch starts another YARN application. After changing the file, run `gateway webhdfs put` again.
 
 Poll:
 

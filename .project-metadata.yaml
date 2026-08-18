@@ -327,7 +327,7 @@ tasks:
     bypass_authentication: false
     static_subdomain: true
     short_summary: Usage and quotas for operators. CML login required. Not an MCP route.
-    description: Agent governance console: usage, quotas, and audit join. CML login required. Not an MCP route.
+    description: "Agent governance console: usage, quotas, and audit join. CML login required. Not an MCP route."
 
   - type: start_application
     name: Agent gateway (APISIX)
@@ -357,7 +357,7 @@ tasks:
     bypass_authentication: true
     static_subdomain: true
     short_summary: APISIX agent edge with knox-jwt.lua. Same routes as Compose on live Knox.
-    description: Agent governance edge: public MCP and /cdp/* allowlist through Apache APISIX.
+    description: "Agent governance edge: public MCP and /cdp/* allowlist through Apache APISIX."
     long_summary: >-
       Runs the same apache/apisix image as Compose, bound to CDSW_APP_PORT. Validates Knox
       RS256 with the pinned PEM, enforces optional X-Agent-Key on MCP, and proxies to the

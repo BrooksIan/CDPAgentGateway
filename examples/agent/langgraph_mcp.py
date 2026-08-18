@@ -364,10 +364,19 @@ def _drop_auto_tool_choice(payload: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _omit_vllm_auto_tool_choice(llm: Any) -> Any:
-    """Keep `tools` on the request but do not send tool_choice=auto (vLLM 400)."""
+def _set_llm_method(llm: Any, name: str, func: Any) -> None:
+    """Bind a method on ChatOpenAI without Pydantic rejecting extra fields."""
     import types
 
+    method = types.MethodType(func, llm)
+    try:
+        object.__setattr__(llm, name, method)
+    except (TypeError, ValueError, AttributeError):
+        setattr(llm, name, method)
+
+
+def _omit_vllm_auto_tool_choice(llm: Any) -> Any:
+    """Keep `tools` on the request but do not send tool_choice=auto (vLLM 400)."""
     orig_bind = llm.bind_tools
 
     def bind_tools(self, tools, *, tool_choice=None, **kwargs):  # noqa: ANN001
@@ -379,7 +388,7 @@ def _omit_vllm_auto_tool_choice(llm: Any) -> Any:
                 return orig_bind(tools, **kwargs)
         return orig_bind(tools, tool_choice=tool_choice, **kwargs)
 
-    llm.bind_tools = types.MethodType(bind_tools, llm)
+    _set_llm_method(llm, "bind_tools", bind_tools)
 
     if hasattr(llm, "_get_request_payload"):
         orig_payload = llm._get_request_payload
@@ -390,7 +399,7 @@ def _omit_vllm_auto_tool_choice(llm: Any) -> Any:
                 return _drop_auto_tool_choice(payload)
             return payload
 
-        llm._get_request_payload = types.MethodType(_get_request_payload, llm)
+        _set_llm_method(llm, "_get_request_payload", _get_request_payload)
 
     orig_generate = llm._generate
 
@@ -402,7 +411,7 @@ def _omit_vllm_auto_tool_choice(llm: Any) -> Any:
         except TypeError:
             return orig_generate(messages, stop=stop, **kwargs)
 
-    llm._generate = types.MethodType(_generate, llm)
+    _set_llm_method(llm, "_generate", _generate)
 
     client = getattr(llm, "client", None)
     orig_create = getattr(client, "create", None) if client is not None else None
@@ -413,7 +422,13 @@ def _omit_vllm_auto_tool_choice(llm: Any) -> Any:
                 kwargs = {key: value for key, value in kwargs.items() if key != "tool_choice"}
             return orig_create(*args, **kwargs)
 
-        client.create = create
+        try:
+            object.__setattr__(client, "create", create)
+        except (TypeError, ValueError, AttributeError):
+            try:
+                client.create = create
+            except (TypeError, ValueError, AttributeError):
+                pass
     return llm
 
 

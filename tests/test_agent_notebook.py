@@ -524,6 +524,23 @@ def test_should_omit_auto_tool_choice_on_custom_url(monkeypatch: pytest.MonkeyPa
     assert lg._should_omit_auto_tool_choice(None) is True
 
 
+def test_set_llm_method_bypasses_pydantic() -> None:
+    lg = _load_langgraph_mcp()
+
+    class FakeModel:
+        model_config = {"extra": "forbid"}
+
+        def __setattr__(self, name: str, value: object) -> None:
+            raise ValueError(f'"{type(self).__name__}" object has no field "{name}"')
+
+        def bind_tools(self, tools, **kwargs):
+            return tools
+
+    llm = FakeModel()
+    lg._set_llm_method(llm, "bind_tools", lambda self, tools, **kwargs: ("patched", tools))
+    assert llm.bind_tools(["x"])[0] == "patched"
+
+
 def test_omit_vllm_auto_tool_choice_strips_payload(monkeypatch: pytest.MonkeyPatch) -> None:
     lg = _load_langgraph_mcp()
     monkeypatch.setenv("MODEL_URL", "https://vllm.example/v1")

@@ -42,7 +42,7 @@ gateway mcp --tool spark_get_log --arg batch_id=0
 
 When the log shows `iceberg_table=…` (or `spark_get_batch` is `success`), Spark History lists `count-to-10` as the Knox subject:
 
-![Spark History: count-to-10 batch as the Knox subject](../../assets/Spark_History_agentActivity.png)
+![Third-party agent in Spark History: count-to-10 as the Knox subject](../../assets/Spark_History_agentActivity.png)
 
 Then query Hive: [examples/hive/README.md](../hive/README.md). The same Spark → Hive path as a third-party MCP host (and as **LangGraph**) is [examples/agent/](../agent/README.md).
 

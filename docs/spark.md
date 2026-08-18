@@ -194,7 +194,7 @@ gateway mcp --tool spark_submit_batch \
 
 Poll with `spark_get_batch` until `state` is `success` or `dead`. Spark History lists the same batch (`count-to-10`) as the Knox subject:
 
-![Spark History: count-to-10 batch as the Knox subject](../assets/Spark_History_agentActivity.png)
+![Third-party agent in Spark History: count-to-10 as the Knox subject](../assets/Spark_History_agentActivity.png)
 
 Then query Hive (same JWT): [hive.md](hive.md), [examples/hive/README.md](../examples/hive/README.md). The same Spark → Hive path as a third-party MCP host, including **LangGraph**, is [examples/agent/](../examples/agent/README.md).
 

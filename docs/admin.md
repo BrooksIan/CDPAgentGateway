@@ -60,9 +60,9 @@ Usage is per UTC day, keyed by Knox `sub`. Click a request id in Activity (or pa
 
 ![Activity log: tool calls keyed by Knox user and request id](../assets/admin-activity.png)
 
-Live Spark and Hive MCP calls (`spark_submit_batch`, `hive_select`, `hive_describe_table`) appear on the same console, keyed by Knox `sub` and `X-Request-Id`:
+Live third-party agent calls (`spark_submit_batch`, `hive_select`, `hive_describe_table`) appear on the same console, keyed by Knox `sub` and `X-Request-Id`:
 
-![Operator console: Spark and Hive MCP usage keyed by Knox sub](../assets/Agent_audit_activity.png)
+![Third-party agent in operator console: Spark and Hive MCP activity](../assets/Agent_audit_activity.png)
 
 ## What it is not
 

@@ -69,7 +69,7 @@ gateway mcp --adapter hive --tool hive_select \
 
 Ranger records those reads on `{user}.count_to_10`. Data Catalog **Access Audits** shows `ALLOWED` `SELECT` as the Knox `sub`:
 
-![Data Catalog access audits for count_to_10 after Hive MCP select](../../assets/CDP_agent_activity.png)
+![Third-party agent in Data Catalog: access audits for count_to_10](../../assets/CDP_agent_activity.png)
 
 Third-party agents (scripted MCP host and **LangGraph**) run this same path from [examples/agent/](../agent/README.md).
 

@@ -46,11 +46,11 @@ Third-party agents are demonstrated with the Jupyter notebooks in [`examples/age
 
 On a live cluster that notebook path is what produces the Spark History, Data Catalog, and operator activity evidence below: `spark_submit_batch` writes `{user}.count_to_10` as the Knox subject, then Hive MCP selects it.
 
-![Spark History: count-to-10 batch as the Knox subject](assets/Spark_History_agentActivity.png)
+![Third-party agent in Spark History: count-to-10 as the Knox subject](assets/Spark_History_agentActivity.png)
 
-![Data Catalog access audits for count_to_10 after Hive MCP select](assets/CDP_agent_activity.png)
+![Third-party agent in Data Catalog: access audits for count_to_10](assets/CDP_agent_activity.png)
 
-![Operator console: Spark and Hive MCP usage keyed by Knox sub](assets/Agent_audit_activity.png)
+![Third-party agent in operator console: Spark and Hive MCP activity](assets/Agent_audit_activity.png)
 
 ## Use Case
 

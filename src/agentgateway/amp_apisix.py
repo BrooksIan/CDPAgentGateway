@@ -14,6 +14,7 @@ import subprocess
 import time
 from pathlib import Path
 from typing import IO
+from urllib.parse import urlparse
 
 import httpx
 
@@ -45,6 +46,8 @@ def build_amp_apisix_env() -> dict[str, str]:
         raise ValueError("AMP APISIX requires CDSW_DOMAIN (Cloudera AI Workbench application host)")
     merged["GATEWAY_MODE"] = "live"
     merged.setdefault("GATEWAY_PUBLIC_URL", f"https://agent-gateway.{domain.rstrip('/')}")
+    if not (os.environ.get("AGENT_CALLER_KEY") or "").strip():
+        merged["AGENT_CALLER_KEY"] = ""
     for svc in _MCP_SERVICES:
         sub = f"mcp-{svc.lower()}"
         merged.setdefault(f"MCP_{svc}_UPSTREAM_SCHEME", "https")
@@ -202,7 +205,8 @@ def run_apisix_process() -> int:
 
 
 def _tls_verify() -> bool:
-    return os.environ.get("UPSTREAM_TLS_VERIFY", "true").lower() in {"true", "1", "yes"}
+    default = "false" if os.environ.get("CDSW_APP_PORT") else "true"
+    return os.environ.get("UPSTREAM_TLS_VERIFY", default).lower() in {"true", "1", "yes"}
 
 
 def _knox_origin() -> str:
@@ -216,18 +220,36 @@ def _knox_origin() -> str:
     return f"{scheme}://{host}:{port}"
 
 
-def _forward_headers(request) -> dict[str, str]:
-    skip = {
-        "host",
-        "content-length",
-        "connection",
-        "keep-alive",
-        "transfer-encoding",
-        "te",
-        "trailer",
-        "upgrade",
+_HOP_BY_HOP = {
+    "host",
+    "content-length",
+    "content-encoding",
+    "connection",
+    "keep-alive",
+    "transfer-encoding",
+    "te",
+    "trailer",
+    "trailers",
+    "upgrade",
+    "proxy-authenticate",
+    "proxy-authorization",
+}
+
+
+def _forward_headers(request, url: str) -> dict[str, str]:
+    headers = {
+        key: value for key, value in request.headers.items() if key.lower() not in _HOP_BY_HOP
     }
-    return {key: value for key, value in request.headers.items() if key.lower() not in skip}
+    host = urlparse(url).netloc
+    if host:
+        headers["Host"] = host
+    return headers
+
+
+def _outbound_headers(response: httpx.Response) -> dict[str, str]:
+    return {
+        key: value for key, value in response.headers.items() if key.lower() not in _HOP_BY_HOP
+    }
 
 
 def _mcp_upstream_base(adapter: str, values: dict[str, str]) -> str:
@@ -263,7 +285,7 @@ def build_python_edge_app():
             response = httpx.request(
                 request.method,
                 url,
-                headers=_forward_headers(request),
+                headers=_forward_headers(request, url),
                 content=body or None,
                 params=request.query_params,
                 timeout=120.0,
@@ -271,13 +293,21 @@ def build_python_edge_app():
                 follow_redirects=False,
             )
         except httpx.HTTPError as extra:
-            return JSONResponse({"error": "upstream_unreachable", "reason": type(extra).__name__}, status_code=502)
-        out_headers = {
-            key: value
-            for key, value in response.headers.items()
-            if key.lower() not in {"content-encoding", "transfer-encoding", "connection"}
-        }
-        return Response(content=response.content, status_code=response.status_code, headers=out_headers)
+            return JSONResponse(
+                {"error": "upstream_unreachable", "reason": type(extra).__name__},
+                status_code=502,
+            )
+        try:
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=_outbound_headers(response),
+            )
+        except Exception as extra:  # noqa: BLE001 — never leak hop-by-hop 500s to the MCP host
+            return JSONResponse(
+                {"error": "upstream_error", "reason": type(extra).__name__},
+                status_code=502,
+            )
 
     async def mcp_proxy(request: Request) -> Response:
         path = request.url.path

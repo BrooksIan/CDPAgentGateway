@@ -52,6 +52,7 @@ If applications exist but stay Starting or Failed, open Application logs. Typica
 - CML applications run in IPython, which already has an asyncio loop. AMP starts uvicorn in a background thread instead of `asyncio.run`.
 - `KNOX_PROXY_URL` must be set in **Project Settings → Environment**. An empty value skips JWKS pin; MCP POSTs then fail closed until you set it and rerun Fetch pinned Knox JWKS.
 - `GET /health` with `"error": "JSONDecodeError"` means Knox JWKS returned HTML or an empty body (common when the derived URL is `api/v1` and the cluster only serves `api/v2`). Set `KNOX_JWKS_URL` to the inventoried `.../homepage/knoxtoken/api/v2/jwks.json`, keep `UPSTREAM_TLS_VERIFY=false` for lab CAs, push this repo, then **Restart** Agent gateway. A healthy Python edge returns `"engine": "python"`.
+- Notebook `MCP HTTP 500` from `agent-gateway` after a valid JWT: check `mcp-spark` is running (`https://mcp-spark.<domain>/health`). `gateway_misconfigured` means that app has no Knox PEM — Restart Spark MCP and Agent gateway after a successful Fetch JWKS. Confirm `mcp-spark`, `mcp-hive`, and `mcp-impala` applications exist; the edge proxies to those hostnames.
 - The process exited before listening on `127.0.0.1:$CDSW_APP_PORT` (CML probes loopback, not `0.0.0.0`).
 - User CPU/memory quota cannot schedule four apps (each 1 CPU / 1 GB). Drop other workloads or raise the quota.
 - Static subdomains `mcp-spark`, `mcp-hive`, `mcp-impala`, or `gateway-admin` already exist from a previous AMP attempt.
@@ -161,8 +162,9 @@ AMP is JWT-only for the agent product. Compose MCP caller keys and Phase 3 mTLS 
 | `6_app-mcp-impala/` | Impala MCP application |
 | `7_app-agent-gateway/` | APISIX application (Docker, knox-jwt.lua, same routes as Compose) |
 | `examples/agent/third_party_agent.ipynb` | Workbench notebook: simulate a third-party MCP host against the AMP apps |
+| `examples/agent/langgraph_agent.ipynb` | Workbench LangGraph ReAct agent over the same MCP tools (needs a model API key in the engine, not project env) |
 
-Set `KNOX_TOKEN` in project environment before running the notebook. Do not add `KNOX_TOKEN` to `.project-metadata.yaml` (same rule as Compose). Override MCP URLs with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if needed. Default is `https://agent-gateway.<CDSW_DOMAIN>/mcp/*`.
+Paste a Knox JWT in the notebook token cell (`getpass`), or set `KNOX_TOKEN` for that engine only. Do not add `KNOX_TOKEN` or model API keys to project environment or `.project-metadata.yaml`. Override MCP URLs with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if needed. Default is `https://agent-gateway.<CDSW_DOMAIN>/mcp/*`.
 
 ## Non-goals
 

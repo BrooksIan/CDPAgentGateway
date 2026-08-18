@@ -236,6 +236,8 @@ Put the Knox JWT in the host secret store, never in git.
 }
 ```
 
+A LangGraph ReAct sample binds the same POST JSON-RPC tools: [`examples/agent/langgraph_agent.ipynb`](../examples/agent/langgraph_agent.ipynb). It does not add Streamable HTTP.
+
 Agents should call `/mcp/spark`, `/mcp/hive`, or `/mcp/impala` only, with **POST JSON-RPC**. Streamable HTTP (GET SSE, MCP session) is **not** implemented and is held. Do not teach them the Knox URL, `/cdp/webhdfs`, `/cdp/hive`, `/cdp/impala`, or the operator admin UI (`:9090`). AMP hosts use `https://mcp-spark.<workspace>/mcp/spark`, `https://mcp-hive.<workspace>/mcp/hive`, or `https://mcp-impala.<workspace>/mcp/impala` instead of localhost; see [amp.md](amp.md).
 
 Operators set per-user daily call/submit quotas in [admin.md](admin.md). A denied submit is an MCP tool error and does not reach Livy. Operators look up a call by APISIX `X-Request-Id` (`GET /api/audit`) to join tool, `sub`, and `knox.id`.

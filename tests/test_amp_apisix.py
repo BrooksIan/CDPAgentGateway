@@ -17,12 +17,14 @@ def test_amp_apisix_env_points_at_sibling_mcp_apps(monkeypatch: pytest.MonkeyPat
         "KNOX_PROXY_URL",
         "https://knox.example.com/gateway/cdp-proxy-token/livy_for_spark3/",
     )
+    monkeypatch.delenv("AGENT_CALLER_KEY", raising=False)
     values = build_amp_apisix_env()
     assert values["GATEWAY_PUBLIC_URL"] == "https://agent-gateway.ml.example.com"
     assert values["MCP_SPARK_UPSTREAM_SCHEME"] == "https"
     assert values["MCP_SPARK_UPSTREAM_HOST"] == "mcp-spark.ml.example.com"
     assert values["MCP_SPARK_UPSTREAM_PORT"] == "443"
     assert values["MCP_SPARK_PASS_HOST"] == "rewrite"
+    assert values.get("AGENT_CALLER_KEY") == ""
 
 
 def test_amp_apisix_render_uses_https_upstreams(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -81,6 +83,57 @@ def test_python_edge_health_is_public(monkeypatch: pytest.MonkeyPatch) -> None:
     assert body["engine"] == "python"
     denied = client.post("/mcp/spark", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     assert denied.status_code == 401
+
+
+def test_python_edge_rewrites_host_and_strips_content_length(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from starlette.testclient import TestClient
+
+    from agentgateway.amp_apisix import build_python_edge_app
+    from agentgateway.keys import generate_test_keys
+    from agentgateway.token import knox_claims, sign_rs256
+
+    monkeypatch.setenv("CDSW_DOMAIN", "ml.example.com")
+    monkeypatch.setenv(
+        "KNOX_PROXY_URL",
+        "https://knox.example.com/gateway/cdp-proxy-token/livy_for_spark3/",
+    )
+    generate_test_keys()
+    pem = ROOT / "conf" / "keys" / "public.pem"
+    monkeypatch.setenv("KNOX_PUBLIC_KEY_FILE", str(pem))
+    monkeypatch.setenv("AGENT_CALLER_KEY", "")
+    captured: dict[str, object] = {}
+
+    class FakeUpstream:
+        status_code = 200
+        content = b'{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}'
+        headers = {
+            "content-type": "application/json",
+            "content-length": "999",
+            "transfer-encoding": "chunked",
+        }
+
+    def fake_request(method, url, **kwargs):
+        captured["method"] = method
+        captured["url"] = url
+        captured["headers"] = kwargs.get("headers")
+        return FakeUpstream()
+
+    monkeypatch.setattr("httpx.request", fake_request)
+    client = TestClient(build_python_edge_app())
+    token = sign_rs256(knox_claims(sub="analyst"))
+    response = client.post(
+        "/mcp/spark",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+    )
+    assert response.status_code == 200, response.text
+    assert captured["url"] == "https://mcp-spark.ml.example.com/mcp"
+    headers = captured["headers"]
+    assert isinstance(headers, dict)
+    assert headers["Host"] == "mcp-spark.ml.example.com"
+    assert "content-length" not in {key.lower() for key in headers}
 
 
 def test_startup_error_app_includes_detail() -> None:

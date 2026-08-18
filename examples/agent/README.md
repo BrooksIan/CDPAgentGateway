@@ -1,12 +1,18 @@
 # Third-party agent demo
 
-[`third_party_agent.ipynb`](third_party_agent.ipynb) simulates an external MCP host (Cursor, Claude, custom agent) calling CDP Agent Gateway. It uses POST JSON-RPC only; it never talks to Knox or Livy directly.
+Two notebooks call CDP Agent Gateway as an external MCP host. Both use POST JSON-RPC only; they never talk to Knox or Livy directly.
+
+| Notebook | Role |
+| --- | --- |
+| [`third_party_agent.ipynb`](third_party_agent.ipynb) | Scripted host: health, `tools/list`, Spark → Hive |
+| [`langgraph_agent.ipynb`](langgraph_agent.ipynb) | LangGraph ReAct agent bound to the same MCP tools |
 
 ## Prerequisites
 
 - **Knox JWT** pasted in the notebook token cell (`getpass`, session only). Optional: `KNOX_TOKEN` for this engine, or `KNOX_TOKEN_FILE`. Never commit tokens, never add them to AMP project env, never print them.
 - **Compose:** `gateway up` on `http://127.0.0.1:9080`. MCP routes need `X-Agent-Key` (default `lab-agent`).
 - **AMP:** `agent-gateway` plus Spark/Hive/Impala MCP applications. Knox JWT as `Authorization: Bearer`.
+- **LangGraph notebook only:** `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for this engine. Optional `LANGGRAPH_MODEL`. Install extras with `pip install -e ".[langgraph]"` (the notebook cell does this). Do not commit model keys.
 
 ## URLs
 
@@ -19,9 +25,11 @@ Override with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if your works
 
 ## Run
 
-1. Open the notebook in Workbench (Python 3.11+) or Jupyter locally.
-2. Run cells in order. The **Knox JWT** cell prompts with `getpass` (not echoed). Then health, `tools/list`, Spark → Hive.
+1. Open a notebook in Workbench (Python 3.11+) or Jupyter locally.
+2. Run cells in order. The **Knox JWT** cell prompts with `getpass` (not echoed).
+3. Scripted notebook: health, `tools/list`, Spark → Hive.
+4. LangGraph notebook: bind MCP tools, then a read-only ReAct turn (list batches / Hive databases). Set `LANGGRAPH_RUN_SUBMIT=1` only if the job file is already staged.
 
 On AMP, stage the job on HDFS first (or set `SPARK_FILE_URI`). Spark jobs can take several minutes; override wait with `SPARK_POLL_TIMEOUT` (seconds).
 
-Helper module: [`mcp_agent.py`](mcp_agent.py) (same logic, importable from other demos).
+This sample does **not** use Streamable HTTP or `langchain-mcp-adapters` transports. Tools are LangChain wrappers around [`mcp_agent.py`](mcp_agent.py) `tools/list` / `tools/call`. LangGraph helper: [`langgraph_mcp.py`](langgraph_mcp.py).

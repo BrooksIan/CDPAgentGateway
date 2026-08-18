@@ -70,6 +70,8 @@ Example MCP host config (put the JWT in the host's secret store, never in git):
 }
 ```
 
+LangGraph over the same POST JSON-RPC tools: [examples/agent/langgraph_agent.ipynb](examples/agent/langgraph_agent.ipynb). Do not add Streamable HTTP.
+
 ## Code and config style
 
 - Prefer declarative APISIX config and Compose over one-off Admin API scripts.

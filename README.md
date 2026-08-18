@@ -187,7 +187,7 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 | `examples/spark/` | Sample Spark 3 batch (`count_to_10.py`) that writes Iceberg for Hive |
 | `examples/hive/` | Query that table with Hive MCP (`hive_list_tables` / `hive_describe_table` / `hive_select`) |
 | `examples/impala/` | Same Iceberg table through Impala MCP when metadata is visible |
-| `examples/agent/` | Jupyter notebook + helper that simulate a third-party MCP host |
+| `examples/agent/` | Jupyter notebooks + helper: MCP host simulation and LangGraph ReAct agent |
 | `tests/` | Inventory, CLI, gateway, and MCP pytest |
 | `AGENTS.md` | Instructions for coding agents |
 | `.cursor/rules/` | Cursor project rules |
@@ -201,6 +201,7 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 - `pip install -e ".[dev]"` installs the `gateway` CLI (`make` is optional)
 - `pip install -e ".[amp]"` only for the Cloudera AI Workbench profile
 - `pip install -e ".[hive]"` only if you run `gateway hive` (impyla)
+- Optional: `pip install -e ".[langgraph]"` for the LangGraph agent notebook (the notebook cell can install it)
 - Local demo: no CDP entitlement; mock Knox runs in Compose
 - Live cluster: CDP Private Cloud Base or Public Cloud, VPN or allowlisted laptop, Knox Token API / Token Generation, JWKS URL, Ranger-allowed test user
 - Optional AMP: Cloudera AI Workbench that can reach Knox; not Docker-in-CML

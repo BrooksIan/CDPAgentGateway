@@ -4,6 +4,7 @@ pyproject.toml
 src/agentgateway/__init__.py
 src/agentgateway/__main__.py
 src/agentgateway/amp.py
+src/agentgateway/amp_apisix.py
 src/agentgateway/cli.py
 src/agentgateway/cml_boot.py
 src/agentgateway/compose.py
@@ -29,6 +30,7 @@ src/cdp_agent_gateway.egg-info/top_level.txt
 tests/test_admin_gateway.py
 tests/test_admin_store.py
 tests/test_agent_notebook.py
+tests/test_amp_apisix.py
 tests/test_amp_mcp.py
 tests/test_amp_packaging.py
 tests/test_apisix_render.py

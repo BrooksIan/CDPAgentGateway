@@ -71,6 +71,16 @@ def apply_live_upstream() -> dict[str, str]:
     return parsed
 
 
+def ensure_amp_runtime_pem() -> Path:
+    """Pin Knox JWKS when the Fetch JWKS job did not write a PEM yet."""
+    path = amp_public_key_path()
+    if path.is_file() and path.read_text().strip():
+        return path
+    from agentgateway.amp_apisix import ensure_amp_knox_pem
+
+    return ensure_amp_knox_pem()
+
+
 def _ensure_service_path(relative: str) -> str:
     path = str(repo_root() / relative)
     if path in sys.path:
@@ -291,6 +301,7 @@ def _prm_routes() -> list[Route]:
 
 def build_mcp_app() -> Starlette:
     apply_live_upstream()
+    ensure_amp_runtime_pem()
     mcp = _load_module("amp_mcp_spark_server", "mcp-spark")
 
     async def root(request: Request) -> Response:
@@ -319,6 +330,7 @@ def build_mcp_app() -> Starlette:
 
 def build_hive_mcp_app() -> Starlette:
     apply_live_upstream()
+    ensure_amp_runtime_pem()
     mcp = _load_module("amp_mcp_hive_server", "mcp-hive")
 
     async def root(request: Request) -> Response:
@@ -347,6 +359,7 @@ def build_hive_mcp_app() -> Starlette:
 
 def build_impala_mcp_app() -> Starlette:
     apply_live_upstream()
+    ensure_amp_runtime_pem()
     mcp = _load_module("amp_mcp_impala_server", "mcp-impala")
 
     async def root(request: Request) -> Response:

@@ -15,3 +15,9 @@ uvicorn
 
 [hive]
 impyla>=0.19
+
+[langgraph]
+langgraph>=0.2
+langchain-core>=0.3
+langchain-openai>=0.2
+langchain-anthropic>=0.2

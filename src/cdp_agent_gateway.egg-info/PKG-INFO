@@ -227,6 +227,11 @@ Requires-Dist: starlette; extra == "amp"
 Requires-Dist: uvicorn; extra == "amp"
 Provides-Extra: hive
 Requires-Dist: impyla>=0.19; extra == "hive"
+Provides-Extra: langgraph
+Requires-Dist: langgraph>=0.2; extra == "langgraph"
+Requires-Dist: langchain-core>=0.3; extra == "langgraph"
+Requires-Dist: langchain-openai>=0.2; extra == "langgraph"
+Requires-Dist: langchain-anthropic>=0.2; extra == "langgraph"
 Dynamic: license-file
 
 # Cloudera Blueprint: CDP Agent Gateway
@@ -406,7 +411,7 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 | `LICENSE` | Apache License 2.0 |
 | `METADATA.yaml` | Catalog metadata for the Cloudera blueprint website |
 | `.project-metadata.yaml` | Optional CML AMP runbook (`launchable` is still false) |
-| `0_`–`6_` AMP dirs | CML jobs/apps; ignored by Compose |
+| `0_`–`7_` AMP dirs | CML jobs/apps; ignored by Compose |
 | `conf/` | APISIX standalone config templates |
 | `plugins/` | Custom `knox-jwt` APISIX plugin |
 | `inventory/` | Phase 0 CDP inventory consumed by tests |
@@ -418,7 +423,7 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 | `examples/spark/` | Sample Spark 3 batch (`count_to_10.py`) that writes Iceberg for Hive |
 | `examples/hive/` | Query that table with Hive MCP (`hive_list_tables` / `hive_describe_table` / `hive_select`) |
 | `examples/impala/` | Same Iceberg table through Impala MCP when metadata is visible |
-| `examples/agent/` | Jupyter notebook + helper that simulate a third-party MCP host |
+| `examples/agent/` | Jupyter notebooks + helper: MCP host simulation and LangGraph ReAct agent |
 | `tests/` | Inventory, CLI, gateway, and MCP pytest |
 | `AGENTS.md` | Instructions for coding agents |
 | `.cursor/rules/` | Cursor project rules |
@@ -432,6 +437,7 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 - `pip install -e ".[dev]"` installs the `gateway` CLI (`make` is optional)
 - `pip install -e ".[amp]"` only for the Cloudera AI Workbench profile
 - `pip install -e ".[hive]"` only if you run `gateway hive` (impyla)
+- Optional: `pip install -e ".[langgraph]"` for the LangGraph agent notebook (the notebook cell can install it)
 - Local demo: no CDP entitlement; mock Knox runs in Compose
 - Live cluster: CDP Private Cloud Base or Public Cloud, VPN or allowlisted laptop, Knox Token API / Token Generation, JWKS URL, Ranger-allowed test user
 - Optional AMP: Cloudera AI Workbench that can reach Knox; not Docker-in-CML
@@ -442,7 +448,7 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 | Deployment | Minimum |
 | --- | --- |
 | Launchable / demo (local Docker) | 2 CPU, 4 GB RAM, 10 GB disk |
-| Optional CML AMP (not catalog-launchable yet) | Workbench Python 3.11 or greater: install session 1 CPU / 2 GB; each app 1 CPU / 1 GB |
+| Optional AMP: Workbench Python 3.11 or greater: install session 1 CPU / 2 GB; each MCP app 1 CPU / 1 GB; APISIX app 1 CPU / 1.5 GB |
 | Production / enterprise (APISIX in front of Knox) | Size APISIX for agent QPS; CDP/Knox/Ranger sizing is unchanged. Plan extra RAM if MCP adapters and long Spark jobs share the same host |
 
 ## Documentation

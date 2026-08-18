@@ -122,7 +122,9 @@ def mcp_request(
         payload["params"] = params
     with httpx.Client(timeout=timeout, verify=_tls_verify()) as client:
         response = client.post(url, json=payload, headers=agent_headers(adapter=adapter))
-    response.raise_for_status()
+    if response.status_code >= 400:
+        snippet = (response.text or "").replace("\n", " ").strip()[:400]
+        raise RuntimeError(f"MCP HTTP {response.status_code} from {url}: {snippet}")
     body = response.json()
     if "error" in body:
         raise RuntimeError(json.dumps(body["error"], indent=2))
@@ -164,6 +166,47 @@ def require_tool_ok(result: dict[str, Any]) -> dict[str, Any]:
     if result.get("isError"):
         raise RuntimeError(json.dumps(payload or result, indent=2))
     return payload
+
+
+_TOOL_PREFIXES = (
+    ("spark_", "spark"),
+    ("hive_", "hive"),
+    ("impala_", "impala"),
+)
+
+
+def adapter_for_tool(name: str) -> str:
+    """Map spark_*, hive_*, or impala_* tool names to an MCP adapter."""
+    key = (name or "").strip()
+    for prefix, adapter in _TOOL_PREFIXES:
+        if key.startswith(prefix):
+            return adapter
+    raise ValueError(f"unknown tool {name!r}; expected spark_*, hive_*, or impala_*")
+
+
+def list_gateway_tools(
+    adapters: tuple[str, ...] | list[str] = ("spark", "hive", "impala"),
+) -> list[dict[str, Any]]:
+    """tools/list across adapters. Each spec includes adapter. Never logs the bearer."""
+    catalog: list[dict[str, Any]] = []
+    for adapter in adapters:
+        for spec in tools_list(adapter):
+            item = dict(spec)
+            item["adapter"] = adapter
+            catalog.append(item)
+    return catalog
+
+
+def call_gateway_tool(
+    name: str,
+    arguments: dict[str, Any] | None = None,
+    *,
+    adapter: str | None = None,
+    timeout: float = 120.0,
+) -> dict[str, Any]:
+    """tools/call on the matching adapter. Returns the tool JSON payload."""
+    target = (adapter or "").strip() or adapter_for_tool(name)
+    return require_tool_ok(tools_call(name, arguments or {}, adapter=target, timeout=timeout))
 
 
 def knox_user_from_spark() -> str:

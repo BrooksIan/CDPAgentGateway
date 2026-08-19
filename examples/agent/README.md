@@ -13,6 +13,10 @@ Use this architecture diagram for LangGraph agent documentation:
 
 ![LangGraph agent architecture](../../assets/LangChainAgentERDiagram.jpeg)
 
+Use this identity and trust-boundary diagram for auth and governance context:
+
+![Identity and trust boundaries](../../assets/IdentityandTrustBoundaries.jpeg)
+
 ## Prerequisites
 
 - **Knox JWT** pasted in the notebook token cell (`getpass`, session only). It must be a Token API **JWT** (`eyJ…`, three segments, `alg=RS256`, `iss=KNOXSSO`). A Knox passcode, cookie, or `Bearer eyJ…` paste becomes `401 invalid_token`. Optional: `KNOX_TOKEN` for this engine, or `KNOX_TOKEN_FILE`. Never commit tokens, never add them to AMP project env, never print them.

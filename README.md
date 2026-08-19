@@ -78,58 +78,11 @@ sequenceDiagram
 
 ### Identity and trust boundaries
 
-```mermaid
-flowchart LR
-    subgraph Client["Agent Host"]
-        JWT["Authorization: Bearer Knox JWT"]
-        KEY["X-Agent-Key"]
-        AGENT["LangGraph / Third-party agent"]
-    end
-
-    subgraph Edge["Agent Gateway (APISIX)"]
-        VJWT["knox-jwt plugin validates RS256 + iss/exp/sub"]
-        VKEY["key-auth validates caller key on /mcp/*"]
-        RL["Rate limit keyed by Knox sub"]
-    end
-
-    subgraph Perimeter["CDP Perimeter"]
-        KNOX["Apache Knox cdp-proxy-token"]
-        RANGER["Apache Ranger authorization"]
-    end
-
-    subgraph Services["CDP Services"]
-        LIVY["Livy for Spark 3"]
-        HIVE["Hive"]
-        IMPALA["Impala"]
-    end
-
-    AGENT --> JWT --> VJWT
-    AGENT --> KEY --> VKEY
-    VJWT --> RL
-    VKEY --> RL
-    RL --> KNOX
-    KNOX --> RANGER
-    KNOX --> LIVY
-    KNOX --> HIVE
-    KNOX --> IMPALA
-```
+![Identity and trust boundaries](assets/IdentityandTrustBoundaries.jpeg)
 
 ### Exposed and blocked routes
 
-```mermaid
-flowchart TB
-    A["Agent HTTP Request"] --> B{"Requested path"}
-
-    B -->|/mcp/spark| S["Allow: POST JSON-RPC to mcp-spark"]
-    B -->|/mcp/hive| H["Allow: POST JSON-RPC to mcp-hive (read-only)"]
-    B -->|/mcp/impala| I["Allow: POST JSON-RPC to mcp-impala (read-only)"]
-    B -->|/cdp/livy_for_spark3*| L["Allow: GET/HEAD only"]
-    B -->|/cdp/webhdfs*| W["Allow: GET/HEAD/PUT only (operator staging)"]
-
-    B -->|/cdp/hive| X1["Block: 404"]
-    B -->|/cdp/impala| X2["Block: 404"]
-    B -->|Raw service / catch-all path| X3["Block: not allowlisted"]
-```
+![Exposed and blocked routes](assets/Exposedandblockedroutes.jpeg)
 
 On a live cluster that notebook path is what produces the Spark History, Data Catalog, and operator activity evidence below: `spark_submit_batch` writes `{user}.count_to_10` as the Knox subject, then Hive MCP selects it.
 

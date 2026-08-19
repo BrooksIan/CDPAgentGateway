@@ -44,6 +44,93 @@ The admin console is for operators, not MCP hosts. Full walkthrough: [docs/admin
 
 Third-party agents are demonstrated with the Jupyter notebooks in [`examples/agent/`](examples/agent/README.md), not the operator CLI. [`third_party_agent.ipynb`](examples/agent/third_party_agent.ipynb) is a scripted MCP host (the same POST JSON-RPC a Cursor or Claude host would send). [`langgraph_agent.ipynb`](examples/agent/langgraph_agent.ipynb) shows **LangGraph**: a ReAct agent bound to the same Spark, Hive, and Impala tools. Both present a Knox JWT and never call cluster APIs directly.
 
+![LangGraph agent architecture](assets/LangChainAgentERDiagram.jpeg)
+
+### LangGraph request sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User / Agent App
+    participant LG as LangGraph Agent
+    participant LLM as Cloudera Inference Service (LLM)
+    participant AGW as APISIX Agent Gateway
+    participant MCP as MCP Adapter (Spark/Hive/Impala)
+    participant K as Apache Knox
+    participant CDP as CDP Service
+
+    U->>LG: Ask data question
+    LG->>LLM: Reason over prompt
+    LLM-->>LG: Tool call decision
+    LG->>AGW: POST /mcp/* (JWT + X-Agent-Key)
+    AGW->>AGW: Verify Knox JWT + caller key
+    AGW->>MCP: Forward JSON-RPC tool call
+    MCP->>K: Forward bearer unchanged
+    K->>CDP: Enforce Ranger as Knox subject
+    CDP-->>K: Data / job status / logs
+    K-->>MCP: Service response
+    MCP-->>AGW: JSON-RPC result
+    AGW-->>LG: Tool result
+    LG->>LLM: Continue reasoning with tool output
+    LLM-->>LG: Final answer
+    LG-->>U: Response
+```
+
+### Identity and trust boundaries
+
+```mermaid
+flowchart LR
+    subgraph Client["Agent Host"]
+        JWT["Authorization: Bearer Knox JWT"]
+        KEY["X-Agent-Key"]
+        AGENT["LangGraph / Third-party agent"]
+    end
+
+    subgraph Edge["Agent Gateway (APISIX)"]
+        VJWT["knox-jwt plugin validates RS256 + iss/exp/sub"]
+        VKEY["key-auth validates caller key on /mcp/*"]
+        RL["Rate limit keyed by Knox sub"]
+    end
+
+    subgraph Perimeter["CDP Perimeter"]
+        KNOX["Apache Knox cdp-proxy-token"]
+        RANGER["Apache Ranger authorization"]
+    end
+
+    subgraph Services["CDP Services"]
+        LIVY["Livy for Spark 3"]
+        HIVE["Hive"]
+        IMPALA["Impala"]
+    end
+
+    AGENT --> JWT --> VJWT
+    AGENT --> KEY --> VKEY
+    VJWT --> RL
+    VKEY --> RL
+    RL --> KNOX
+    KNOX --> RANGER
+    KNOX --> LIVY
+    KNOX --> HIVE
+    KNOX --> IMPALA
+```
+
+### Exposed and blocked routes
+
+```mermaid
+flowchart TB
+    A["Agent HTTP Request"] --> B{"Requested path"}
+
+    B -->|/mcp/spark| S["Allow: POST JSON-RPC to mcp-spark"]
+    B -->|/mcp/hive| H["Allow: POST JSON-RPC to mcp-hive (read-only)"]
+    B -->|/mcp/impala| I["Allow: POST JSON-RPC to mcp-impala (read-only)"]
+    B -->|/cdp/livy_for_spark3*| L["Allow: GET/HEAD only"]
+    B -->|/cdp/webhdfs*| W["Allow: GET/HEAD/PUT only (operator staging)"]
+
+    B -->|/cdp/hive| X1["Block: 404"]
+    B -->|/cdp/impala| X2["Block: 404"]
+    B -->|Raw service / catch-all path| X3["Block: not allowlisted"]
+```
+
 On a live cluster that notebook path is what produces the Spark History, Data Catalog, and operator activity evidence below: `spark_submit_batch` writes `{user}.count_to_10` as the Knox subject, then Hive MCP selects it.
 
 ![Third-party agent in Spark History: count-to-10 as the Knox subject](assets/Spark_History_agentActivity.png)

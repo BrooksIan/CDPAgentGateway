@@ -7,6 +7,12 @@ These notebooks **demonstrate third-party agents** against CDP Agent Gateway. Th
 | [`third_party_agent.ipynb`](third_party_agent.ipynb) | Scripted third-party MCP host: health, `tools/list`, Spark → Hive |
 | [`langgraph_agent.ipynb`](langgraph_agent.ipynb) | **LangGraph** ReAct agent bound to the same MCP tools |
 
+## LangGraph agent diagram
+
+Use this architecture diagram for LangGraph agent documentation:
+
+![LangGraph agent architecture](../../assets/LangChainAgentERDiagram.jpeg)
+
 ## Prerequisites
 
 - **Knox JWT** pasted in the notebook token cell (`getpass`, session only). It must be a Token API **JWT** (`eyJ…`, three segments, `alg=RS256`, `iss=KNOXSSO`). A Knox passcode, cookie, or `Bearer eyJ…` paste becomes `401 invalid_token`. Optional: `KNOX_TOKEN` for this engine, or `KNOX_TOKEN_FILE`. Never commit tokens, never add them to AMP project env, never print them.

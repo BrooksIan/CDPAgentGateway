@@ -405,6 +405,7 @@ def cmd_test(args: argparse.Namespace) -> int:
                 "tests/test_apisix_render.py",
                 "tests/test_knox_jwt.py",
                 "tests/test_amp_packaging.py",
+                "tests/test_amp_apisix.py",
                 "tests/test_amp_mcp.py",
             ]
         )

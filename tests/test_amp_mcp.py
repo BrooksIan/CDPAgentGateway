@@ -171,3 +171,37 @@ def test_cml_bind_host_is_loopback_when_app_port_set(monkeypatch: pytest.MonkeyP
 
 def test_event_loop_running_is_false_in_sync_tests() -> None:
     assert event_loop_running() is False
+
+
+def test_build_adapter_app_returns_disabled_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    from agentgateway.amp import build_adapter_app
+
+    monkeypatch.setenv("ENABLE_MCP_IMPALA", "false")
+    app, service = build_adapter_app("impala")
+    assert service == "mcp-impala"
+    body = TestClient(app).get("/health").json()
+    assert body["status"] == "disabled"
+    assert body["reason"] == "adapter_disabled"
+
+
+def test_build_adapter_app_traps_startup_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A broken adapter must still bind the port: AMP cannot skip a start_application."""
+    from agentgateway import amp
+
+    def _boom():
+        raise RuntimeError("boom")
+
+    monkeypatch.setenv("ENABLE_MCP_HIVE", "true")
+    monkeypatch.setitem(amp._MCP_BUILDERS, "hive", ("mcp-hive", _boom))
+    app, service = amp.build_adapter_app("hive")
+    assert service == "mcp-hive"
+    body = TestClient(app).get("/health").json()
+    assert body["reason"] == "startup_failed"
+    assert "boom" in body["detail"]
+
+
+def test_build_adapter_app_rejects_unknown_adapter() -> None:
+    from agentgateway.amp import build_adapter_app
+
+    with pytest.raises(KeyError):
+        build_adapter_app("ozone")

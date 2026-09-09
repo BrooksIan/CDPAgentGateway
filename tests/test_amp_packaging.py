@@ -42,11 +42,11 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert "0_session-install-dependencies/install_dependencies.py" in scripts
     assert "1_job-fetch-jwks/fetch_jwks.py" in scripts
     assert "2_job-smoke-knox/smoke_knox.py" in scripts
-    assert "3_app-mcp-spark/app.py" in scripts
-    assert "5_app-mcp-hive/app.py" in scripts
-    assert "6_app-mcp-impala/app.py" in scripts
-    assert "7_app-agent-gateway/app.py" in scripts
-    assert "4_app-operator-admin/app.py" in scripts
+    assert "3_app-mcp-spark/mcp_spark_app.py" in scripts
+    assert "5_app-mcp-hive/mcp_hive_app.py" in scripts
+    assert "6_app-mcp-impala/mcp_impala_app.py" in scripts
+    assert "7_app-agent-gateway/agent_gateway_app.py" in scripts
+    assert "4_app-operator-admin/operator_admin_app.py" in scripts
 
     kernels = {runtime["kernel"] for runtime in amp["runtimes"]}
     editors = {runtime["editor"] for runtime in amp["runtimes"]}
@@ -166,11 +166,11 @@ def test_amp_layout_and_catalog_exist() -> None:
         ROOT / "0_session-install-dependencies" / "install_dependencies.py",
         ROOT / "1_job-fetch-jwks" / "fetch_jwks.py",
         ROOT / "2_job-smoke-knox" / "smoke_knox.py",
-        ROOT / "3_app-mcp-spark" / "app.py",
-        ROOT / "4_app-operator-admin" / "app.py",
-        ROOT / "5_app-mcp-hive" / "app.py",
-        ROOT / "6_app-mcp-impala" / "app.py",
-        ROOT / "7_app-agent-gateway" / "app.py",
+        ROOT / "3_app-mcp-spark" / "mcp_spark_app.py",
+        ROOT / "4_app-operator-admin" / "operator_admin_app.py",
+        ROOT / "5_app-mcp-hive" / "mcp_hive_app.py",
+        ROOT / "6_app-mcp-impala" / "mcp_impala_app.py",
+        ROOT / "7_app-agent-gateway" / "agent_gateway_app.py",
         ROOT / "src" / "agentgateway" / "knox_jwt.py",
         ROOT / "src" / "agentgateway" / "amp.py",
         ROOT / "src" / "agentgateway" / "amp_apisix.py",

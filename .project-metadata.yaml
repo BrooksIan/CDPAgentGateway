@@ -6,8 +6,8 @@ description: >-
   the workbench. This is not Docker Compose and does not replace Apache Knox.
 author: Cloudera
 specification_version: "1.0"
-prototype_version: "0.1"
-date: "2026-08-18"
+prototype_version: "1.0.0"
+date: "2026-09-10"
 
 environment_variables:
   KNOX_PROXY_URL:

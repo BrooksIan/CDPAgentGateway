@@ -4,15 +4,13 @@ import os
 import sys
 from pathlib import Path
 _root = Path(os.environ.get("AGENTGATEWAY_ROOT") or Path.cwd()).resolve()
-if not (_root / ".project-metadata.yaml").is_file():
-    _alt = Path("/home/cdsw")
-    if (_alt / ".project-metadata.yaml").is_file():
-        _root = _alt.resolve()
+if not (_root / "src" / "agentgateway" / "cml_boot.py").is_file():
+    _root = Path("/home/cdsw")
 sys.path.insert(0, str(_root / "src"))
-from agentgateway.cml_boot import ensure_amp_extra, ensure_src_path, project_root
-_ROOT = project_root()
-ensure_src_path(_ROOT)
-ensure_amp_extra(_ROOT)
+from agentgateway.cml_boot import boot_amp
+boot_amp()
+# Not an MCP adapter: no enable-check, and this app runs bypass_authentication: false
+# (CML-login-gated, not a public agent route). Keep that distinction visible here.
 from agentgateway.amp import build_admin_app, serve_cml_app, startup_error_app
 try:
     app = build_admin_app()

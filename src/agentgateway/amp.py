@@ -478,6 +478,33 @@ def startup_error_app(service: str, exc: BaseException):
     )
 
 
+_MCP_BUILDERS: dict[str, tuple[str, Any]] = {
+    "spark": ("mcp-spark", build_mcp_app),
+    "hive": ("mcp-hive", build_hive_mcp_app),
+    "impala": ("mcp-impala", build_impala_mcp_app),
+}
+
+
+def build_adapter_app(adapter: str):
+    """Return (app, service) for one MCP adapter.
+
+    Never raises for a known adapter: AMP cannot skip a start_application slot, so a
+    disabled or broken adapter still has to bind the port and report why.
+    """
+    from agentgateway.env import mcp_adapter_enabled
+
+    key = (adapter or "").strip().lower()
+    if key not in _MCP_BUILDERS:
+        raise KeyError(f"unknown MCP adapter {adapter!r}")
+    service, builder = _MCP_BUILDERS[key]
+    if not mcp_adapter_enabled(key):
+        return disabled_mcp_app(service), service
+    try:
+        return builder(), service
+    except Exception as err:  # noqa: BLE001 - CML needs the port bound either way
+        return startup_error_app(service, err), service
+
+
 def event_loop_running() -> bool:
     """True inside IPython/CML cells. uvicorn.asyncio_run cannot start a second loop there."""
     try:

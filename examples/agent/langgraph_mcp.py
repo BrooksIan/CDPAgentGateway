@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from importlib.metadata import PackageNotFoundError, version
@@ -45,7 +46,6 @@ _ANTHROPIC_EXTRA = "langchain-anthropic>=0.3,<0.4"
 _ANTHROPIC_02 = "langchain-anthropic>=0.1.23,<0.3"
 _AMP_OPENAI = "openai>=1.104.2,<2"
 _CONSTRAINTS = Path(__file__).resolve().parent / "langgraph-constraints.txt"
-_CONSTRAINTS_02 = Path(__file__).resolve().parent / "langgraph-constraints-02.txt"
 
 _TERMINAL_BATCH = {"success", "dead", "killed", "error"}
 
@@ -157,6 +157,25 @@ def require_langchain_core_03() -> str:
     return require_langchain_core()
 
 
+def constraint_lines_for(line: str, source: Path | None = None) -> list[str]:
+    """Return pip constraint lines for langchain-core line 0.2 or 0.3 from the shared file."""
+    path = source or _CONSTRAINTS
+    if not path.is_file():
+        return []
+    marker = f"## line:{line}"
+    selected: list[str] = []
+    active = False
+    for raw in path.read_text().splitlines():
+        stripped = raw.strip()
+        if stripped.startswith("## line:"):
+            active = stripped == marker
+            continue
+        if not active or not stripped or stripped.startswith("#"):
+            continue
+        selected.append(stripped)
+    return selected
+
+
 def install_langgraph_deps(*, root: Path | None = None) -> list[str]:
     """Install LangGraph to match CML langchain (0.2 or 0.3). Never install core 1.x."""
     amp = _amp_runtime()
@@ -172,9 +191,19 @@ def install_langgraph_deps(*, root: Path | None = None) -> list[str]:
     ]
     if amp:
         cmd.append("--user")
-    constraints = _CONSTRAINTS_02 if line == "0.2" else _CONSTRAINTS
-    if constraints.is_file():
-        cmd.extend(["-c", str(constraints)])
+    pins = constraint_lines_for(line)
+    constraint_path: Path | None = None
+    if pins:
+        handle = tempfile.NamedTemporaryFile(
+            "w",
+            suffix=f"-langgraph-{line}.txt",
+            delete=False,
+            encoding="utf-8",
+        )
+        with handle:
+            handle.write("\n".join(pins) + "\n")
+        constraint_path = Path(handle.name)
+        cmd.extend(["-c", str(constraint_path)])
     cmd.extend(packages)
     core_before = _dist_version("langchain-core") or ""
     if amp and line == "0.2" and core_before.startswith("0.3."):
@@ -183,7 +212,11 @@ def install_langgraph_deps(*, root: Path | None = None) -> list[str]:
             "(undoes a previous 0.3 install that conflicted with langchain-aws)."
         )
     print("langgraph pip:", " ".join(packages))
-    subprocess.check_call(cmd, cwd=str(root or Path.cwd()))
+    try:
+        subprocess.check_call(cmd, cwd=str(root or Path.cwd()))
+    finally:
+        if constraint_path is not None:
+            constraint_path.unlink(missing_ok=True)
     print("langchain-core:", require_langchain_core())
     print("langgraph line:", line)
     if amp:

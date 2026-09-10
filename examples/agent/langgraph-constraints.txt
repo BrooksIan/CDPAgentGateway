@@ -1,7 +1,18 @@
-# Local Compose and CML langchain 0.3. Do not install langchain-core 1.x.
-# AMP engines with langchain 0.2 use langgraph-constraints-02.txt instead.
+# Shared LangGraph pip constraints for the agent notebook.
+# install_langgraph_deps selects the ## line:0.2 or ## line:0.3 block for pip -c.
 # Do not pin protobuf: CML plugins disagree (mlflow 4.25.3 vs raz-client 7.34.0).
+#
+# line:0.3 — local Compose and CML langchain 0.3. Do not install langchain-core 1.x.
+# line:0.2 — AMP / CML engines that still ship langchain 0.2.x (core must stay <0.3).
+
+## line:0.3
 langchain-core>=0.3.85,<0.4
 langgraph>=0.3.5,<0.4
 langchain-openai>=0.3,<0.4
 openai>=1.104.2,<2
+
+## line:0.2
+langchain-core>=0.2.43,<0.3
+langgraph>=0.2.27,<0.3
+langchain-openai>=0.1.22,<0.3
+langsmith>=0.1.112,<0.2

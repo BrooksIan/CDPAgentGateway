@@ -605,11 +605,15 @@ def test_langgraph_extra_pins_core_03() -> None:
     assert "langgraph>=0.3.5,<0.4" in text
     constraints = (ROOT / "examples/agent/langgraph-constraints.txt").read_text()
     assert "langchain-core>=0.3.85,<0.4" in constraints
+    assert "langchain-core>=0.2.43,<0.3" in constraints
+    assert "## line:0.3" in constraints
+    assert "## line:0.2" in constraints
     assert not any(line.startswith("protobuf") for line in constraints.splitlines())
-    constraints_02 = (ROOT / "examples/agent/langgraph-constraints-02.txt").read_text()
-    assert "langchain-core>=0.2.43,<0.3" in constraints_02
-    assert "langgraph>=0.2.27,<0.3" in constraints_02
-    assert "langsmith>=0.1.112,<0.2" in constraints_02
+    assert not (ROOT / "examples/agent/langgraph-constraints-02.txt").exists()
+    lg = _load_langgraph_mcp()
+    assert "langgraph>=0.3.5,<0.4" in lg.constraint_lines_for("0.3")
+    assert "langgraph>=0.2.27,<0.3" in lg.constraint_lines_for("0.2")
+    assert "langsmith>=0.1.112,<0.2" in lg.constraint_lines_for("0.2")
 
 
 def test_langgraph_pip_packages_amp_keeps_core_03(monkeypatch: pytest.MonkeyPatch) -> None:

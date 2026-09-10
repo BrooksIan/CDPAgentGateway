@@ -92,7 +92,7 @@ def _ensure_service_path(relative: str) -> str:
     return path
 
 
-def _load_module(module_name: str, directory: str, filename: str = "server.py"):
+def _load_module(module_name: str, directory: str, filename: str):
     import importlib.util
 
     path = _ensure_service_path(directory)
@@ -323,7 +323,7 @@ def _prm_routes() -> list[Route]:
 def build_mcp_app() -> Starlette:
     apply_live_upstream()
     ensure_amp_runtime_pem()
-    mcp = _load_module("amp_mcp_spark_server", "mcp-spark")
+    mcp = _load_module("amp_mcp_spark_server", "mcp-spark", "mcp_spark_server.py")
 
     async def root(request: Request) -> Response:
         if request.method == "GET":
@@ -352,7 +352,7 @@ def build_mcp_app() -> Starlette:
 def build_hive_mcp_app() -> Starlette:
     apply_live_upstream()
     ensure_amp_runtime_pem()
-    mcp = _load_module("amp_mcp_hive_server", "mcp-hive")
+    mcp = _load_module("amp_mcp_hive_server", "mcp-hive", "mcp_hive_server.py")
 
     async def root(request: Request) -> Response:
         if request.method == "GET":
@@ -381,7 +381,7 @@ def build_hive_mcp_app() -> Starlette:
 def build_impala_mcp_app() -> Starlette:
     apply_live_upstream()
     ensure_amp_runtime_pem()
-    mcp = _load_module("amp_mcp_impala_server", "mcp-impala")
+    mcp = _load_module("amp_mcp_impala_server", "mcp-impala", "mcp_impala_server.py")
 
     async def root(request: Request) -> Response:
         if request.method == "GET":
@@ -411,7 +411,7 @@ def build_admin_app():
     os.environ.setdefault("ADMIN_DB", str(repo_root() / "data" / "gateway.sqlite"))
     os.environ.setdefault("APISIX_HEALTH_URL", "")
     os.environ.setdefault("MCP_SPARK_HEALTH_URL", os.environ.get("AMP_MCP_HEALTH_URL") or "")
-    return _load_module("amp_admin_server", "admin").app
+    return _load_module("amp_admin_server", "admin", "operator_admin_server.py").app
 
 
 def disabled_mcp_app(service: str):

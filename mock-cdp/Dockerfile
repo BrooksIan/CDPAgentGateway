@@ -2,6 +2,6 @@
 ARG PYTHON_VERSION=3.12
 FROM python:${PYTHON_VERSION}-alpine
 WORKDIR /app
-COPY server.py /app/server.py
+COPY mock_cdp_server.py /app/mock_cdp_server.py
 EXPOSE 8080
-CMD ["python", "-u", "/app/server.py"]
+CMD ["python", "-u", "/app/mock_cdp_server.py"]

@@ -254,20 +254,20 @@ def _outbound_headers(response: httpx.Response) -> dict[str, str]:
 
 
 _MCP_ADAPTER_DIRS = {
-    "spark": ("amp_edge_spark", "mcp-spark"),
-    "hive": ("amp_edge_hive", "mcp-hive"),
-    "impala": ("amp_edge_impala", "mcp-impala"),
+    "spark": ("amp_edge_spark", "mcp-spark", "mcp_spark_server.py"),
+    "hive": ("amp_edge_hive", "mcp-hive", "mcp_hive_server.py"),
+    "impala": ("amp_edge_impala", "mcp-impala", "mcp_impala_server.py"),
 }
 
 
 def load_python_edge_mcp_endpoints(values: dict[str, str] | None = None) -> dict:
     """Load enabled MCP adapters in-process. CML cannot hairpin to sibling app HTTPS."""
     endpoints: dict = {}
-    for adapter, (module_name, directory) in _MCP_ADAPTER_DIRS.items():
+    for adapter, (module_name, directory, filename) in _MCP_ADAPTER_DIRS.items():
         if not mcp_adapter_enabled(adapter, values):
             continue
         try:
-            endpoints[adapter] = _load_module(module_name, directory).mcp_endpoint
+            endpoints[adapter] = _load_module(module_name, directory, filename).mcp_endpoint
         except Exception as extra:  # noqa: BLE001 — hive extra is optional on AMP
             print(
                 json.dumps(

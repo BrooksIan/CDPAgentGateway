@@ -8,12 +8,13 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 _root = Path(os.environ.get("AGENTGATEWAY_ROOT") or Path.cwd()).resolve()
-if not (_root / "pyproject.toml").is_file():
-    _root = Path("/home/cdsw").resolve()
-sys.path.insert(0, str(_root / "src"))
-from agentgateway.cml_boot import project_root, run_amp_main
+if not (_root / "cml_path.py").is_file():
+    _root = Path("/home/cdsw")
+sys.path.insert(0, str(_root))
+import cml_path
+ROOT = cml_path.bootstrap()
+from agentgateway.cml_boot import run_amp_main
 from agentgateway.knox import parse_knox_proxy_url, trusted_jku
-ROOT = project_root()
 
 def _insecure() -> bool:
     return os.environ.get("UPSTREAM_TLS_VERIFY", "true").lower() in {"false", "0", "no"}

@@ -172,6 +172,7 @@ def test_amp_layout_and_catalog_exist() -> None:
         ROOT / "5_app-mcp-hive" / "mcp_hive_app.py",
         ROOT / "6_app-mcp-impala" / "mcp_impala_app.py",
         ROOT / "7_app-agent-gateway" / "agent_gateway_app.py",
+        ROOT / "cml_path.py",
         ROOT / "src" / "agentgateway" / "knox_jwt.py",
         ROOT / "src" / "agentgateway" / "amp.py",
         ROOT / "src" / "agentgateway" / "amp_apisix.py",
@@ -196,10 +197,19 @@ def _code_lines(source: str) -> list[str]:
 
 def test_amp_entrypoint_preludes_are_identical() -> None:
     preludes = {
-        (ROOT / relative).read_text().split("from agentgateway.cml_boot")[0]
+        (ROOT / relative).read_text().split("import cml_path")[0]
         for relative in AMP_ENTRYPOINTS
     }
     assert len(preludes) == 1, "the five CML entrypoint preludes have drifted apart"
+
+
+def test_cml_path_helpers_cover_all_apps() -> None:
+    import cml_path
+
+    assert callable(cml_path.bootstrap)
+    assert callable(cml_path.run_mcp)
+    assert callable(cml_path.run_admin)
+    assert callable(cml_path.run_agent_gateway)
 
 
 @pytest.mark.parametrize("relative", AMP_ENTRYPOINTS)
@@ -226,7 +236,7 @@ def test_amp_entrypoint_boots_without_file_or_port(
     namespace: dict[str, object] = {"__name__": "amp_entrypoint_under_test"}
     exec(compile(source, relative, "exec"), namespace)
     if relative.startswith("7_"):
-        assert callable(namespace["serve_amp_apisix"])
+        assert callable(namespace["cml_path"].run_agent_gateway)
     else:
         assert namespace["app"] is not None
 

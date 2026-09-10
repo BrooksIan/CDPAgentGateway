@@ -1,11 +1,14 @@
 # Python 3.11 or greater. Default 3.12.
+# Build from repo root: docker compose build context `.`, dockerfile `admin/Dockerfile`.
 ARG PYTHON_VERSION=3.12
 FROM python:${PYTHON_VERSION}-alpine
+WORKDIR /build
+COPY pyproject.toml README.md LICENSE ./
+COPY src ./src
+RUN pip install --no-cache-dir ".[admin]" && rm -rf /build
 WORKDIR /app
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
-COPY store.py operator_admin_server.py /app/
-COPY static /app/static
+COPY admin/store.py admin/operator_admin_server.py /app/
+COPY admin/static /app/static
 ENV PORT=8080
 ENV ADMIN_DB=/data/gateway.sqlite
 EXPOSE 8080

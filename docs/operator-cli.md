@@ -1,6 +1,6 @@
 # Operator CLI
 
-`gateway` (also `ag` and `python -m agentgateway`) operates the laptop APISIX stack. Install with `pip install -e .` or `pip install -r tests/requirements.txt` after `PYTHONPATH=src` / editable install from `pyproject.toml`.
+`gateway` (also `ag` and `python -m agentgateway`) operates the laptop APISIX stack. Install with `pip install -e ".[dev]"` from `pyproject.toml`.
 
 All commands run from the **repository root**. Secrets stay in `.env`.
 

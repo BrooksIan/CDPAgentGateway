@@ -94,6 +94,31 @@ def test_dockerfiles_use_python_311_or_greater() -> None:
         assert (int(match.group(1)), int(match.group(2))) >= (3, 11)
 
 
+def test_service_deps_live_in_pyproject_extras() -> None:
+    import tomllib
+
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    extras = data["project"]["optional-dependencies"]
+    assert "httpx" in extras["mcp"]
+    assert "starlette" in extras["mcp"]
+    assert "uvicorn" in extras["mcp"]
+    assert "starlette" in extras["admin"]
+    assert "uvicorn" in extras["admin"]
+    assert any(item.startswith("impyla") for item in extras["hive"])
+    for relative in (
+        "mcp-spark/requirements.txt",
+        "mcp-hive/requirements.txt",
+        "mcp-impala/requirements.txt",
+        "admin/requirements.txt",
+        "tests/requirements.txt",
+    ):
+        assert not (ROOT / relative).exists(), relative
+    assert '".[mcp]"' in (ROOT / "mcp-spark" / "Dockerfile").read_text()
+    assert '".[mcp,hive]"' in (ROOT / "mcp-hive" / "Dockerfile").read_text()
+    assert '".[mcp,hive]"' in (ROOT / "mcp-impala" / "Dockerfile").read_text()
+    assert '".[admin]"' in (ROOT / "admin" / "Dockerfile").read_text()
+
+
 def test_blueprint_layout_dirs_exist() -> None:
     for path in (
         ROOT / "images" / "architecture.svg",

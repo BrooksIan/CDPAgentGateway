@@ -254,6 +254,7 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 | `plugins/` | Custom `knox-jwt` APISIX plugin |
 | `inventory/` | Phase 0 CDP inventory consumed by tests |
 | `src/agentgateway/` | Operator CLI (`gateway` / `python -m agentgateway`) |
+| `pyproject.toml` | Package metadata and dependency extras (`dev`, `mcp`, `admin`, `hive`, `amp`, `langgraph`) |
 | `mcp-spark/` | Livy Spark 3 MCP adapter |
 | `mcp-hive/` | Hive MCP adapter (read-only) |
 | `mcp-impala/` | Impala MCP adapter (read-only) |
@@ -273,6 +274,7 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 
 - Git, Docker Desktop (or Engine + Compose v2), Python 3.11+
 - `pip install -e ".[dev]"` installs the `gateway` CLI (`make` is optional)
+- Compose service images install from the same file: `.[mcp]`, `.[mcp,hive]`, `.[admin]`
 - `pip install -e ".[amp]"` only for the Cloudera AI Workbench profile
 - `pip install -e ".[hive]"` only if you run `gateway hive` (impyla)
 - Optional: `pip install -e ".[langgraph]"` for the LangGraph agent notebook (langchain-core 0.3.x locally; the AMP install cell matches CML langchain 0.2 or 0.3)

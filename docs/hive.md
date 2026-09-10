@@ -103,7 +103,7 @@ A successful `hive_select` looks like `kind=select`, `columns=["n"]`, `returned=
 
 Ranger still authorizes that `SELECT` as the Knox `sub`. Data Catalog access audits on `{user}.count_to_10` show `ALLOWED` for the same subject:
 
-![Third-party agent in Data Catalog: access audits for count_to_10](../assets/CDP_agent_activity.png)
+![Third-party agent in Data Catalog: access audits for count_to_10](../images/CDP_agent_activity.png)
 
 The same Spark → Hive path as a third-party MCP host, including **LangGraph**, is [examples/agent/](../examples/agent/README.md).
 

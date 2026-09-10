@@ -11,11 +11,11 @@ These notebooks **demonstrate third-party agents** against CDP Agent Gateway. Th
 
 Use this architecture diagram for LangGraph agent documentation:
 
-![LangGraph agent architecture](../../assets/LangChainAgentERDiagram.jpeg)
+![LangGraph agent architecture](../../images/LangChainAgentERDiagram.jpeg)
 
 Use this identity and trust-boundary diagram for auth and governance context:
 
-![Identity and trust boundaries](../../assets/IdentityandTrustBoundaries.jpeg)
+![Identity and trust boundaries](../../images/IdentityandTrustBoundaries.jpeg)
 
 ## Prerequisites
 

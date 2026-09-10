@@ -2,7 +2,7 @@
 
 Third-party agents must not discover Livy, Hive, Impala, Ozone, NiFi, or other CDP endpoints. They talk only to this gateway. Phase 1 allowlists **Livy for Spark 3** (`GET`/`HEAD` `/cdp/livy_for_spark3*`) and **WebHDFS** (`GET`/`HEAD`/`PUT` `/cdp/webhdfs*`).
 
-![CDP Agent Gateway traffic path](../assets/architecture.svg)
+![CDP Agent Gateway traffic path](../images/architecture.svg)
 
 Phase 1 traffic is `agents → APISIX → Knox → Livy (Spark 3)` plus operator HDFS staging `→ APISIX → Knox → WebHDFS`. Phase 2 adds `agents → APISIX → mcp-spark → Knox → Livy`, `agents → APISIX → mcp-hive → Knox → Hive`, and `agents → APISIX → mcp-impala → Knox Impala or CDW coordinator`. `/cdp/hive` and `/cdp/impala` stay **404**. Optional AMP is `agents → agent-gateway (APISIX on CML) → mcp-spark, mcp-hive, or mcp-impala → Knox` (Impala AMP may use inventoried `IMPALA_HOST`). Direct MCP app URLs remain for debugging.
 

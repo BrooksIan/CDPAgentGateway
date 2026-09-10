@@ -24,7 +24,7 @@ entries:
       Spark MCP and read-only Hive and Impala MCP are published. Operator quotas and
       audit join record who called which tool. Operators stage Spark files at /cdp/webhdfs.
       /cdp/hive and /cdp/impala stay 404. Apache Knox remains the CDP perimeter.</p>
-    image_path: assets/AMP_thumbnail.jpg # Use a raw HTTPS URL once the repo is public
+    image_path: images/AMP_thumbnail.jpg # Use a raw HTTPS URL once the repo is public
     tags:
       - agents
       - agent-governance

@@ -13,7 +13,7 @@ Default URL: `http://127.0.0.1:9090`.
 
 On the optional CML AMP profile the same UI is a workbench application (`cdp-ag-admin`) with **CML login**. It shares `data/gateway.sqlite` with mcp-spark. It is still not an agent route. How-to: [amp.md](amp.md).
 
-![Operator console: path status, health, and UTC-day usage](../assets/admin-overview.png)
+![Operator console: path status, health, and UTC-day usage](../images/admin-overview.png)
 
 ## What it shows
 
@@ -43,7 +43,7 @@ Livy GET on `/cdp/livy_for_spark3*` and WebHDFS on `/cdp/webhdfs*` are not burst
 
 Empty fields mean unlimited. Per-user rows override the default `*` quota.
 
-![Default `*` quota and a per-user override for `analyst`](../assets/admin-quotas.png)
+![Default `*` quota and a per-user override for `analyst`](../images/admin-quotas.png)
 
 | Field | Applies to |
 | --- | --- |
@@ -56,13 +56,13 @@ A denied submit returns an MCP tool error (`status=429`) and does not reach Knox
 
 Usage is per UTC day, keyed by Knox `sub`. Click a request id in Activity (or paste it into Audit join) to see tool, `sub`, and `knox.id` for that call. Bearers are never stored.
 
-![UTC-day usage by Knox `sub`, plus audit lookup by `X-Request-Id`](../assets/admin-usage-audit.png)
+![UTC-day usage by Knox `sub`, plus audit lookup by `X-Request-Id`](../images/admin-usage-audit.png)
 
-![Activity log: tool calls keyed by Knox user and request id](../assets/admin-activity.png)
+![Activity log: tool calls keyed by Knox user and request id](../images/admin-activity.png)
 
 Live third-party agent calls (`spark_submit_batch`, `hive_select`, `hive_describe_table`) appear on the same console, keyed by Knox `sub` and `X-Request-Id`:
 
-![Third-party agent in operator console: Spark and Hive MCP activity](../assets/Agent_audit_activity.png)
+![Third-party agent in operator console: Spark and Hive MCP activity](../images/Agent_audit_activity.png)
 
 ## What it is not
 

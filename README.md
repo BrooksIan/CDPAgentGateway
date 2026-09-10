@@ -6,7 +6,7 @@
 [![Forks](https://img.shields.io/github/forks/BrooksIan/CDPAgentGateway?logo=github)](https://github.com/BrooksIan/CDPAgentGateway/network/members)
 [![Watchers](https://img.shields.io/github/watchers/BrooksIan/CDPAgentGateway?logo=github)](https://github.com/BrooksIan/CDPAgentGateway/watchers)
 
-![CDP Agent Gateway catalog cover](assets/AMP_thumbnail.jpg)
+![CDP Agent Gateway catalog cover](images/AMP_thumbnail.jpg)
 
 **Agent governance** for [Cloudera Data Platform](https://www.cloudera.com/). Third-party agents present [Apache Knox](https://knox.apache.org/) JWTs at a north-south gateway. They never talk to Livy, HiveServer2, Impala, Ozone, or NiFi hostnames. Ranger stays authorization. Catalog fields live in [`METADATA.yaml`](METADATA.yaml).
 
@@ -38,19 +38,19 @@ Hive is inventoried (`gateway jdbc add`) and agents use read-only MCP at `/mcp/h
 
 A recorded Reprise walkthrough is not published yet. The current path is the local Docker stack in [Quickstart](#quickstart): mock Knox, APISIX on `localhost:9080`, Spark MCP at `/mcp/spark`, read-only Hive MCP at `/mcp/hive`, read-only Impala MCP at `/mcp/impala`, operator admin UI on `127.0.0.1:9090`. Pytest covers missing bearer, `alg=none`, expired tokens, subject forwarding, and MCP tool list. `--mint` is the lab JWT only; live Knox uses `gateway token set`.
 
-![Operator console: path status, health, and UTC-day usage](assets/admin-overview.png)
+![Operator console: path status, health, and UTC-day usage](images/admin-overview.png)
 
-![Default quota and per-user override](assets/admin-quotas.png)
+![Default quota and per-user override](images/admin-quotas.png)
 
-![UTC-day usage by Knox sub and audit join](assets/admin-usage-audit.png)
+![UTC-day usage by Knox sub and audit join](images/admin-usage-audit.png)
 
-![Activity log keyed by Knox user and request id](assets/admin-activity.png)
+![Activity log keyed by Knox user and request id](images/admin-activity.png)
 
 The admin console is for operators, not MCP hosts. Full walkthrough: [docs/admin.md](docs/admin.md).
 
 Third-party agents are demonstrated with the Jupyter notebooks in [`examples/agent/`](examples/agent/README.md), not the operator CLI. [`third_party_agent.ipynb`](examples/agent/third_party_agent.ipynb) is a scripted MCP host (the same POST JSON-RPC a Cursor or Claude host would send). [`langgraph_agent.ipynb`](examples/agent/langgraph_agent.ipynb) shows **LangGraph**: a ReAct agent bound to the same Spark, Hive, and Impala tools. Both present a Knox JWT and never call cluster APIs directly.
 
-![LangGraph agent architecture](assets/LangChainAgentERDiagram.jpeg)
+![LangGraph agent architecture](images/LangChainAgentERDiagram.jpeg)
 
 ### LangGraph request sequence
 
@@ -84,19 +84,19 @@ sequenceDiagram
 
 ### Identity and trust boundaries
 
-![Identity and trust boundaries](assets/IdentityandTrustBoundaries.jpeg)
+![Identity and trust boundaries](images/IdentityandTrustBoundaries.jpeg)
 
 ### Exposed and blocked routes
 
-![Exposed and blocked routes](assets/Exposedandblockedroutes.jpeg)
+![Exposed and blocked routes](images/Exposedandblockedroutes.jpeg)
 
 On a live cluster that notebook path is what produces the Spark History, Data Catalog, and operator activity evidence below: `spark_submit_batch` writes `{user}.count_to_10` as the Knox subject, then Hive MCP selects it.
 
-![Third-party agent in Spark History: count-to-10 as the Knox subject](assets/Spark_History_agentActivity.png)
+![Third-party agent in Spark History: count-to-10 as the Knox subject](images/Spark_History_agentActivity.png)
 
-![Third-party agent in Data Catalog: access audits for count_to_10](assets/CDP_agent_activity.png)
+![Third-party agent in Data Catalog: access audits for count_to_10](images/CDP_agent_activity.png)
 
-![Third-party agent in operator console: Spark and Hive MCP activity](assets/Agent_audit_activity.png)
+![Third-party agent in operator console: Spark and Hive MCP activity](images/Agent_audit_activity.png)
 
 ## Use Case
 
@@ -190,7 +190,7 @@ Do not commit Knox tokens, JDBC passwords, or private keys.
 
 Agents terminate at APISIX (Compose) or at a Cloudera AI Application (optional AMP). That edge is the **agent governance** hop: Knox JWT, caller key, allowlisted MCP, quotas, and audit. The `mcp-spark`, `mcp-hive`, and `mcp-impala` adapters sit behind it and forward the caller's Knox bearer to Livy, Hive, or Impala. Knox remains the only hop that presents cluster credentials. The admin UI is not an agent route (localhost `:9090` on Compose; CML login on AMP).
 
-![CDP Agent Gateway traffic path](assets/architecture.svg)
+![CDP Agent Gateway traffic path](images/architecture.svg)
 
 Spark MCP is the published Spark path. Operators stage HDFS files at `/cdp/webhdfs*`. Hive MCP is read-only at `/mcp/hive`. Impala MCP is read-only at `/mcp/impala`. `/cdp/hive` and `/cdp/impala` stay **404**. JDBC inventory is `gateway jdbc add` / `gateway hive` / `gateway impala`.
 
@@ -230,7 +230,7 @@ Extended design: [docs/architecture.md](docs/architecture.md), [docs/amp.md](doc
 
 | Path | Description |
 | --- | --- |
-| `assets/` | Architecture diagram, AMP catalog cover, admin UI, Spark History, and Data Catalog screenshots |
+| `images/` | Architecture diagram, AMP catalog cover, admin UI, Spark History, and Data Catalog screenshots |
 | `deploy/` | Docker Compose (APISIX, mock CDP, mcp-spark, mcp-hive, mcp-impala, admin) |
 | `docs/` | Architecture, Spark, Hive, Impala, admin, identity, AMP, phases, tests |
 | `LICENSE` | Apache License 2.0 |

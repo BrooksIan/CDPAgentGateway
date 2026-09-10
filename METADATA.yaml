@@ -46,7 +46,7 @@ product_mapping: # Cloudera products used
 publisher: cloudera # cloudera | partner-name
 source: Internal # Internal | Partner | NVIDIA Adaptation | Customer
 
-# --- Repository & assets ---
+# --- Repository & images ---
 public_github_link: "" # e.g. https://github.com/cloudera/cdp-agent-gateway
 #private_github_link: "" # If applicable, original repo during development
 

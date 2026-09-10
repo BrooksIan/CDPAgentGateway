@@ -152,7 +152,7 @@ AMP is JWT-only for the agent product. Compose MCP caller keys and Phase 3 mTLS 
 | --- | --- |
 | `.project-metadata.yaml` | AMP runbook (CML ignores Compose) |
 | `catalog-entry.yaml` | Optional custom catalog snippet |
-| `assets/AMP_thumbnail.jpg` | Catalog tile cover (`image_path`) |
+| `images/AMP_thumbnail.jpg` | Catalog tile cover (`image_path`) |
 | `0_session-install-dependencies/` | `pip install --user -e ".[amp]"` (hive extra is best-effort) |
 | `1_job-fetch-jwks/` | Pin JWKS → `conf/generated/knox-public.pem` |
 | `2_job-smoke-knox/` | PEM + JWKS reachability; optional Livy GET |

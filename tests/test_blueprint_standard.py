@@ -47,7 +47,7 @@ def test_readme_has_blueprint_standard_sections() -> None:
     assert text.startswith("# Cloudera Blueprint:")
     for heading in REQUIRED_README_HEADINGS:
         assert heading in text, f"README missing required section {heading}"
-    assert "assets/" in text
+    assert "images/" in text
     assert "deploy/" in text
     assert "METADATA.yaml" in text
     assert "docs/amp.md" in text
@@ -96,7 +96,7 @@ def test_dockerfiles_use_python_311_or_greater() -> None:
 
 def test_blueprint_layout_dirs_exist() -> None:
     for path in (
-        ROOT / "assets" / "architecture.svg",
+        ROOT / "images" / "architecture.svg",
         ROOT / "deploy" / "docker-compose.yml",
         ROOT / "docs" / "architecture.md",
         ROOT / "mcp-spark" / "mcp_spark_server.py",

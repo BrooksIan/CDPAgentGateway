@@ -33,6 +33,21 @@ APISIX standalone config is rendered from `conf/apisix.yaml.tpl` into `conf/gene
 | `/mcp/hive*` | GET, HEAD, POST, DELETE | `knox-jwt` + `key-auth` + `limit-count` | `mcp-hive:8080/mcp` |
 | `/mcp/impala*` | GET, HEAD, POST, DELETE | `knox-jwt` + `key-auth` + `limit-count` | `mcp-impala:8080/mcp` |
 
+```mermaid
+flowchart TB
+    req[Agent HTTP request] --> path{Requested path}
+
+    path -->|POST /mcp/spark| spark[Allow → mcp-spark JSON-RPC]
+    path -->|POST /mcp/hive| hive[Allow → mcp-hive read-only]
+    path -->|POST /mcp/impala| impala[Allow → mcp-impala read-only]
+    path -->|GET/HEAD /cdp/livy_for_spark3*| livy[Allow Livy reads only]
+    path -->|GET/HEAD/PUT /cdp/webhdfs*| webhdfs[Allow operator HDFS staging]
+
+    path -->|/cdp/hive| hive404[404 unpublished]
+    path -->|/cdp/impala| impala404[404 unpublished]
+    path -->|other /cdp/* or raw services| blocked[404 not allowlisted]
+```
+
 Example: `GET http://127.0.0.1:9080/cdp/livy_for_spark3/sessions` becomes `GET {knox}/gateway/cdp-proxy-token/livy_for_spark3/sessions` (prefix varies on Public Cloud). `POST`/`PUT`/`DELETE` on that Livy prefix return **404** (or 405). Submit goes through `/mcp/spark` (`spark_submit_batch`). Interactive `POST .../sessions/{id}/statements` is not a route.
 
 WebHDFS is the operator staging hop for Spark `file` URIs. `GET`/`HEAD` list and stat; `PUT` is MKDIRS and CREATE (including Knox's `/webhdfs/data/v1` follow-up). `DELETE` is **not** published. CREATE with `noredirect=true` returns a Knox `Location`; `gateway webhdfs put` rewrites that Location onto this gateway and refuses a foreign host. How-to: [spark.md](spark.md).

@@ -88,7 +88,20 @@ sequenceDiagram
 
 ### Exposed and blocked routes
 
-![Exposed and blocked routes](images/Exposedandblockedroutes.jpeg)
+```mermaid
+flowchart TB
+    req[Agent HTTP request] --> path{Requested path}
+
+    path -->|POST /mcp/spark| spark[Allow → mcp-spark JSON-RPC]
+    path -->|POST /mcp/hive| hive[Allow → mcp-hive read-only]
+    path -->|POST /mcp/impala| impala[Allow → mcp-impala read-only]
+    path -->|GET/HEAD /cdp/livy_for_spark3*| livy[Allow Livy reads only]
+    path -->|GET/HEAD/PUT /cdp/webhdfs*| webhdfs[Allow operator HDFS staging]
+
+    path -->|/cdp/hive| hive404[404 unpublished]
+    path -->|/cdp/impala| impala404[404 unpublished]
+    path -->|other /cdp/* or raw services| blocked[404 not allowlisted]
+```
 
 On a live cluster that notebook path is what produces the Spark History, Data Catalog, and operator activity evidence below: `spark_submit_batch` writes `{user}.count_to_10` as the Knox subject, then Hive MCP selects it.
 

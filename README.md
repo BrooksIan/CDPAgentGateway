@@ -1,5 +1,13 @@
 # Cloudera Blueprint: CDP Agent Gateway
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](pyproject.toml)
+[![Stars](https://img.shields.io/github/stars/BrooksIan/CDPAgentGateway?logo=github)](https://github.com/BrooksIan/CDPAgentGateway/stargazers)
+[![Forks](https://img.shields.io/github/forks/BrooksIan/CDPAgentGateway?logo=github)](https://github.com/BrooksIan/CDPAgentGateway/network/members)
+[![Watchers](https://img.shields.io/github/watchers/BrooksIan/CDPAgentGateway?logo=github)](https://github.com/BrooksIan/CDPAgentGateway/watchers)
+
+![CDP Agent Gateway catalog cover](assets/AMP_thumbnail.jpg)
+
 **Agent governance** for [Cloudera Data Platform](https://www.cloudera.com/). Third-party agents present [Apache Knox](https://knox.apache.org/) JWTs at a north-south gateway. They never talk to Livy, HiveServer2, Impala, Ozone, or NiFi hostnames. Ranger stays authorization. Catalog fields live in [`METADATA.yaml`](METADATA.yaml).
 
 This repo follows the [Cloudera Blueprints Standard](https://github.com/kevinbtalbert/Cloudera-Blueprints-Standard). After reading this page you should know what the blueprint does, who it is for, and how to run the local demo.
@@ -21,8 +29,6 @@ This repo follows the [Cloudera Blueprints Standard](https://github.com/kevinbta
 - [License](#license)
 
 ## Overview
-
-![CDP Agent Gateway catalog cover](assets/AMP_thumbnail.jpg)
 
 CDP Agent Gateway is **agent governance** for Cloudera Data Platform. Cursor, Claude, and other MCP hosts can run Spark, Hive, and Impala without learning cluster topology and without a parallel credential path. Apache APISIX terminates agent HTTP, validates Knox-issued RS256 JWTs, and forwards the same bearer into Knox `cdp-proxy-token` **Livy for Spark 3**. Agents use MCP at `/mcp/spark`. Operators can `GET` Livy for tests and stage job files with **WebHDFS** (`/cdp/webhdfs*`). Knox Trusted Proxy and Apache Ranger remain the authorization source of truth. Operator quotas, burst caps, and audit join record which agent product and which Knox user called which tool.
 

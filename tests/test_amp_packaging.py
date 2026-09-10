@@ -42,11 +42,11 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert "0_session-install-dependencies/install_dependencies.py" in scripts
     assert "1_job-fetch-jwks/fetch_jwks.py" in scripts
     assert "2_job-smoke-knox/smoke_knox.py" in scripts
-    assert "3_app-mcp-spark/app.py" in scripts
-    assert "5_app-mcp-hive/app.py" in scripts
-    assert "6_app-mcp-impala/app.py" in scripts
-    assert "7_app-agent-gateway/app.py" in scripts
-    assert "4_app-operator-admin/app.py" in scripts
+    assert "3_app-mcp-spark/mcp_spark_app.py" in scripts
+    assert "5_app-mcp-hive/mcp_hive_app.py" in scripts
+    assert "6_app-mcp-impala/mcp_impala_app.py" in scripts
+    assert "7_app-agent-gateway/agent_gateway_app.py" in scripts
+    assert "4_app-operator-admin/operator_admin_app.py" in scripts
 
     kernels = {runtime["kernel"] for runtime in amp["runtimes"]}
     editors = {runtime["editor"] for runtime in amp["runtimes"]}
@@ -68,6 +68,7 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
         assert "Python 3.11" in task_kernels
         assert "Python 3.12" in task_kernels
         assert "JupyterLab" in task_editors
+        assert task["runtimes"] == amp["runtimes"], task.get("entity_label")
     install = next(task for task in amp["tasks"] if task.get("script") == "0_session-install-dependencies/install_dependencies.py")
     assert install["type"] == "run_session"
     assert install["entity_label"] == "install_deps"
@@ -166,14 +167,74 @@ def test_amp_layout_and_catalog_exist() -> None:
         ROOT / "0_session-install-dependencies" / "install_dependencies.py",
         ROOT / "1_job-fetch-jwks" / "fetch_jwks.py",
         ROOT / "2_job-smoke-knox" / "smoke_knox.py",
-        ROOT / "3_app-mcp-spark" / "app.py",
-        ROOT / "4_app-operator-admin" / "app.py",
-        ROOT / "5_app-mcp-hive" / "app.py",
-        ROOT / "6_app-mcp-impala" / "app.py",
-        ROOT / "7_app-agent-gateway" / "app.py",
+        ROOT / "3_app-mcp-spark" / "mcp_spark_app.py",
+        ROOT / "4_app-operator-admin" / "operator_admin_app.py",
+        ROOT / "5_app-mcp-hive" / "mcp_hive_app.py",
+        ROOT / "6_app-mcp-impala" / "mcp_impala_app.py",
+        ROOT / "7_app-agent-gateway" / "agent_gateway_app.py",
         ROOT / "src" / "agentgateway" / "knox_jwt.py",
         ROOT / "src" / "agentgateway" / "amp.py",
         ROOT / "src" / "agentgateway" / "amp_apisix.py",
         ROOT / "src" / "agentgateway" / "cml_boot.py",
     ):
         assert path.is_file(), path
+
+
+AMP_ENTRYPOINTS = [
+    "3_app-mcp-spark/mcp_spark_app.py",
+    "4_app-operator-admin/operator_admin_app.py",
+    "5_app-mcp-hive/mcp_hive_app.py",
+    "6_app-mcp-impala/mcp_impala_app.py",
+    "7_app-agent-gateway/agent_gateway_app.py",
+]
+
+
+def _code_lines(source: str) -> list[str]:
+    """Drop comments. The prelude carries a '# ... do not use __file__' warning."""
+    return [line for line in source.splitlines() if not line.lstrip().startswith("#")]
+
+
+def test_amp_entrypoint_preludes_are_identical() -> None:
+    preludes = {
+        (ROOT / relative).read_text().split("from agentgateway.cml_boot")[0]
+        for relative in AMP_ENTRYPOINTS
+    }
+    assert len(preludes) == 1, "the five CML entrypoint preludes have drifted apart"
+
+
+@pytest.mark.parametrize("relative", AMP_ENTRYPOINTS)
+def test_amp_entrypoint_boots_without_file_or_port(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, relative: str
+) -> None:
+    """Run the real CML entrypoint the way CML's IPython kernel does.
+
+    No __file__, no CDSW_APP_PORT, every adapter disabled, so it builds the app and
+    returns without binding a socket or needing Knox, a PEM, or impyla.
+    """
+    monkeypatch.chdir(ROOT)
+    monkeypatch.delenv("CDSW_APP_PORT", raising=False)
+    monkeypatch.delenv("AGENTGATEWAY_ROOT", raising=False)
+    monkeypatch.setenv("ENABLE_MCP_SPARK", "false")
+    monkeypatch.setenv("ENABLE_MCP_HIVE", "false")
+    monkeypatch.setenv("ENABLE_MCP_IMPALA", "false")
+    monkeypatch.setenv("ADMIN_BACKEND", "sqlite")
+    monkeypatch.setenv("ADMIN_DB", str(tmp_path / "gateway.sqlite"))
+
+    source = (ROOT / relative).read_text()
+    assert not any("__file__" in line for line in _code_lines(source)), relative
+
+    namespace: dict[str, object] = {"__name__": "amp_entrypoint_under_test"}
+    exec(compile(source, relative, "exec"), namespace)
+    if relative.startswith("7_"):
+        assert callable(namespace["serve_amp_apisix"])
+    else:
+        assert namespace["app"] is not None
+
+
+def test_amp_adapter_tables_agree() -> None:
+    from agentgateway import amp, cml_boot
+
+    assert set(cml_boot.AMP_EXTRAS) == set(amp._MCP_BUILDERS)
+    assert cml_boot.AMP_EXTRAS["spark"] == "amp"
+    assert cml_boot.AMP_EXTRAS["hive"] == "amp,hive"
+    assert cml_boot.AMP_EXTRAS["impala"] == "amp,hive"

@@ -84,3 +84,31 @@ def ensure_amp_extra(root: Path, extra: str = "amp") -> None:
             [sys.executable, "-m", "pip", "install", "--user", "-e", f"{root}[{extra}]"],
             cwd=root,
         )
+
+
+# impyla (the "hive" extra) drives BOTH the Hive and the Impala HS2 adapters. The
+# extra name is misleading; renaming it is out of scope for this change.
+AMP_EXTRAS: dict[str, str] = {"spark": "amp", "hive": "amp,hive", "impala": "amp,hive"}
+
+
+def boot_amp(extra: str = "amp") -> Path:
+    """Locate the project root, put src on sys.path, install the AMP extras if missing."""
+    root = project_root()
+    ensure_src_path(root)
+    ensure_amp_extra(root, extra=extra)
+    return root
+
+
+def mcp_adapter_app(adapter: str):
+    """CML entrypoint for one MCP adapter. Returns (app, service).
+
+    Stays in cml_boot, not amp, because `ensure_amp_extra` is what installs the
+    Starlette that `agentgateway.amp` imports at module scope.
+    """
+    key = (adapter or "").strip().lower()
+    if key not in AMP_EXTRAS:
+        raise KeyError(f"unknown MCP adapter {adapter!r}")
+    boot_amp(AMP_EXTRAS[key])
+    from agentgateway.amp import build_adapter_app
+
+    return build_adapter_app(key)

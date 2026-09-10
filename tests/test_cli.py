@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def run_gateway(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     src = str(ROOT / "src")
-    env["PYTHONPATH"] = src + ((":" + env["PYTHONPATH"]) if env.get("PYTHONPATH") else "")
+    env["PYTHONPATH"] = src + ((os.pathsep + env["PYTHONPATH"]) if env.get("PYTHONPATH") else "")
     return subprocess.run(
         [sys.executable, "-m", "agentgateway", *args],
         cwd=ROOT,
@@ -98,7 +98,7 @@ def test_config_writes_apisix_yaml() -> None:
 def test_mint_refused_when_gateway_mode_live() -> None:
     env = os.environ.copy()
     src = str(ROOT / "src")
-    env["PYTHONPATH"] = src + ((":" + env["PYTHONPATH"]) if env.get("PYTHONPATH") else "")
+    env["PYTHONPATH"] = src + ((os.pathsep + env["PYTHONPATH"]) if env.get("PYTHONPATH") else "")
     env["GATEWAY_MODE"] = "live"
     result = subprocess.run(
         [sys.executable, "-m", "agentgateway", "mcp", "--adapter", "hive", "--mint"],

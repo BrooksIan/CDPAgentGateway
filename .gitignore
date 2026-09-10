@@ -10,3 +10,4 @@ data/*.sqlite
 data/*.sqlite-*
 .DS_Store
 *.log
+.cursor/rules/

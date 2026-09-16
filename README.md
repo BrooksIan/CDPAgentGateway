@@ -2,6 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](pyproject.toml)
+[![Cloudera Blueprint](https://img.shields.io/badge/Cloudera-Blueprint-f96702.svg)](METADATA.yaml)
 [![Stars](https://img.shields.io/github/stars/BrooksIan/CDPAgentGateway?logo=github)](https://github.com/BrooksIan/CDPAgentGateway/stargazers)
 [![Forks](https://img.shields.io/github/forks/BrooksIan/CDPAgentGateway?logo=github)](https://github.com/BrooksIan/CDPAgentGateway/network/members)
 [![Watchers](https://img.shields.io/github/watchers/BrooksIan/CDPAgentGateway?logo=github)](https://github.com/BrooksIan/CDPAgentGateway/watchers)
@@ -288,7 +289,7 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 | Deployment | Minimum |
 | --- | --- |
 | Launchable / demo (local Docker) | 2 CPU, 4 GB RAM, 10 GB disk |
-| Optional AMP: Workbench Python 3.11 or greater: install session 1 CPU / 2 GB; each MCP app 1 CPU / 1 GB; APISIX app 1 CPU / 1.5 GB |
+| Optional AMP | Workbench Python 3.11 or greater: install session 1 CPU / 2 GB; each MCP app 1 CPU / 1 GB; APISIX app 1 CPU / 1.5 GB |
 | Production / enterprise (APISIX in front of Knox) | Size APISIX for agent QPS; CDP/Knox/Ranger sizing is unchanged. Plan extra RAM if MCP adapters and long Spark jobs share the same host |
 
 ## Documentation
@@ -314,5 +315,10 @@ Open `AgentGateway.code-workspace` in Cursor so project rules load with the repo
 ## License
 
 Copyright 2026 Cloudera, Inc.
+
+
+## Disclaimer
+
+*This blueprint is intended for Proof-of-Concept and research use only. It is not designed for production deployment. Use in production environments is at the user's own risk. The authors and contributors accept no liability for operational impacts or damages.*
 
 Licensed under the Apache License, Version 2.0. See [`LICENSE`](LICENSE).

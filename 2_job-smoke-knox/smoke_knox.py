@@ -15,6 +15,7 @@ import cml_path
 ROOT = cml_path.bootstrap()
 from agentgateway.cml_boot import run_amp_main
 from agentgateway.knox import parse_knox_proxy_url, trusted_jku
+from agentgateway.project_knox import apply_inventory_knox
 
 def _insecure() -> bool:
     return os.environ.get("UPSTREAM_TLS_VERIFY", "true").lower() in {"false", "0", "no"}
@@ -25,6 +26,7 @@ def _open(url: str, *, headers: dict[str, str] | None = None):
     return urllib.request.urlopen(request, context=context, timeout=20)
 
 def main() -> int:
+    apply_inventory_knox(ROOT)
     pem = Path(os.environ.get("KNOX_PUBLIC_KEY_FILE") or ROOT / "conf" / "generated" / "knox-public.pem")
     if not pem.is_file() or not pem.read_text().strip():
         print('{"event":"knox_smoke_skipped","reason":"missing_pem"}')

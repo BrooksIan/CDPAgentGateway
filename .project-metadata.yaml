@@ -11,8 +11,8 @@ date: "2026-09-10"
 
 environment_variables:
   KNOX_PROXY_URL:
-    default: "https://go01-obser-de-gateway.go01-dem.ylcu-atmi.cloudera.site:443/go01-obser-de/cdp-proxy-token/livy_for_spark3/"
-    description: "HTTPS Livy-for-Spark-3 URL on Knox cdp-proxy-token (include /livy_for_spark3/)."
+    default: "https://knox.invalid/gateway/cdp-proxy-token/livy_for_spark3/"
+    description: "HTTPS Livy-for-Spark-3 URL. Leave this placeholder to fill Project Settings from inventory/cdp.yaml when the project launches. Type a URL to override."
     required: true
   ENABLE_MCP_SPARK:
     default: "true"
@@ -27,8 +27,8 @@ environment_variables:
     description: "Enable Impala MCP (true/false). Default false. AMP still starts the app slot; agent-gateway only serves enabled adapters."
     required: false
   KNOX_JWKS_URL:
-    default: "https://go01-obser-de-gateway.go01-dem.ylcu-atmi.cloudera.site/go01-obser-de/homepage/knoxtoken/api/v2/jwks.json"
-    description: "Knox JWKS URL. Host must match KNOX_PROXY_URL."
+    default: ""
+    description: "Knox JWKS URL. Leave empty to fill from inventory/cdp.yaml at launch. Host must match KNOX_PROXY_URL when you set both."
     required: false
   KNOX_ISSUER:
     default: "KNOXSSO"
@@ -160,7 +160,7 @@ tasks:
   - type: run_job
     entity_label: fetch_jwks
     short_summary: Run Fetch pinned Knox JWKS.
-    long_summary: Pins JWKS using KNOX_PROXY_URL from the Configure Project form. Refuses a foreign jku host.
+    long_summary: Pins JWKS using KNOX_PROXY_URL. Launch copies inventory/cdp.yaml into project settings when the form still has the placeholder. Refuses a foreign jku host.
 
   - type: create_job
     name: Smoke-check Knox

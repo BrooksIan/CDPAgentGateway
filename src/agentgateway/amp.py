@@ -59,6 +59,9 @@ def amp_public_key_path() -> Path:
 
 
 def apply_live_upstream() -> dict[str, str]:
+    from agentgateway.project_knox import apply_inventory_knox
+
+    apply_inventory_knox()
     url = (os.environ.get("KNOX_PROXY_URL") or "").strip()
     if not url:
         raise ValueError("AMP requires KNOX_PROXY_URL (Knox Livy-for-Spark-3 HTTPS URL)")

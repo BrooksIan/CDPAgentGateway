@@ -12,11 +12,13 @@ import cml_path
 ROOT = cml_path.bootstrap()
 from agentgateway.cml_boot import run_amp_main
 from agentgateway.keys import fetch_pinned_knox_pubkey
+from agentgateway.project_knox import apply_inventory_knox
 
 def _insecure() -> bool:
     return os.environ.get("UPSTREAM_TLS_VERIFY", "true").lower() in {"false", "0", "no"}
 
 def main() -> int:
+    apply_inventory_knox(ROOT)
     proxy = (os.environ.get("KNOX_PROXY_URL") or "").strip()
     if not proxy:
         print('{"event":"jwks_pin_skipped","reason":"KNOX_PROXY_URL_unset"}')

@@ -22,6 +22,11 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     assert default.startswith("https://")
     assert "cdp-proxy-token" in default
     assert "livy_for_spark3" in default
+    assert "cloudera.site" not in default
+    from agentgateway.project_knox import KNOX_PROXY_PLACEHOLDER
+
+    assert default == KNOX_PROXY_PLACEHOLDER
+    assert not (env["KNOX_JWKS_URL"].get("default") or "").strip()
     assert "KNOX_TOKEN" not in env
     assert env["ENABLE_MCP_SPARK"]["default"] == "true"
     assert env["ENABLE_MCP_HIVE"]["default"] == "true"
@@ -102,6 +107,7 @@ def test_amp_metadata_is_optional_and_not_launchable() -> None:
     install_src = (ROOT / "0_session-install-dependencies" / "install_dependencies.py").read_text()
     assert "--user" in install_src
     assert '[amp]' in install_src
+    assert "configure_project_knox" in install_src
     assert "if __name__" not in install_src
     assert "require_python" in install_src
 

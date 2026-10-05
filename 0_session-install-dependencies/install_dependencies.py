@@ -14,6 +14,8 @@ ROOT = cml_path.bootstrap()
 from agentgateway.cml_boot import require_python
 require_python()
 subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "-e", f"{ROOT}[amp]"], cwd=str(ROOT))
+from agentgateway.project_knox import configure_project_knox
+configure_project_knox(ROOT)
 try:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "-e", f"{ROOT}[hive]"], cwd=str(ROOT))
 except subprocess.CalledProcessError as exc:

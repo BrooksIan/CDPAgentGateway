@@ -58,6 +58,41 @@ def amp_public_key_path() -> Path:
     return repo_root() / "conf" / "generated" / "knox-public.pem"
 
 
+def knox_livy_url() -> str:
+    """Livy base the Spark adapter calls. Host and path only; no bearer."""
+    scheme = (os.environ.get("UPSTREAM_SCHEME") or "https").rstrip(":/")
+    host = (os.environ.get("UPSTREAM_HOST") or "").strip()
+    port = (os.environ.get("UPSTREAM_PORT") or "").strip()
+    prefix = (os.environ.get("KNOX_PROXY_PREFIX") or "").rstrip("/")
+    if not host or not prefix:
+        return ""
+    origin = f"{scheme}://{host}"
+    if port and not ((scheme == "https" and port == "443") or (scheme == "http" and port == "80")):
+        origin = f"{origin}:{port}"
+    return f"{origin}{prefix}/livy_for_spark3"
+
+
+def spark_endpoint_urls() -> dict[str, str]:
+    """Public MCP URLs plus the Knox Livy URL, for application health pages."""
+    from agentgateway.knox import SPARK_MCP_PATH
+
+    urls: dict[str, str] = {}
+    domain = (os.environ.get("CDSW_DOMAIN") or "").strip().strip("/")
+    public = (os.environ.get("GATEWAY_PUBLIC_URL") or "").strip().rstrip("/")
+    if not public and domain:
+        public = f"https://cdp-ag.{domain}"
+    if not public:
+        public = (os.environ.get("GATEWAY_URL") or "").strip().rstrip("/")
+    if public:
+        urls["agent_url"] = f"{public}{SPARK_MCP_PATH}"
+    if domain:
+        urls["mcp_url"] = f"https://cdp-ag-spark.{domain}{SPARK_MCP_PATH}"
+    livy = knox_livy_url()
+    if livy:
+        urls["knox_livy_url"] = livy
+    return urls
+
+
 def apply_live_upstream() -> dict[str, str]:
     from agentgateway.project_knox import apply_inventory_knox
 
@@ -327,17 +362,37 @@ def build_mcp_app() -> Starlette:
     apply_live_upstream()
     ensure_amp_runtime_pem()
     mcp = _load_module("amp_mcp_spark_server", "mcp-spark", "mcp_spark_server.py")
+    endpoints = spark_endpoint_urls()
+    print(
+        json.dumps({"service": "mcp-spark", "event": "endpoints", "profile": "amp", **endpoints}),
+        flush=True,
+    )
+
+    def _with_urls(body: dict[str, Any]) -> dict[str, Any]:
+        merged = dict(body)
+        merged.update(endpoints)
+        return merged
+
+    async def health(_request: Request) -> JSONResponse:
+        upstream = await mcp.health(_request)
+        payload = json.loads(upstream.body.decode() or "{}")
+        if not isinstance(payload, dict):
+            payload = {"status": "ok", "service": "mcp-spark"}
+        payload["profile"] = "amp"
+        return JSONResponse(_with_urls(payload))
 
     async def root(request: Request) -> Response:
         if request.method == "GET":
-            return JSONResponse({"status": "ok", "service": "mcp-spark", "profile": "amp"})
+            return JSONResponse(
+                _with_urls({"status": "ok", "service": "mcp-spark", "profile": "amp"})
+            )
         return await mcp.mcp_endpoint(request)
 
     app = Starlette(
         routes=[
             *_prm_routes(),
-            Route("/health", mcp.health, methods=["GET", "HEAD"]),
-            Route("/healthcheck", mcp.health, methods=["GET", "HEAD"]),
+            Route("/health", health, methods=["GET", "HEAD"]),
+            Route("/healthcheck", health, methods=["GET", "HEAD"]),
             Route("/", root, methods=["GET", "HEAD", "POST"]),
             Route("/mcp", mcp.mcp_endpoint, methods=["GET", "POST"]),
             Route("/mcp/", mcp.mcp_endpoint, methods=["GET", "POST"]),

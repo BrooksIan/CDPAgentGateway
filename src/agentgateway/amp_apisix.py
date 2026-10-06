@@ -27,6 +27,7 @@ from agentgateway.amp import (
     amp_public_key_path,
     apply_live_upstream,
     cml_port,
+    spark_endpoint_urls,
     serve_cml_app,
     startup_error_app,
 )
@@ -308,18 +309,29 @@ def build_python_edge_app():
     endpoints = load_python_edge_mcp_endpoints(values)
     disabled = [name for name in ("spark", "hive", "impala") if not mcp_adapter_enabled(name, values)]
 
+    from agentgateway.knox import HIVE_MCP_PATH, IMPALA_MCP_PATH, SPARK_MCP_PATH
+
+    spark_urls = spark_endpoint_urls()
+    agent_base = spark_urls.get("agent_url", "").removesuffix(SPARK_MCP_PATH)
+    mcp_urls = {}
+    for name, path in (("spark", SPARK_MCP_PATH), ("hive", HIVE_MCP_PATH), ("impala", IMPALA_MCP_PATH)):
+        if name in endpoints and agent_base:
+            mcp_urls[name] = f"{agent_base}{path}"
+
     async def health(_request: Request) -> JSONResponse:
-        return JSONResponse(
-            {
-                "status": "ok",
-                "service": "agent-gateway",
-                "profile": "amp",
-                "engine": "python",
-                "mcp": "inprocess",
-                "adapters": sorted(endpoints),
-                "disabled": disabled,
-            }
-        )
+        body = {
+            "status": "ok",
+            "service": "agent-gateway",
+            "profile": "amp",
+            "engine": "python",
+            "mcp": "inprocess",
+            "adapters": sorted(endpoints),
+            "disabled": disabled,
+            "mcp_urls": mcp_urls,
+        }
+        if spark_urls.get("knox_livy_url"):
+            body["knox_livy_url"] = spark_urls["knox_livy_url"]
+        return JSONResponse(body)
 
     async def _proxy(request: Request, url: str) -> Response:
         body = await request.body()

@@ -116,6 +116,12 @@ def test_amp_mcp_tools_list(pem_file: Path, tmp_path: Path, monkeypatch: pytest.
     client = TestClient(build_mcp_app())
     public = client.get("/health")
     assert public.status_code == 200
+    assert public.json()["knox_livy_url"] == (
+        "https://knox.example.com/gateway/cdp-proxy-token/livy_for_spark3"
+    )
+    page = client.get("/")
+    assert page.status_code == 200
+    assert page.json()["knox_livy_url"] == public.json()["knox_livy_url"]
     prm = client.get("/.well-known/oauth-protected-resource")
     assert prm.status_code == 200
     assert prm.json()["bearer_methods_supported"] == ["header"]

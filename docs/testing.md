@@ -93,7 +93,7 @@ Python Knox JWT and CML packaging. Compose tests above stay the source of truth 
 | --- | --- | --- | --- |
 | AMP-01 | AMP metadata present; `launchable` false | `.project-metadata.yaml` tasks; install is `run_session`; `KNOX_PROXY_URL` required with non-empty `knox.invalid` placeholder (Configure Project form); launch copies `inventory/cdp.yaml` into project settings; `ENABLE_MCP_SPARK`/`HIVE` default `true`, `ENABLE_MCP_IMPALA` default `false`; `create_job`+`run_job` for JWKS and smoke; jobs before MCP apps; APISIX last; no `KNOX_TOKEN` project env; mcp-spark bypasses CML login; admin does not | `tests/test_amp_packaging.py`, `tests/test_project_knox.py` |
 | AMP-02 | Python knox-jwt fail-closed | `missing_token`, `invalid_alg`, `expired`, `invalid_issuer` | `tests/test_knox_jwt.py` |
-| AMP-03 | AMP MCP GET `/health` public; POST without JWT `401` | Valid token `tools/list`; no raw bearer in body | `tests/test_amp_mcp.py` |
+| AMP-03 | AMP MCP GET `/health` public; POST without JWT `401` | Valid token `tools/list`; no raw bearer in body; Spark `/` and `/health` include `knox_livy_url`; Python edge `/health` includes `mcp_urls.spark` | `tests/test_amp_mcp.py`, `tests/test_amp_apisix.py` |
 | AMP-04 | JWKS host pin on AMP fetch | Foreign `jku` host refused before download | `tests/test_knox_jwt.py` |
 | AMP-05 | Workbench import against live Knox | MCP `tools/list` through the CML app HTTPS URL; optional [`examples/agent/third_party_agent.ipynb`](../examples/agent/third_party_agent.ipynb) or LangGraph [`examples/agent/langgraph_agent.ipynb`](../examples/agent/langgraph_agent.ipynb); paste Knox JWT in the notebook (`getpass`). Do not put `KNOX_TOKEN` or model API keys in project env | Manual; record below without tokens |
 

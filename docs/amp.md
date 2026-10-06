@@ -64,10 +64,12 @@ Push this repo to GitHub, then **Redeploy** the AMP so the workbench re-imports 
 | Subdomain | CML login | Role |
 | --- | --- | --- |
 | **`cdp-ag`** | Bypassed | **Agent edge.** Docker APISIX when `docker` exists; otherwise Python (`engine: python`). `/mcp/spark`, `/mcp/hive`, `/mcp/impala`, `/cdp/livy_for_spark3*`, `/cdp/webhdfs*`. Knox JWT + optional `X-Agent-Key`. |
-| `cdp-ag-spark` | Bypassed (MCP hosts cannot send CML cookies) | MCP adapter upstream. Direct URL still works (Python JWT). Prefer `cdp-ag`. |
+| `cdp-ag-spark` | Bypassed (MCP hosts cannot send CML cookies) | MCP adapter upstream. Direct URL still works (Python JWT). Prefer `cdp-ag`. Open the app: `GET /` and `GET /health` show `agent_url`, `mcp_url`, and `knox_livy_url` (no bearer). |
 | `cdp-ag-hive` | Bypassed | POST JSON-RPC Hive (read-only). Knox JWT required. `/cdp/hive` is not this app. |
 | `cdp-ag-impala` | Bypassed | POST JSON-RPC Impala (read-only). Off unless `ENABLE_MCP_IMPALA=true`. Knox JWT required. `/cdp/impala` is not this app. CDW `HTTP code 401` after a valid JWT is warehouse trust, not APISIX. |
 | `cdp-ag-admin` | Required | Operator usage/quotas. Shares `data/gateway.sqlite`. Not an agent route. |
+
+Opening **Spark MCP** shows the URL agents should call (`agent_url`, `https://cdp-ag.<workspace>/mcp/spark`) and the Knox Livy URL that adapter uses (`knox_livy_url`). The Python **Agent gateway** health page lists `mcp_urls` for each enabled adapter plus the same `knox_livy_url`. Docker APISIX on `cdp-ag` keeps a short `/health` body; use the Spark MCP application page for those fields.
 
 Quotas use sqlite on the project filesystem (`ADMIN_BACKEND=sqlite`). Compose still uses HTTP to the admin container and fails open if that container is down.
 

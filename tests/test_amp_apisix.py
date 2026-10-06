@@ -88,6 +88,10 @@ def test_python_edge_health_is_public(monkeypatch: pytest.MonkeyPatch) -> None:
     assert body["mcp"] == "inprocess"
     assert body["adapters"] == ["hive", "spark"]
     assert body["disabled"] == ["impala"]
+    assert body["mcp_urls"]["spark"] == "https://cdp-ag.ml.example.com/mcp/spark"
+    assert body["mcp_urls"]["hive"] == "https://cdp-ag.ml.example.com/mcp/hive"
+    assert "impala" not in body["mcp_urls"]
+    assert body["knox_livy_url"] == "https://knox.example.com/gateway/cdp-proxy-token/livy_for_spark3"
     denied = client.post("/mcp/spark", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     assert denied.status_code == 401
 

@@ -48,6 +48,53 @@ def test_mcp_base_url_amp(monkeypatch: pytest.MonkeyPatch) -> None:
     assert mcp_agent.mcp_base_url("hive") == "https://cdp-ag.ml.example.com/mcp/hive"
 
 
+def test_debug_endpoints_lists_agent_and_knox_urls(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CDSW_DOMAIN", "ml.example.com")
+    monkeypatch.delenv("MCP_SPARK_URL", raising=False)
+    monkeypatch.delenv("GATEWAY_PUBLIC_URL", raising=False)
+    monkeypatch.setenv(
+        "KNOX_PROXY_URL",
+        "https://knox.example.com/env/cdp-proxy-token/livy_for_spark3/",
+    )
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"location": ""}
+        text = ""
+
+        def json(self) -> dict:
+            return {
+                "status": "ok",
+                "knox_livy_url": "https://knox.example.com/env/cdp-proxy-token/livy_for_spark3",
+                "mcp_urls": {"spark": "https://cdp-ag.ml.example.com/mcp/spark"},
+            }
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+        def get(self, url: str):
+            assert url == "https://cdp-ag.ml.example.com/health"
+            return FakeResponse()
+
+    monkeypatch.setattr(mcp_agent.httpx, "Client", FakeClient)
+    info = mcp_agent.debug_endpoints()
+    assert info["agent_url"] == "https://cdp-ag.ml.example.com/mcp/spark"
+    assert info["agent_url_source"] == "CDSW_DOMAIN"
+    assert info["mcp_url"] == "https://cdp-ag-spark.ml.example.com/mcp/spark"
+    assert info["knox_livy_url"].endswith("/env/cdp-proxy-token/livy_for_spark3")
+    assert info["application_health"] == "200"
+    assert info["application_knox_livy_url"].endswith("/livy_for_spark3")
+    assert info["application_agent_url"] == "https://cdp-ag.ml.example.com/mcp/spark"
+    assert "eyJ" not in json.dumps(info)
+
+
 def test_agent_headers_compose_includes_caller_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CDSW_DOMAIN", raising=False)
     monkeypatch.setenv("KNOX_TOKEN", "test-token")
@@ -310,6 +357,7 @@ def test_notebook_runs_spark_to_hive_example() -> None:
     assert "poll_spark_batch" in source
     assert "load_knox_token" in source
     assert "knox_token_status" in source
+    assert "print_debug_endpoints" in source
     assert "getpass" in source or "Knox JWT" in source
     assert "langgraph_agent.ipynb" in source
     assert "print(token)" not in source
@@ -440,6 +488,7 @@ def test_langgraph_notebook_present() -> None:
     assert "invoke_agent" in source
     assert "load_knox_token" in source
     assert "knox_token_status" in source
+    assert "print_debug_endpoints" in source
     assert "getpass" in source or "Knox JWT" in source
     assert "install_langgraph_deps" in source
     assert "show_model_form" in source

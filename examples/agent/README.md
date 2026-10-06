@@ -31,7 +31,7 @@ Use this identity and trust-boundary diagram for auth and governance context:
 | Compose | `http://127.0.0.1:9080/mcp/spark` |
 | AMP | `https://cdp-ag.<CDSW_DOMAIN>/mcp/spark` (APISIX; preferred) |
 
-Override with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if your workspace uses a different hostname pattern.
+Override with `MCP_SPARK_URL`, `MCP_HIVE_URL`, or `MCP_IMPALA_URL` if your workspace uses a different hostname pattern. The first cell prints `agent_url`, `mcp_url`, and `knox_livy_url` from this session, then probes `GET /health` and prints the same fields from the running application (and the redirect host when that probe returns 302).
 
 ## Run
 

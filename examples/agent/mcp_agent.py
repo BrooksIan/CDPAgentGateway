@@ -14,7 +14,7 @@ import time
 from getpass import getpass
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -170,6 +170,51 @@ def profile() -> str:
     if os.environ.get("CDSW_DOMAIN") or os.environ.get("CDSW_PROJECT"):
         return "amp"
     return "compose"
+
+
+def _url_source(adapter: str) -> str:
+    key = (adapter or "spark").strip().lower()
+    env_key = f"MCP_{key.upper()}_URL"
+    if (os.environ.get(env_key) or os.environ.get(f"AGENT_{env_key}") or "").strip():
+        return env_key
+    if (os.environ.get("CDSW_DOMAIN") or "").strip():
+        if (os.environ.get("GATEWAY_PUBLIC_URL") or "").strip():
+            return "GATEWAY_PUBLIC_URL"
+        return "CDSW_DOMAIN"
+    if (os.environ.get("GATEWAY_URL") or "").strip():
+        return "GATEWAY_URL"
+    return "default"
+
+
+def _direct_mcp_url(adapter: str) -> str:
+    key = (adapter or "spark").strip().lower()
+    domain = (os.environ.get("CDSW_DOMAIN") or "").strip().strip("/")
+    if key not in _AMP_SUBDOMAINS or not domain:
+        return ""
+    return f"https://{_AMP_SUBDOMAINS[key]}.{domain}{_ADAPTERS[key]}"
+
+
+def knox_livy_from_env() -> str:
+    """Knox Livy base from this session's project env. Empty when it is still unset."""
+    proxy = (os.environ.get("KNOX_PROXY_URL") or "").strip()
+    parsed: dict[str, str] = {}
+    if proxy and "knox.invalid" not in proxy:
+        try:
+            from agentgateway.knox import parse_knox_proxy_url
+
+            parsed = parse_knox_proxy_url(proxy)
+        except Exception:
+            parsed = {}
+    scheme = (parsed.get("UPSTREAM_SCHEME") or os.environ.get("UPSTREAM_SCHEME") or "https").rstrip(":/")
+    host = (parsed.get("UPSTREAM_HOST") or os.environ.get("UPSTREAM_HOST") or "").strip()
+    port = (parsed.get("UPSTREAM_PORT") or os.environ.get("UPSTREAM_PORT") or "").strip()
+    prefix = (parsed.get("KNOX_PROXY_PREFIX") or os.environ.get("KNOX_PROXY_PREFIX") or "").rstrip("/")
+    if not host or not prefix:
+        return ""
+    origin = f"{scheme}://{host}"
+    if port and not ((scheme == "https" and port == "443") or (scheme == "http" and port == "80")):
+        origin = f"{origin}:{port}"
+    return f"{origin}{prefix}/livy_for_spark3"
 
 
 def mcp_base_url(adapter: str = "spark") -> str:
@@ -425,6 +470,75 @@ def poll_spark_batch(
             return last
         time.sleep(max(step, 1.0))
     raise TimeoutError(f"batch {batch_id} still {last.get('state')!r} after {wait}s")
+
+
+def debug_endpoints(*, probe: bool = True) -> dict[str, Any]:
+    """URLs this notebook will call, plus what the running application reports.
+
+    Does not include the Knox bearer. A redirect on GET /health is recorded as
+    application_redirect (host only).
+    """
+    info: dict[str, Any] = {
+        "profile": profile(),
+        "agent_url": mcp_base_url("spark"),
+        "agent_url_source": _url_source("spark"),
+        "hive_url": mcp_base_url("hive"),
+        "impala_url": mcp_base_url("impala"),
+        "mcp_url": _direct_mcp_url("spark"),
+        "knox_livy_url": knox_livy_from_env(),
+    }
+    if probe:
+        info.update(_probe_application())
+    return info
+
+
+def print_debug_endpoints() -> dict[str, Any]:
+    """Print the active agent, direct MCP, and Knox Livy URLs. Safe to re-run."""
+    info = debug_endpoints()
+    print("profile:", info["profile"])
+    print("agent_url:", info["agent_url"], f"({info['agent_url_source']})")
+    print("mcp_url:", info["mcp_url"] or "(same as agent_url)")
+    print("hive url:", info["hive_url"])
+    print("impala url:", info["impala_url"])
+    print("knox_livy_url:", info["knox_livy_url"] or "(unset)")
+    print("application health:", info.get("application_health") or "(not probed)")
+    if info.get("application_redirect"):
+        print("application redirect:", info["application_redirect"])
+    for key in ("application_agent_url", "application_mcp_url", "application_knox_livy_url"):
+        if info.get(key):
+            print(f"{key}:", info[key])
+    return info
+
+
+def _probe_application() -> dict[str, Any]:
+    base = mcp_base_url("spark").rsplit("/mcp/", 1)[0]
+    health_url = urljoin(base + "/", "health")
+    try:
+        with httpx.Client(timeout=10.0, verify=_tls_verify(), follow_redirects=False) as client:
+            response = client.get(health_url)
+    except Exception as exc:
+        return {"application_health": type(exc).__name__}
+    found: dict[str, Any] = {"application_health": str(response.status_code)}
+    location = (response.headers.get("location") or "").strip()
+    if location:
+        found["application_redirect"] = urlparse(location).hostname or location[:160]
+    if response.status_code != 200:
+        return found
+    try:
+        body = response.json()
+    except Exception:
+        return found
+    if not isinstance(body, dict):
+        return found
+    for key in ("agent_url", "mcp_url", "knox_livy_url"):
+        value = body.get(key)
+        if isinstance(value, str) and value.strip():
+            found[f"application_{key}"] = value.strip()
+    mcp_urls = body.get("mcp_urls")
+    spark = mcp_urls.get("spark") if isinstance(mcp_urls, dict) else ""
+    if isinstance(spark, str) and spark.strip():
+        found["application_agent_url"] = spark.strip()
+    return found
 
 
 def health(adapter: str = "spark") -> dict[str, Any]:
